@@ -11,6 +11,7 @@ export default function Home() {
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [service, setService] = useState('Corte Tradicional')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const [availableTimes, setAvailableTimes] = useState<string[]>([])
 
@@ -116,39 +117,45 @@ export default function Home() {
       {/* NAVBAR */}
       <header className="fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-black/70 border-b border-zinc-800">
 
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-8 py-5">
+  <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-5">
 
-          <h1 className="text-2xl font-bold tracking-wide text-white">
-            PRIME BARBER
-          </h1>
+    <h1 className="text-2xl font-bold text-white">
+      PRIME BARBER
+    </h1>
 
-          <nav className="flex gap-6 text-sm text-zinc-300">
+    {/* BOTÃO MOBILE */}
+    <button
+      className="md:hidden text-white text-2xl"
+      onClick={() => setMenuOpen(!menuOpen)}
+    >
+      ☰
+    </button>
 
-            <a href="#inicio" className="hover:text-yellow-500 transition">
-              Início
-            </a>
+    {/* MENU DESKTOP */}
+    <nav className="hidden md:flex gap-6 text-sm text-zinc-300">
+      <a href="#inicio" className="hover:text-yellow-500">Início</a>
+      <a href="#servicos" className="hover:text-yellow-500">Serviços</a>
+      <a href="#equipe" className="hover:text-yellow-500">Equipe</a>
+      <a href="#agendar" className="hover:text-yellow-500">Agendar</a>
+      <a href="#contato" className="hover:text-yellow-500">Contato</a>
+    </nav>
 
-            <a href="#servicos" className="hover:text-yellow-500 transition">
-              Serviços
-            </a>
+  </div>
 
-            <a href="#equipe" className="hover:text-yellow-500 transition">
-              Equipe
-            </a>
+  {/* MENU MOBILE */}
+  {menuOpen && (
+    <div className="md:hidden bg-black border-t border-zinc-800 px-6 py-4 flex flex-col gap-4 text-zinc-300">
 
-            <a href="#agendar" className="hover:text-yellow-500 transition">
-              Agendar
-            </a>
+      <a href="#inicio" onClick={() => setMenuOpen(false)}>Início</a>
+      <a href="#servicos" onClick={() => setMenuOpen(false)}>Serviços</a>
+      <a href="#equipe" onClick={() => setMenuOpen(false)}>Equipe</a>
+      <a href="#agendar" onClick={() => setMenuOpen(false)}>Agendar</a>
+      <a href="#contato" onClick={() => setMenuOpen(false)}>Contato</a>
 
-            <a href="#contato" className="hover:text-yellow-500 transition">
-              Contato
-            </a>
+    </div>
+  )}
 
-          </nav>
-
-        </div>
-
-      </header>
+</header>
 
       {/* HERO */}
       <section
