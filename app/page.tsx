@@ -1,620 +1,1544 @@
 'use client'
 
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
+import { useEffect } from 'react'
+import Link from 'next/link'
+
+const features = [
+  {
+    icon: '📅',
+    number: '01',
+    name: 'Agendamentos',
+    description:
+      'Agenda online 24h, confirmação automática por WhatsApp, controle de fila de espera e histórico completo do cliente.',
+    badge: 'Online & Presencial',
+  },
+  {
+    icon: '💰',
+    number: '02',
+    name: 'Financeiro',
+    description:
+      'Controle de caixa, entradas e saídas, relatórios detalhados e fechamento diário/mensal com gráficos em tempo real.',
+    badge: 'Relatórios Automáticos',
+  },
+  {
+    icon: '📊',
+    number: '03',
+    name: 'Dashboard',
+    description:
+      'Visão geral do negócio com indicadores de desempenho, ranking de barbeiros, ticket médio e muito mais.',
+    badge: 'Tempo Real',
+  },
+  {
+    icon: '✂️',
+    number: '04',
+    name: 'Serviços',
+    description:
+      'Cadastro ilimitado de serviços com preços, duração e fotos. Pacotes personalizados e promoções com regras flexíveis.',
+    badge: 'Ilimitado',
+  },
+  {
+    icon: '🏆',
+    number: '05',
+    name: 'Comissões',
+    description:
+      'Configure comissões por barbeiro, por serviço ou por meta. Cálculo automático com extrato individual e transparência total.',
+    badge: 'Flexível',
+  },
+  {
+    icon: '👑',
+    number: '06',
+    name: 'Assinaturas',
+    description:
+      'Planos mensais para seus clientes, cobrança recorrente automática e controle de benefícios por nível de assinatura.',
+    badge: 'Recorrência',
+  },
+]
+
+const steps = [
+  ['Crie sua conta', 'Cadastro em menos de 2 minutos. Sem cartão de crédito para o período de teste.'],
+  ['Configure sua barbearia', 'Adicione barbeiros, serviços, horários e valores. Nosso setup guiado facilita tudo.'],
+  ['Compartilhe o link', 'Seus clientes agendam pelo link personalizado da sua barbearia no Instagram ou WhatsApp.'],
+  ['Acompanhe tudo', 'Dashboard em tempo real com todos os indicadores que você precisa para tomar decisões.'],
+]
+
+const plans = [
+  {
+    name: 'Basic',
+    price: '39',
+    features: [
+      ['Agendamentos online', true],
+      ['1 barbeiro', true],
+      ['Controle financeiro', true],
+      ['Dashboard básico', true],
+      ['Lembrete via WhatsApp', false],
+      ['Comissões automáticas', false],
+      ['Assinaturas de clientes', false],
+      ['Relatórios avançados', false],
+    ],
+  },
+  {
+    name: 'Pro',
+    price: '69',
+    featured: true,
+    features: [
+      ['Agendamentos online', true],
+      ['Barbeiros ilimitados', true],
+      ['Controle financeiro', true],
+      ['Dashboard completo', true],
+      ['Comissões automáticas', true],
+      ['Lembrete via WhatsApp', true],
+      ['Assinaturas de clientes', true],
+      ['Relatórios avançados', false],
+    ],
+  },
+  {
+    name: 'Premium',
+    price: '139',
+    features: [
+      ['Agendamentos online', true],
+      ['Barbeiros ilimitados', true],
+      ['Controle financeiro', true],
+      ['Dashboard completo', true],
+      ['Comissões automáticas', true],
+      ['Lembrete via WhatsApp', true],
+      ['Assinaturas de clientes', true],
+      ['Relatórios avançados', true],
+    ],
+  },
+]
+
+const testimonials = [
+  {
+    initials: 'RF',
+    name: 'Rafael Fonseca',
+    role: 'Dono · Barbearia RF, SP',
+    text: 'Antes eu controlava tudo no caderninho. Hoje tenho o faturamento, comissões e agendamentos na palma da mão. Aumentei meu faturamento 40% em 3 meses.',
+  },
+  {
+    initials: 'MC',
+    name: 'Marcos Carvalho',
+    role: 'Dono · The Barber Club, RJ',
+    text: 'O sistema de assinaturas foi um divisor de águas. Hoje tenho uma renda previsível todo mês e meus clientes VIP adoram os benefícios exclusivos.',
+  },
+  {
+    initials: 'LB',
+    name: 'Lucas Barbosa',
+    role: 'Dono · Studio LB, BH',
+    text: 'Meus barbeiros amam o controle de comissões. Tudo transparente, sem discussão no final do mês. O suporte é incrível, respondem na hora.',
+  },
+]
 
 export default function Home() {
-
-  const [clientName, setClientName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
-  const [service, setService] = useState('Corte Tradicional')
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  const [availableTimes, setAvailableTimes] = useState<string[]>([])
-
-  const services = [
-    {
-      name: 'Corte Tradicional',
-      price: 40
-    },
-    {
-      name: 'Barba Completa',
-      price: 35
-    },
-    {
-      name: 'Corte + Barba',
-      price: 70
-    }
-  ]
-
-  async function handleAppointment() {
-
-    if (!clientName || !phone || !date || !time || !service) {
-      alert('Preencha todos os campos')
-      return
-    }
-
-    const selectedService = services.find(
-      (item) => item.name === service
+  useEffect(() => {
+    const reveals = document.querySelectorAll('.reveal')
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.1 },
     )
 
-    const { error } = await supabase
-      .from('appointments')
-      .insert([
-        {
-          client_name: clientName,
-          phone: phone,
-          service: selectedService?.name,
-          price: selectedService?.price,
-          barber: 'Rafael',
-          appointment_date: date,
-          appointment_time: time,
-          status: 'scheduled'
-        }
-      ])
-
-    if (error) {
-
-      if (error.code === '23505') {
-        alert('Horário já está ocupado')
-        return
-      }
-
-      console.log(error)
-      alert('Erro ao agendar')
-      return
-    }
-
-    alert('Agendamento realizado com sucesso!')
-
-    setClientName('')
-    setPhone('')
-    setDate('')
-    setTime('')
-    setService('Corte Tradicional')
-  }
-
-  async function fetchAvailableTimes(selectedDate: string) {
-
-    const { data, error } = await supabase
-      .from('appointments')
-      .select('appointment_time')
-      .eq('appointment_date', selectedDate)
-
-    if (error) {
-      console.log(error)
-      return
-    }
-
-    const booked = data.map(
-      (item) => item.appointment_time
-    )
-
-    const allTimes = [
-      '09:00',
-      '10:00',
-      '11:00',
-      '12:00',
-      '14:00',
-      '15:00',
-      '16:00',
-      '17:00'
-    ]
-
-    const available = allTimes.filter(
-      (t) => !booked.includes(t)
-    )
-
-    setAvailableTimes(available)
-  }
+    reveals.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
 
   return (
-    <main className="bg-black text-white min-h-screen">
+    <main className="nex-page">
+      <style>{`
+        .nex-page {
+          --black: #0a0a0a;
+          --dark: #111111;
+          --card: #161616;
+          --border: #222222;
+          --gold: #c9a84c;
+          --gold-light: #e8c96b;
+          --gold-dim: rgba(201, 168, 76, 0.15);
+          --white: #f5f0e8;
+          --muted: #888;
+          min-height: 100vh;
+          overflow-x: hidden;
+          background: var(--black);
+          color: var(--white);
+          font-family: "DM Sans", "Segoe UI", Arial, sans-serif;
+          font-weight: 300;
+        }
 
-      {/* NAVBAR */}
-      <header className="fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-black/70 border-b border-zinc-800">
+        .nex-page *,
+        .nex-page *::before,
+        .nex-page *::after {
+          box-sizing: border-box;
+        }
 
-  <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-5">
+        .nex-page::before {
+          content: "";
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          pointer-events: none;
+          opacity: 0.4;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+        }
 
-    <h1 className="text-2xl font-bold text-white">
-      PRIME BARBER
-    </h1>
+        .nex-nav {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 60px;
+          background: rgba(10, 10, 10, 0.85);
+          border-bottom: 1px solid var(--border);
+          backdrop-filter: blur(20px);
+        }
 
-    {/* BOTÃO MOBILE */}
-    <button
-      className="md:hidden text-white text-2xl"
-      onClick={() => setMenuOpen(!menuOpen)}
-    >
-      ☰
-    </button>
+        .nav-logo,
+        .footer-logo,
+        .hero h1,
+        .stat-number,
+        .section-title,
+        .feature-num,
+        .step-num,
+        .mock-card-val,
+        .plan-price,
+        .cta-title {
+          font-family: Impact, "Bebas Neue", "Arial Narrow", sans-serif;
+          font-weight: 400;
+          letter-spacing: 2px;
+        }
 
-    {/* MENU DESKTOP */}
-    <nav className="hidden md:flex gap-6 text-sm text-zinc-300">
-      <a href="#inicio" className="hover:text-yellow-500">Início</a>
-      <a href="#servicos" className="hover:text-yellow-500">Serviços</a>
-      <a href="#equipe" className="hover:text-yellow-500">Equipe</a>
-      <a href="#agendar" className="hover:text-yellow-500">Agendar</a>
-      <a href="#contato" className="hover:text-yellow-500">Contato</a>
-    </nav>
+        .nav-logo {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          color: var(--gold);
+          font-size: 28px;
+          letter-spacing: 4px;
+          text-decoration: none;
+        }
 
-  </div>
+        .nav-logo span,
+        .footer-logo span {
+          color: var(--white);
+        }
 
-  {/* MENU MOBILE */}
-  {menuOpen && (
-    <div className="md:hidden bg-black border-t border-zinc-800 px-6 py-4 flex flex-col gap-4 text-zinc-300">
+        .nav-links,
+        .footer-links {
+          display: flex;
+          gap: 40px;
+          list-style: none;
+        }
 
-      <a href="#inicio" onClick={() => setMenuOpen(false)}>Início</a>
-      <a href="#servicos" onClick={() => setMenuOpen(false)}>Serviços</a>
-      <a href="#equipe" onClick={() => setMenuOpen(false)}>Equipe</a>
-      <a href="#agendar" onClick={() => setMenuOpen(false)}>Agendar</a>
-      <a href="#contato" onClick={() => setMenuOpen(false)}>Contato</a>
+        .nav-links a,
+        .footer-links a {
+          color: var(--muted);
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 1px;
+          text-decoration: none;
+          text-transform: uppercase;
+          transition: color 0.3s;
+        }
 
-    </div>
-  )}
+        .nav-links a:hover,
+        .footer-links a:hover {
+          color: var(--gold);
+        }
 
-</header>
+        .nav-cta {
+          background: var(--gold);
+          color: var(--black);
+          padding: 10px 24px;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-decoration: none;
+          text-transform: uppercase;
+          transition: background 0.3s, transform 0.2s;
+        }
 
-      {/* HERO */}
-      <section
-        id="inicio"
-        className="relative flex flex-col items-center justify-center text-center px-6 min-h-screen overflow-hidden"
-      >
+        .nav-cta:hover {
+          background: var(--gold-light);
+          transform: translateY(-1px);
+        }
 
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1621605815971-fbc98d665033?q=80&w=1600&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
+        .hero {
+          position: relative;
+          display: flex;
+          min-height: 100vh;
+          align-items: center;
+          overflow: hidden;
+          padding: 0 60px;
+        }
 
-        <div className="relative z-10 max-w-5xl">
+        .hero-bg,
+        .hero-lines {
+          position: absolute;
+          inset: 0;
+        }
 
-          <span className="text-yellow-500 uppercase tracking-[0.3em] text-sm mb-4 block">
-            Barbearia Premium
-          </span>
+        .hero-bg {
+          background:
+            radial-gradient(ellipse 60% 60% at 70% 50%, rgba(201, 168, 76, 0.08) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 40% at 10% 80%, rgba(192, 57, 43, 0.06) 0%, transparent 60%);
+        }
 
-          <h2 className="text-5xl md:text-7xl font-bold leading-tight">
-            Estilo e presença em cada detalhe
-          </h2>
+        .hero-lines {
+          background-image:
+            linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+          background-size: 80px 80px;
+        }
 
-          <p className="text-zinc-300 mt-6 max-w-2xl mx-auto text-lg">
-            Atendimento profissional, agendamento online e experiência premium.
+        .hero-content {
+          position: relative;
+          z-index: 2;
+          max-width: 720px;
+        }
+
+
+        .hero-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 32px;
+          padding: 6px 14px;
+          border: 1px solid var(--gold);
+          color: var(--gold);
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          animation: fadeUp 0.8s ease both;
+        }
+
+        .hero-tag::before {
+          content: "";
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--gold);
+          animation: pulse 2s infinite;
+        }
+
+        .hero h1 {
+          color: var(--white);
+          font-size: clamp(72px, 10vw, 140px);
+          line-height: 0.9;
+          animation: fadeUp 0.8s 0.1s ease both;
+        }
+
+        .hero h1 .accent {
+          color: var(--gold);
+        }
+
+        .hero h1 .line2 {
+          display: block;
+          color: var(--muted);
+          font-size: 85%;
+        }
+
+        .hero-sub {
+          max-width: 480px;
+          margin: 28px 0 44px;
+          color: var(--muted);
+          font-size: 17px;
+          line-height: 1.7;
+          animation: fadeUp 0.8s 0.2s ease both;
+        }
+
+        .hero-actions,
+        .cta-actions {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .hero-actions {
+          animation: fadeUp 0.8s 0.3s ease both;
+        }
+
+        .btn-primary {
+          display: inline-block;
+          padding: 16px 36px;
+          clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+          background: var(--gold);
+          color: var(--black);
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: 2px;
+          text-decoration: none;
+          text-transform: uppercase;
+          transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+          background: var(--gold-light);
+          box-shadow: 0 12px 40px rgba(201, 168, 76, 0.3);
+          transform: translateY(-2px);
+        }
+
+        .btn-ghost {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--white);
+          font-size: 13px;
+          letter-spacing: 1px;
+          text-decoration: none;
+          transition: color 0.3s;
+        }
+
+        .btn-ghost:hover {
+          color: var(--gold);
+        }
+
+        .btn-ghost::before {
+          content: "▶";
+          font-size: 10px;
+        }
+
+        .hero-stats {
+          position: absolute;
+          right: 60px;
+          bottom: 80px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+          animation: fadeUp 0.8s 0.5s ease both;
+        }
+
+        .stat-item {
+          padding-right: 20px;
+          border-right: 2px solid var(--gold);
+          text-align: right;
+        }
+
+        .stat-number {
+          color: var(--gold);
+          font-size: 42px;
+          line-height: 1;
+        }
+
+        .stat-label {
+          color: var(--muted);
+          font-size: 11px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        }
+
+        .scroll-line {
+          position: absolute;
+          bottom: 0;
+          left: 60px;
+          width: 1px;
+          height: 80px;
+          background: linear-gradient(to bottom, transparent, var(--gold));
+          animation: fadeUp 1s 0.8s ease both;
+        }
+
+        .nex-section {
+          padding: 120px 60px;
+        }
+
+        .section-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+          color: var(--gold);
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 4px;
+          text-transform: uppercase;
+        }
+
+        .section-label::before {
+          content: "";
+          width: 32px;
+          height: 1px;
+          background: var(--gold);
+        }
+
+        .section-title {
+          margin-bottom: 20px;
+          font-size: clamp(42px, 6vw, 80px);
+          line-height: 1;
+        }
+
+        .section-desc {
+          max-width: 500px;
+          color: var(--muted);
+          font-size: 16px;
+          line-height: 1.8;
+        }
+
+        .features,
+        .pricing,
+        .cta-section {
+          background: var(--dark);
+        }
+
+        .features-header,
+        .testimonials-header,
+        .how-inner {
+          display: grid;
+          align-items: end;
+          gap: 60px;
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .features-header,
+        .testimonials-header {
+          margin-bottom: 70px;
+        }
+
+        .features-grid,
+        .pricing-grid,
+        .testimonials-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .features-grid,
+        .pricing-grid {
+          gap: 2px;
+        }
+
+        .feature-card,
+        .plan,
+        .testimonial,
+        .mockup-window {
+          border: 1px solid var(--border);
+          background: var(--card);
+        }
+
+        .feature-card {
+          position: relative;
+          overflow: hidden;
+          padding: 48px 36px;
+          transition: border-color 0.4s, transform 0.3s;
+        }
+
+        .feature-card::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, var(--gold-dim) 0%, transparent 60%);
+          opacity: 0;
+          transition: opacity 0.4s;
+        }
+
+        .feature-card:hover {
+          border-color: var(--gold);
+          transform: translateY(-4px);
+        }
+
+        .feature-card:hover::before {
+          opacity: 1;
+        }
+
+        .feature-icon {
+          display: block;
+          margin-bottom: 24px;
+          font-size: 32px;
+        }
+
+        .feature-num {
+          position: absolute;
+          top: 24px;
+          right: 24px;
+          color: rgba(255, 255, 255, 0.04);
+          font-size: 48px;
+          line-height: 1;
+        }
+
+        .feature-name,
+        .step-title,
+        .mock-header,
+        .plan-name,
+        .test-name {
+          font-weight: 700;
+        }
+
+        .feature-name {
+          position: relative;
+          margin-bottom: 12px;
+          color: var(--white);
+          font-size: 20px;
+        }
+
+        .feature-desc {
+          position: relative;
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.7;
+        }
+
+        .feature-badge {
+          position: relative;
+          display: inline-block;
+          margin-top: 20px;
+          padding: 3px 10px;
+          border: 1px solid var(--gold);
+          color: var(--gold);
+          font-size: 10px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        }
+
+        .how {
+          position: relative;
+          overflow: hidden;
+          background: var(--black);
+        }
+
+        .how::before {
+          content: "";
+          position: absolute;
+          top: -200px;
+          left: -200px;
+          width: 600px;
+          height: 600px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(201, 168, 76, 0.05) 0%, transparent 70%);
+        }
+
+        .how-inner {
+          align-items: center;
+          gap: 100px;
+        }
+
+        .steps {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .step {
+          display: flex;
+          gap: 24px;
+          padding: 32px 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .step:last-child {
+          border-bottom: 0;
+        }
+
+        .step:hover .step-num {
+          border-color: var(--gold);
+          color: var(--gold);
+        }
+
+        .step-num {
+          display: flex;
+          width: 52px;
+          height: 52px;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid var(--border);
+          color: var(--border);
+          font-size: 32px;
+          transition: all 0.3s;
+        }
+
+        .step-title {
+          margin-bottom: 8px;
+          font-size: 18px;
+        }
+
+        .step-text {
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.7;
+        }
+
+        .mockup-window {
+          overflow: hidden;
+          border-radius: 4px;
+          box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+        }
+
+        .mockup-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 14px 18px;
+          border-bottom: 1px solid var(--border);
+          background: #1a1a1a;
+        }
+
+        .dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+        }
+
+        .dot-r { background: #ff5f57; }
+        .dot-y { background: #febc2e; }
+        .dot-g { background: #28c840; }
+
+        .mockup-body {
+          padding: 28px;
+        }
+
+        .mock-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+          font-size: 18px;
+        }
+
+        .mock-badge {
+          padding: 4px 10px;
+          background: rgba(40, 200, 64, 0.15);
+          color: #28c840;
+          font-size: 11px;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+        }
+
+        .mock-cards {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        .mock-card {
+          padding: 16px;
+          border: 1px solid var(--border);
+          border-radius: 2px;
+          background: var(--dark);
+        }
+
+        .mock-dashboard-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+
+        .mock-dashboard-card {
+          min-height: 105px;
+          padding: 14px;
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 14px;
+          background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(8, 13, 24, 0.9));
+        }
+
+        .mock-dashboard-icon {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 9px;
+          background: rgba(201,168,76,0.14);
+          color: var(--gold);
+          font-size: 14px;
+          margin-bottom: 12px;
+        }
+
+        .mock-dashboard-label {
+          color: #64748b;
+          font-size: 9px;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+        }
+
+        .mock-dashboard-value {
+          margin-top: 5px;
+          color: #f8fafc;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .mock-dashboard-layout {
+          display: grid;
+          grid-template-columns: 1.6fr 0.8fr;
+          gap: 12px;
+        }
+
+        .mock-panel {
+          min-height: 150px;
+          padding: 16px;
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 14px;
+          background: rgba(15, 23, 42, 0.72);
+        }
+
+        .mock-bars {
+          height: 92px;
+          display: flex;
+          align-items: flex-end;
+          gap: 8px;
+          margin-top: 20px;
+        }
+
+        .mock-bars span {
+          flex: 1;
+          min-height: 10px;
+          border-radius: 8px 8px 0 0;
+          background: linear-gradient(to top, rgba(59,130,246,0.6), #3b82f6);
+        }
+
+        .mock-summary-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 10px 0;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          color: #94a3b8;
+          font-size: 12px;
+        }
+
+        .mock-card-label {
+          margin-bottom: 8px;
+          color: var(--muted);
+          font-size: 10px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        }
+
+        .mock-card-val {
+          color: var(--gold);
+          font-size: 28px;
+        }
+
+        .mock-chart {
+          display: flex;
+          height: 60px;
+          align-items: flex-end;
+          gap: 4px;
+          margin-top: 16px;
+        }
+
+        .bar {
+          flex: 1;
+          border-top: 2px solid var(--gold);
+          border-radius: 2px 2px 0 0;
+          background: var(--gold-dim);
+          transform-origin: bottom;
+          animation: barGrow 1.5s ease both;
+        }
+
+        .bar:nth-child(1) { height: 40%; animation-delay: 0.1s; }
+        .bar:nth-child(2) { height: 65%; animation-delay: 0.2s; }
+        .bar:nth-child(3) { height: 50%; animation-delay: 0.3s; }
+        .bar:nth-child(4) { height: 80%; animation-delay: 0.4s; }
+        .bar:nth-child(5) { height: 55%; animation-delay: 0.5s; }
+        .bar:nth-child(6) { height: 90%; background: var(--gold); animation-delay: 0.6s; }
+        .bar:nth-child(7) { height: 70%; animation-delay: 0.7s; }
+
+        .pricing-header,
+        .cta-section {
+          text-align: center;
+        }
+
+        .pricing-header {
+          margin-bottom: 70px;
+        }
+
+        .pricing-header .section-label,
+        .cta-section .section-label {
+          justify-content: center;
+        }
+
+        .pricing-header .section-label::before,
+        .cta-section .section-label::before {
+          display: none;
+        }
+
+        .pricing-grid {
+          max-width: 1000px;
+          margin: 0 auto;
+        }
+
+        .plan {
+          position: relative;
+          padding: 48px 36px;
+        }
+
+        .plan.featured {
+          border-color: var(--gold);
+          background: #141209;
+        }
+
+        .plan.featured::before {
+          content: "MAIS POPULAR";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          padding: 4px 16px;
+          background: var(--gold);
+          color: var(--black);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 2px;
+          transform: translateX(-50%);
+        }
+
+        .plan-name {
+          margin-bottom: 20px;
+          color: var(--muted);
+          font-size: 13px;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+        }
+
+        .plan.featured .plan-name {
+          color: var(--gold);
+        }
+
+        .plan-price {
+          margin-bottom: 4px;
+          color: var(--white);
+          font-size: 64px;
+          line-height: 1;
+        }
+
+        .plan-price span {
+          display: inline-block;
+          margin-top: 16px;
+          color: var(--muted);
+          font-size: 24px;
+          vertical-align: top;
+        }
+
+        .plan-period {
+          margin-bottom: 36px;
+          color: var(--muted);
+          font-size: 13px;
+        }
+
+        .plan-features {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 40px;
+          padding: 0;
+          list-style: none;
+        }
+
+        .plan-features li {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: var(--muted);
+          font-size: 14px;
+        }
+
+        .plan-features li.active {
+          color: var(--white);
+        }
+
+        .plan-features li::before {
+          content: "✓";
+          display: flex;
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--border);
+          color: var(--muted);
+          font-size: 12px;
+        }
+
+        .plan-features li.active::before {
+          border-color: var(--gold);
+          background: var(--gold-dim);
+          color: var(--gold);
+        }
+
+        .plan-btn {
+          display: block;
+          padding: 14px;
+          border: 1px solid var(--border);
+          color: var(--muted);
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 2px;
+          text-align: center;
+          text-decoration: none;
+          text-transform: uppercase;
+          transition: all 0.3s;
+        }
+
+        .plan-btn:hover {
+          border-color: var(--gold);
+          color: var(--gold);
+        }
+
+        .plan.featured .plan-btn {
+          border-color: var(--gold);
+          background: var(--gold);
+          color: var(--black);
+        }
+
+        .testimonials {
+          overflow: hidden;
+          background: var(--black);
+        }
+
+        .testimonials-grid {
+          gap: 20px;
+        }
+
+        .testimonial {
+          position: relative;
+          padding: 36px;
+        }
+
+        .testimonial::before {
+          content: '"';
+          position: absolute;
+          top: 10px;
+          right: 20px;
+          color: rgba(201, 168, 76, 0.2);
+          font-family: Impact, "Arial Narrow", sans-serif;
+          font-size: 80px;
+          line-height: 1;
+        }
+
+        .stars {
+          margin-bottom: 16px;
+          color: var(--gold);
+          font-size: 12px;
+          letter-spacing: 2px;
+        }
+
+        .test-text {
+          margin-bottom: 28px;
+          color: var(--muted);
+          font-size: 15px;
+          font-style: italic;
+          line-height: 1.8;
+        }
+
+        .test-author {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .test-avatar {
+          display: flex;
+          width: 44px;
+          height: 44px;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--gold);
+          border-radius: 50%;
+          background: var(--gold-dim);
+          color: var(--gold);
+          font-size: 18px;
+          font-weight: 700;
+        }
+
+        .test-role {
+          color: var(--muted);
+          font-size: 12px;
+        }
+
+        .cta-section {
+          position: relative;
+          overflow: hidden;
+          padding: 140px 60px;
+        }
+
+        .cta-section::before {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 800px;
+          height: 400px;
+          pointer-events: none;
+          background: radial-gradient(ellipse, rgba(201, 168, 76, 0.1) 0%, transparent 70%);
+          transform: translate(-50%, -50%);
+        }
+
+        .cta-title {
+          position: relative;
+          margin-bottom: 24px;
+          font-size: clamp(56px, 8vw, 110px);
+          line-height: 1;
+        }
+
+        .cta-title .gold {
+          color: var(--gold);
+        }
+
+        .cta-sub {
+          max-width: 480px;
+          margin: 0 auto 48px;
+          color: var(--muted);
+          font-size: 17px;
+          line-height: 1.7;
+        }
+
+        .cta-actions {
+          position: relative;
+          justify-content: center;
+        }
+
+        .cta-note {
+          margin-top: 20px;
+          color: var(--muted);
+          font-size: 12px;
+        }
+
+        .whatsapp-float {
+          position: fixed;
+          right: 32px;
+          bottom: 32px;
+          z-index: 200;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          text-decoration: none;
+          animation: fadeUp 1s 1s ease both;
+        }
+
+        .whatsapp-label {
+          padding: 8px 16px;
+          border: 1px solid #25d366;
+          background: var(--card);
+          color: var(--white);
+          font-size: 13px;
+          font-weight: 500;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateX(10px);
+          transition: all 0.3s;
+          white-space: nowrap;
+        }
+
+        .whatsapp-bubble {
+          position: relative;
+          display: flex;
+          width: 58px;
+          height: 58px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #25d366;
+          box-shadow: 0 8px 30px rgba(37, 211, 102, 0.4);
+          transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .whatsapp-bubble::before {
+          content: "";
+          position: absolute;
+          inset: -4px;
+          border: 2px solid rgba(37, 211, 102, 0.3);
+          border-radius: 50%;
+          animation: waPulse 2s infinite;
+        }
+
+        .whatsapp-float:hover .whatsapp-bubble {
+          box-shadow: 0 12px 40px rgba(37, 211, 102, 0.6);
+          transform: scale(1.1);
+        }
+
+        .whatsapp-float:hover .whatsapp-label {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .whatsapp-icon {
+          width: 28px;
+          height: 28px;
+          fill: white;
+        }
+
+        .nex-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 48px 60px;
+          border-top: 1px solid var(--border);
+          background: var(--black);
+        }
+
+        .footer-logo {
+          color: var(--gold);
+          font-size: 22px;
+          letter-spacing: 4px;
+        }
+
+        .footer-logo span {
+          color: rgba(255, 255, 255, 0.3);
+        }
+
+        .nex-footer p {
+          color: var(--muted);
+          font-size: 13px;
+        }
+
+        .footer-links {
+          gap: 28px;
+        }
+
+        .reveal {
+          opacity: 0;
+          transform: translateY(40px);
+          transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+
+        .reveal.visible {
+          opacity: 1;
+          transform: none;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes barGrow {
+          from { transform: scaleY(0); }
+          to { transform: scaleY(1); }
+        }
+
+        @keyframes waPulse {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.5); }
+        }
+
+        @media (max-width: 900px) {
+          .nex-nav {
+            padding: 16px 24px;
+          }
+
+          .nav-links {
+            display: none;
+          }
+
+          .nex-section {
+            padding: 80px 24px;
+          }
+
+          .hero {
+            min-height: 92vh;
+            padding: 96px 24px 56px;
+          }
+
+          .hero h1 {
+            font-size: 64px;
+          }
+
+          .hero-actions,
+          .cta-actions {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .btn-primary,
+          .btn-ghost {
+            justify-content: center;
+            text-align: center;
+          }
+
+          .hero-stats,
+          .scroll-line {
+            display: none;
+          }
+
+
+          .features-header,
+          .how-inner,
+          .testimonials-header,
+          .features-grid,
+          .pricing-grid,
+          .testimonials-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .features-header,
+          .how-inner,
+          .testimonials-header {
+            gap: 32px;
+          }
+
+          .mock-cards {
+            grid-template-columns: 1fr;
+          }
+
+          .mock-dashboard-grid,
+          .mock-dashboard-layout {
+            grid-template-columns: 1fr;
+          }
+
+          .nex-footer {
+            flex-direction: column;
+            gap: 20px;
+            padding: 40px 24px;
+            text-align: center;
+          }
+
+          .footer-links {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+
+          .whatsapp-float {
+            right: 20px;
+            bottom: 20px;
+          }
+
+          .whatsapp-label {
+            display: none;
+          }
+        }
+      `}</style>
+
+      <nav className="nex-nav" aria-label="Navegação principal">
+        <a className="nav-logo" href="#inicio">
+          Nex<span>Barber</span>
+        </a>
+        <ul className="nav-links">
+          <li><a href="#funcionalidades">Funcionalidades</a></li>
+          <li><a href="#como-funciona">Como funciona</a></li>
+          <li><a href="#planos">Planos</a></li>
+          <li><a href="#depoimentos">Depoimentos</a></li>
+        </ul>
+        <Link href="/pricing" className="nav-cta">Começar grátis</Link>
+      </nav>
+
+      <section className="hero" id="inicio">
+        <div className="hero-bg" />
+        <div className="hero-lines" />
+        <div className="hero-content">
+          <div className="hero-tag">Sistema SaaS para Barbearias</div>
+          <h1>
+            GERENCIE<br />
+            <span className="accent">SUA</span>
+            <span className="line2">BARBEARIA</span>
+          </h1>
+          <p className="hero-sub">
+            Do agendamento à comissão, do financeiro ao dashboard — tudo em um único sistema pensado para quem vive de navalha e tesoura.
           </p>
-
-          <div className="flex flex-col md:flex-row gap-4 justify-center mt-10">
-
-            <a
-              href="#agendar"
-              className="bg-yellow-500 text-black px-8 py-4 rounded-xl font-semibold hover:scale-105 transition"
-            >
-              Agendar Agora
-            </a>
-
-            <a
-              href="#servicos"
-              className="border border-zinc-700 px-8 py-4 rounded-xl hover:bg-zinc-900 transition"
-            >
-              Ver Serviços
-            </a>
-
+          <div className="hero-actions">
+            <Link href="/pricing" className="btn-primary">Testar 7 dias grátis</Link>
+            <a href="#como-funciona" className="btn-ghost">Ver como funciona</a>
           </div>
-
         </div>
-
+        <div className="hero-stats">
+          <div className="stat-item">
+            <div className="stat-number">3k+</div>
+            <div className="stat-label">Barbearias ativas</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">98%</div>
+            <div className="stat-label">Satisfação</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">2m+</div>
+            <div className="stat-label">Agendamentos</div>
+          </div>
+        </div>
+        <div className="scroll-line" />
       </section>
 
-      {/* SERVIÇOS */}
-      <section
-        id="servicos"
-        className="px-8 py-24 bg-zinc-950"
-      >
-
-        <div className="max-w-7xl mx-auto">
-
-          <div className="text-center mb-16">
-
-            <span className="text-yellow-500 uppercase tracking-[0.3em] text-sm">
-              Serviços
-            </span>
-
-            <h3 className="text-4xl font-bold mt-4">
-              Escolha sua experiência
-            </h3>
-
+      <section className="nex-section features" id="funcionalidades">
+        <div className="features-header reveal">
+          <div>
+            <div className="section-label">Funcionalidades</div>
+            <h2 className="section-title">TUDO QUE VOCÊ PRECISA</h2>
           </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="grid md:grid-cols-3 gap-8"
-          >
-
-            {services.map((item) => (
-
-              <div
-                key={item.name}
-                className="bg-zinc-900 p-8 rounded-3xl border border-zinc-800 hover:border-yellow-500 transition hover:-translate-y-1 duration-300 shadow-xl"
-              >
-
-                <h4 className="text-2xl font-bold mb-4">
-                  {item.name}
-                </h4>
-
-                <p className="text-zinc-400 mb-6">
-                  Atendimento premium e acabamento profissional.
-                </p>
-
-                <span className="text-yellow-500 text-3xl font-bold">
-                  R$ {item.price}
-                </span>
-
-              </div>
-
-            ))}
-
-          </motion.div>
-
-        </div>
-
-      </section>
-
-      {/* BARBEIROS */}
-      <section
-        id="equipe"
-        className="px-8 py-24 bg-black"
-      >
-
-        <div className="max-w-7xl mx-auto">
-
-          <div className="text-center mb-16">
-
-            <span className="text-yellow-500 uppercase tracking-[0.3em] text-sm">
-              Nossa Equipe
-            </span>
-
-            <h3 className="text-4xl font-bold mt-4">
-              Barbeiros Profissionais
-            </h3>
-
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-
-            {['Rafael', 'Lucas', 'Matheus'].map((barber) => (
-
-              <div
-                key={barber}
-                className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-yellow-500 transition"
-              >
-
-                <div className="h-80 bg-zinc-800"></div>
-
-                <div className="p-6">
-
-                  <h4 className="text-2xl font-bold">
-                    {barber}
-                  </h4>
-
-                  <p className="text-zinc-400 mt-2">
-                    Atendimento premium e experiência profissional.
-                  </p>
-
-                </div>
-
-              </div>
-
-            ))}
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* AVALIAÇÕES */}
-      <section className="px-8 py-24 bg-zinc-950">
-
-        <div className="max-w-7xl mx-auto">
-
-          <div className="text-center mb-16">
-
-            <span className="text-yellow-500 uppercase tracking-[0.3em] text-sm">
-              Avaliações
-            </span>
-
-            <h3 className="text-4xl font-bold mt-4">
-              O que nossos clientes dizem
-            </h3>
-
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-
-            {[
-              {
-                name: 'Carlos Henrique',
-                text: 'Melhor barbearia da cidade. Atendimento impecável e ambiente premium.'
-              },
-              {
-                name: 'Lucas Martins',
-                text: 'Sistema de agendamento muito prático e corte extremamente profissional.'
-              },
-              {
-                name: 'Fernando Alves',
-                text: 'Experiência premium do início ao fim. Recomendo sem dúvidas.'
-              }
-            ].map((review) => (
-
-              <div
-                key={review.name}
-                className="bg-zinc-900 p-8 rounded-3xl border border-zinc-800"
-              >
-
-                <p className="text-zinc-300 leading-relaxed">
-                  {review.text}
-                </p>
-
-                <div className="mt-6">
-
-                  <p className="font-bold">
-                    {review.name}
-                  </p>
-
-                  <p className="text-yellow-500">
-                    ★★★★★
-                  </p>
-
-                </div>
-
-              </div>
-
-            ))}
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* AGENDAMENTO */}
-      <section
-        id="agendar"
-        className="px-8 py-32 bg-yellow-500 text-black"
-      >
-
-        <div className="max-w-5xl mx-auto text-center">
-
-          <h3 className="text-5xl font-bold leading-tight">
-            Agende seu horário agora mesmo
-          </h3>
-
-          <p className="mt-6 text-xl max-w-2xl mx-auto">
-            Atendimento profissional, ambiente premium e praticidade para marcar online.
+          <p className="section-desc">
+            Seis módulos integrados para que você foque no que importa: o corte perfeito e o cliente satisfeito.
           </p>
+        </div>
+        <div className="features-grid">
+          {features.map((feature) => (
+            <article className="feature-card reveal" key={feature.number}>
+              <span className="feature-icon">{feature.icon}</span>
+              <div className="feature-num">{feature.number}</div>
+              <h3 className="feature-name">{feature.name}</h3>
+              <p className="feature-desc">{feature.description}</p>
+              <span className="feature-badge">{feature.badge}</span>
+            </article>
+          ))}
+        </div>
+      </section>
 
-          <div className="bg-white/10 backdrop-blur-lg p-8 rounded-3xl border border-white/10 max-w-xl mx-auto mt-12">
-
-            <div className="flex flex-col gap-4">
-
-              <input
-                type="text"
-                placeholder="Seu nome"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                className="px-4 py-4 rounded-xl bg-white text-black"
-              />
-
-              <input
-                type="text"
-                placeholder="Seu telefone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="px-4 py-4 rounded-xl bg-white text-black"
-              />
-
-              <select
-                value={service}
-                onChange={(e) => setService(e.target.value)}
-                className="px-4 py-4 rounded-xl bg-white text-black"
-              >
-
-                {services.map((item) => (
-
-                  <option
-                    key={item.name}
-                    value={item.name}
-                  >
-                    {item.name} — R$ {item.price}
-                  </option>
-
-                ))}
-
-              </select>
-
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => {
-
-                  const newDate = e.target.value
-
-                  setDate(newDate)
-                  setTime('')
-
-                  fetchAvailableTimes(newDate)
-                }}
-                className="px-4 py-4 rounded-xl bg-white text-black"
-              />
-
-              <div className="grid grid-cols-3 gap-2">
-
-                {availableTimes.map((t) => (
-
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTime(t)}
-                    className={`py-3 rounded-lg border transition ${
-                      time === t
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black hover:bg-zinc-200'
-                    }`}
-                  >
-                    {t}
-                  </button>
-
-                ))}
-
-              </div>
-
-              <button
-                onClick={handleAppointment}
-                className="bg-black text-white px-8 py-4 rounded-xl font-semibold hover:scale-105 transition shadow-lg"
-              >
-                Agendar Online
-              </button>
-
-              <a
-                href="https://wa.me/5547999999999"
-                target="_blank"
-                className="bg-green-600 text-white px-8 py-4 rounded-xl font-semibold hover:scale-105 transition shadow-lg"
-              >
-                WhatsApp
-              </a>
-
+      <section className="nex-section how" id="como-funciona">
+        <div className="how-inner">
+          <div className="reveal">
+            <div className="section-label">Como funciona</div>
+            <h2 className="section-title">SIMPLES DE COMEÇAR</h2>
+            <p className="section-desc" style={{ marginBottom: 48 }}>
+              Em menos de uma hora, sua barbearia já opera com o sistema completo.
+            </p>
+            <div className="steps">
+              {steps.map(([title, text], index) => (
+                <div className="step" key={title}>
+                  <div className="step-num">{index + 1}</div>
+                  <div>
+                    <h3 className="step-title">{title}</h3>
+                    <p className="step-text">{text}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-
           </div>
 
+          <div className="mockup-window reveal">
+            <div className="mockup-bar">
+              <div className="dot dot-r" />
+              <div className="dot dot-y" />
+              <div className="dot dot-g" />
+              <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 12 }}>Painel Admin · Dashboard</span>
+            </div>
+            <div className="mockup-body">
+              <div className="mock-header">
+                Visão Geral
+                <div className="mock-badge">● Ao Vivo</div>
+              </div>
+              <div className="mock-dashboard-grid">
+                <div className="mock-dashboard-card">
+                  <div className="mock-dashboard-icon">💵</div>
+                  <div className="mock-dashboard-label">Receita</div>
+                  <div className="mock-dashboard-value">R$ 2.480</div>
+                </div>
+                <div className="mock-dashboard-card">
+                  <div className="mock-dashboard-icon">📈</div>
+                  <div className="mock-dashboard-label">Lucro</div>
+                  <div className="mock-dashboard-value">R$ 1.920</div>
+                </div>
+                <div className="mock-dashboard-card">
+                  <div className="mock-dashboard-icon">✂</div>
+                  <div className="mock-dashboard-label">Hoje</div>
+                  <div className="mock-dashboard-value">18</div>
+                </div>
+                <div className="mock-dashboard-card">
+                  <div className="mock-dashboard-icon">🎯</div>
+                  <div className="mock-dashboard-label">Ticket</div>
+                  <div className="mock-dashboard-value">R$ 137</div>
+                </div>
+              </div>
+              <div className="mock-dashboard-layout">
+                <div className="mock-panel">
+                  <div style={{ color: '#f8fafc', fontWeight: 800, fontSize: 14 }}>Receita</div>
+                  <div className="mock-bars">
+                    {[28, 44, 36, 58, 48, 78, 62, 88].map((h) => (
+                      <span key={h} style={{ height: `${h}%` }} />
+                    ))}
+                  </div>
+                </div>
+                <div className="mock-panel">
+                  <div style={{ color: '#f8fafc', fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Resumo</div>
+                  <div className="mock-summary-row"><span>Agendamentos</span><strong style={{ color: '#60a5fa' }}>18</strong></div>
+                  <div className="mock-summary-row"><span>Finalizados</span><strong style={{ color: '#10b981' }}>14</strong></div>
+                  <div className="mock-summary-row"><span>Comissões</span><strong style={{ color: '#c9a84c' }}>R$ 560</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-
       </section>
 
-      {/* MAPA */}
-      <section className="px-8 py-24 bg-black">
-
-        <div className="max-w-7xl mx-auto">
-
-          <div className="text-center mb-12">
-
-            <span className="text-yellow-500 uppercase tracking-[0.3em] text-sm">
-              Localização
-            </span>
-
-            <h3 className="text-4xl font-bold mt-4">
-              Venha nos visitar
-            </h3>
-
-            <p className="text-zinc-400 mt-4">
-              Atendimento premium em Joinville - SC
-            </p>
-
-          </div>
-
-          <div className="rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
-
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3575.9055225952898!2d-48.817731599999995!3d-26.3295586!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94deb1b0804104c7%3A0xc83329478e4d290a!2sBarbearia%20Tra%C3%A7o%20fino!5e0!3m2!1spt-BR!2sbr!4v1778884228161!5m2!1spt-BR!2sbr" 
-              loading="lazy"
-              allowFullScreen
-              width="100%"
-              height="450"
-            ></iframe>
-
-          </div>
-
+      <section className="nex-section pricing" id="planos">
+        <div className="pricing-header reveal">
+          <div className="section-label">Planos</div>
+          <h2 className="section-title">ESCOLHA O SEU PLANO</h2>
+          <p style={{ color: 'var(--muted)', fontSize: 15 }}>7 dias de teste grátis em qualquer plano. Cancele quando quiser.</p>
         </div>
-
+        <div className="pricing-grid">
+          {plans.map((plan) => (
+            <article className={`plan reveal${plan.featured ? ' featured' : ''}`} key={plan.name}>
+              <h3 className="plan-name">{plan.name}</h3>
+              <div className="plan-price"><span>R$</span>{plan.price}</div>
+              <div className="plan-period">por mês</div>
+              <ul className="plan-features">
+                {plan.features.map(([feature, active]) => (
+                  <li className={active ? 'active' : ''} key={String(feature)}>{feature}</li>
+                ))}
+              </ul>
+              <Link href="/pricing" className="plan-btn">Começar grátis</Link>
+            </article>
+          ))}
+        </div>
       </section>
 
-      {/* FOOTER */}
-      <footer
-        id="contato"
-        className="bg-zinc-950 border-t border-zinc-800 px-8 py-16"
-      >
-
-        <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-12">
-
+      <section className="nex-section testimonials" id="depoimentos">
+        <div className="testimonials-header reveal">
           <div>
-
-            <h4 className="text-2xl font-bold text-white">
-              PRIME BARBER
-            </h4>
-
-            <p className="text-zinc-400 mt-4">
-              Estilo, presença e experiência premium em cada atendimento.
-            </p>
-
+            <div className="section-label">Depoimentos</div>
+            <h2 className="section-title">O QUE DIZEM OS DONOS</h2>
           </div>
-
-          <div>
-
-            <h5 className="text-white font-semibold mb-4">
-              Navegação
-            </h5>
-
-            <ul className="space-y-2 text-zinc-400">
-
-              <li><a href="#inicio">Início</a></li>
-              <li><a href="#servicos">Serviços</a></li>
-              <li><a href="#equipe">Equipe</a></li>
-              <li><a href="#contato">Contato</a></li>
-
-            </ul>
-
-          </div>
-
-          <div>
-
-            <h5 className="text-white font-semibold mb-4">
-              Contato
-            </h5>
-
-            <ul className="space-y-2 text-zinc-400">
-
-              <li>(47) 99999-9999</li>
-              <li>contato@primebarber.com</li>
-              <li>Joinville - SC</li>
-
-            </ul>
-
-          </div>
-
-          <div>
-
-            <h5 className="text-white font-semibold mb-4">
-              Redes Sociais
-            </h5>
-
-            <ul className="space-y-2 text-zinc-400">
-
-              <li>Instagram</li>
-              <li>Facebook</li>
-              <li>TikTok</li>
-
-            </ul>
-
-          </div>
-
+          <p className="section-desc">Mais de 3.000 barbearias já transformaram sua gestão com o NexBarber.</p>
         </div>
-
-        <div className="border-t border-zinc-800 mt-12 pt-8 text-center text-zinc-500 text-sm">
-          © 2026 PRIME BARBER. Todos os direitos reservados.
+        <div className="testimonials-grid">
+          {testimonials.map((testimonial) => (
+            <article className="testimonial reveal" key={testimonial.initials}>
+              <div className="stars">★★★★★</div>
+              <p className="test-text">{testimonial.text}</p>
+              <div className="test-author">
+                <div className="test-avatar">{testimonial.initials}</div>
+                <div>
+                  <div className="test-name">{testimonial.name}</div>
+                  <div className="test-role">{testimonial.role}</div>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
+      </section>
 
-      </footer>
+      <section className="cta-section">
+        <div className="section-label reveal">Comece agora</div>
+        <h2 className="cta-title reveal">
+          SUA BARBEARIA<br />
+          <span className="gold">NO PRÓXIMO NÍVEL</span>
+        </h2>
+        <p className="cta-sub reveal">
+          Junte-se a mais de 3.000 barbearias que já profissionalizaram sua gestão. 7 dias grátis, sem compromisso.
+        </p>
+        <div className="cta-actions reveal">
+          <Link href="/pricing" className="btn-primary">Criar minha conta grátis</Link>
+        </div>
+        <p className="cta-note reveal">Sem cartão de crédito · Cancele quando quiser · Suporte em português</p>
+      </section>
 
-      {/* BOTÃO WHATSAPP */}
-      <a
-        href="https://wa.me/5547999999999"
-        target="_blank"
-        className="fixed bottom-6 right-6 bg-green-500 w-16 h-16 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition z-50"
-      >
-        <span className="text-3xl">
-          💬
-        </span>
+      <a href="https://wa.me/5547999471941" target="_blank" rel="noreferrer" className="whatsapp-float" title="Fale conosco no WhatsApp">
+        <div className="whatsapp-label">Fale conosco!</div>
+        <div className="whatsapp-bubble">
+          <svg className="whatsapp-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z" />
+          </svg>
+        </div>
       </a>
 
+      <footer className="nex-footer">
+        <div className="footer-logo">Nex<span>Barber</span></div>
+        <p>© 2026 NexBarber. Todos os direitos reservados.</p>
+        <div className="footer-links">
+          <Link href="/termos">Termos</Link>
+          <Link href="/privacidade">Privacidade</Link>
+          <Link href="/suporte">Suporte</Link>
+        </div>
+      </footer>
     </main>
   )
 }
