@@ -40,6 +40,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [barbers, setBarbers]   = useState<Barber[]>([])
   const [bookedTimes, setBookedTimes] = useState<string[]>([])
   const [mobileNav, setMobileNav] = useState(false)
+  const [tenantChecked, setTenantChecked] = useState(false)
 
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [selectedBarber, setSelectedBarber]   = useState<Barber | null>(null)
@@ -57,13 +58,21 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
   useEffect(() => {
     async function load() {
+      setTenantChecked(false)
       const { data: t } = await supabase.from('tenants').select('*').eq('slug', slug).maybeSingle()
-      if (!t) return
+      if (!t) {
+        setTenant(null)
+        setServices([])
+        setBarbers([])
+        setTenantChecked(true)
+        return
+      }
       setTenant(t)
       const { data: sv } = await supabase.from('services').select('*').eq('tenant_id', t.id).order('price')
       const { data: br } = await supabase.from('barbeiros').select('*').eq('tenant_id', t.id).eq('ativo', true)
       setServices(sv ?? [])
       setBarbers(br ?? [])
+      setTenantChecked(true)
     }
     load()
   }, [slug])
@@ -106,6 +115,32 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const tenantName = tenant?.nome ?? slug.toUpperCase()
   const todayStr = new Date().toISOString().split('T')[0]
   const access = getTenantAccess(tenant)
+
+  if (!tenantChecked) {
+    return (
+      <div style={{ minHeight: '100vh', background: DARK, color: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Outfit','Segoe UI',sans-serif" }}>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', border: '3px solid rgba(201,168,76,0.2)', borderTopColor: GOLD, animation: 'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg);}}`}</style>
+      </div>
+    )
+  }
+
+  if (!tenant) {
+    return (
+      <div style={{ minHeight: '100vh', background: DARK, color: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Outfit','Segoe UI',sans-serif" }}>
+        <div style={{ width: '100%', maxWidth: 460, background: '#111', border: `1px solid rgba(201,168,76,0.25)`, borderRadius: 20, padding: '34px 28px', textAlign: 'center', boxShadow: '0 24px 70px rgba(0,0,0,0.35)' }}>
+          <div style={{ width: 52, height: 52, margin: '0 auto 16px', borderRadius: 14, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900 }}>✂</div>
+          <h1 style={{ fontSize: 24, margin: '0 0 10px', fontWeight: 900 }}>Barbearia nao encontrada</h1>
+          <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
+            O link acessado nao existe ou ainda nao foi configurado.
+          </p>
+          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, textDecoration: 'none', fontWeight: 800, fontSize: 13 }}>
+            Voltar para NexBarber
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   if (tenant && !access.allowed) {
     return (
