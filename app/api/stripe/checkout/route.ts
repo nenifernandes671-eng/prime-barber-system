@@ -11,10 +11,10 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
-const PLANS: Record<string, string> = {
-  basic:   'price_1Tb74601aYPmeBYyN3unIq5Z',
-  pro:     'price_1Tb74N01aYPmeBYyN6XWcCne',
-  premium: 'price_1Tb74c01aYPmeBYyw9dLWACr',
+const PLANS: Record<string, string | undefined> = {
+  basic: process.env.STRIPE_PRICE_BASIC,
+  pro: process.env.STRIPE_PRICE_PRO,
+  premium: process.env.STRIPE_PRICE_PREMIUM,
 }
 
 export async function POST(req: NextRequest) {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     const priceId = PLANS[plano]
     if (!priceId) {
-      return NextResponse.json({ error: 'Plano inválido.' }, { status: 400 })
+      return NextResponse.json({ error: 'Plano invalido ou preco nao configurado.' }, { status: 400 })
     }
 
     const { data: existingTenant } = await supabaseAdmin
