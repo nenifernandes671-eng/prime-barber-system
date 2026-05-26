@@ -19,7 +19,7 @@ interface Barber {
   user_id: string
 }
 
-type ModalState = 'closed' | 'create' | 'confirm-deactivate'
+type ModalState = 'closed' | 'create' | 'confirm-deactivate' | 'edit-access'
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -44,6 +44,9 @@ const reachedLimit =
   const [telefone, setTelefone] = useState('')
   const [senha, setSenha] = useState('')
   const [showSenha, setShowSenha] = useState(false)
+  const [accessEmail, setAccessEmail] = useState('')
+  const [accessPassword, setAccessPassword] = useState('')
+  const [showAccessPassword, setShowAccessPassword] = useState(false)
   
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -145,6 +148,72 @@ const reachedLimit =
     await fetchBarbers()
   }
 
+  const openEditAccess = (barber: Barber) => {
+    setFeedback(null)
+    setSelectedBarber(barber)
+    setAccessEmail(barber.email || '')
+    setAccessPassword('')
+    setShowAccessPassword(false)
+    setModal('edit-access')
+  }
+
+  const handleSaveAccess = async () => {
+    if (!selectedBarber || !tenantId) return
+
+    if (!accessEmail.trim()) {
+      setFeedback({ type: 'error', msg: 'Informe o e-mail de acesso do barbeiro.' })
+      return
+    }
+
+    if (accessPassword && accessPassword.length < 6) {
+      setFeedback({ type: 'error', msg: 'A nova senha deve ter ao menos 6 caracteres.' })
+      return
+    }
+
+    setSubmitting(true)
+    setFeedback(null)
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) {
+        setFeedback({ type: 'error', msg: 'Sessão expirada. Entre novamente.' })
+        setSubmitting(false)
+        return
+      }
+
+      const res = await fetch('/api/admin/atualizar-barbeiro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          barber_id: selectedBarber.id,
+          tenant_id: tenantId,
+          email: accessEmail.trim(),
+          password: accessPassword,
+        }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) {
+        setFeedback({ type: 'error', msg: json.error ?? 'Erro ao atualizar acesso.' })
+        setSubmitting(false)
+        return
+      }
+
+      setFeedback({ type: 'success', msg: `Acesso de ${selectedBarber.nome} atualizado.` })
+      setModal('closed')
+      setSelectedBarber(null)
+      setAccessPassword('')
+      await fetchBarbers()
+    } catch {
+      setFeedback({ type: 'error', msg: 'Erro de conexão. Tente novamente.' })
+    }
+
+    setSubmitting(false)
+  }
+
   const resetForm = () => {
     setNome(''); setEmail(''); setSenha(''); setTelefone(''); setShowSenha(false)
     setFeedback(null)
@@ -215,7 +284,7 @@ const reachedLimit =
       ) : (
         <div style={styles.list}>
           {barbers.map(b => (
-            <BarberRow key={b.id} barber={b} onToggle={handleToggleActive} />
+            <BarberRow key={b.id} barber={b} onToggle={handleToggleActive} onEditAccess={openEditAccess} />
           ))}
         </div>
       )}
@@ -299,13 +368,71 @@ const reachedLimit =
         </Overlay>
       )}
 
+      {/* ── Modal Editar Acesso ── */}
+      {modal === 'edit-access' && selectedBarber && (
+        <Overlay onClose={() => setModal('closed')}>
+          <div style={styles.modal}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Acesso do barbeiro</h2>
+              <button onClick={() => setModal('closed')} style={styles.modalClose}>✕</button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <p style={styles.confirmText}>
+                Atualize o e-mail ou defina uma nova senha para <strong style={{ color: '#f1f5f9' }}>{selectedBarber.nome}</strong>.
+              </p>
+
+              <Field label="E-mail de login" icon="✉">
+                <input
+                  style={styles.input}
+                  type="email"
+                  placeholder="barbeiro@email.com"
+                  value={accessEmail}
+                  onChange={e => setAccessEmail(e.target.value)}
+                />
+              </Field>
+
+              <Field label="Nova senha (opcional)" icon="🔒">
+                <div style={{ position: 'relative' }}>
+                  <input
+                    style={{ ...styles.input, paddingRight: 44 }}
+                    type={showAccessPassword ? 'text' : 'password'}
+                    placeholder="Deixe em branco para manter a atual"
+                    value={accessPassword}
+                    onChange={e => setAccessPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAccessPassword(v => !v)}
+                    style={styles.eyeBtn}
+                  >
+                    {showAccessPassword ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </Field>
+
+              <div style={styles.modalHint}>
+                Se o barbeiro esqueceu a senha, coloque uma nova aqui e envie para ele acessar em <strong style={{ color: '#93c5fd' }}>/barber/login</strong>.
+              </div>
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button onClick={() => setModal('closed')} style={styles.cancelBtn}>Cancelar</button>
+              <button onClick={handleSaveAccess} disabled={submitting} style={{ ...styles.confirmBtn, opacity: submitting ? 0.7 : 1 }}>
+                {submitting ? 'Salvando...' : 'Salvar acesso'}
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
     </div>
   )
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function BarberRow({ barber, onToggle }: { barber: Barber; onToggle: (b: Barber) => void }) {
+function BarberRow({ barber, onToggle, onEditAccess }: { barber: Barber; onToggle: (b: Barber) => void; onEditAccess: (b: Barber) => void }) {
   const initials = barber.nome.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
   const since = new Date(barber.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
 
@@ -322,6 +449,12 @@ function BarberRow({ barber, onToggle }: { barber: Barber; onToggle: (b: Barber)
         </span>
         <p style={styles.rowSince}>desde {since}</p>
       </div>
+      <button
+        onClick={() => onEditAccess(barber)}
+        style={styles.accessBtn}
+      >
+        Acesso
+      </button>
       <button
         onClick={() => onToggle(barber)}
         style={{ ...styles.toggleBtn, ...(barber.ativo ? styles.toggleDeactivate : styles.toggleActivate) }}
@@ -429,6 +562,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toggleDeactivate: { borderColor: '#ef444440', color: '#f87171' },
   toggleActivate: { borderColor: '#10b98140', color: '#6ee7b7' },
+  accessBtn: {
+    padding: '8px 14px',
+    borderRadius: 8,
+    border: '1px solid #2d3748',
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    flexShrink: 0,
+    background: '#0f172a',
+    color: '#93c5fd',
+  },
 
   // Modal
   overlay: {

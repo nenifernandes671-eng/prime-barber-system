@@ -19,9 +19,10 @@ interface Barber {
   id: string
   nome: string
   email: string
-  commission_percentage: number
-  commission_type: 'percentage' | 'fixed'
-  commission_fixed: number
+  tenant_id?: string | null
+  commission_percentage?: number | null
+  commission_type?: 'percentage' | null
+  commissionSourceId?: string | null
   ativo: boolean
 }
 
@@ -72,12 +73,7 @@ function calcCommission(
 
   let commission = 0
 
-  if (barber.commission_type === 'fixed') {
-    commission = totalServices * (barber.commission_fixed || 0)
-  } else {
-    commission =
-      totalRevenue * ((barber.commission_percentage || 0) / 100)
-  }
+  commission = totalRevenue * ((barber.commission_percentage || 0) / 100)
 
   return {
     commission,
@@ -96,21 +92,22 @@ export default function AdminComissoes() {
   const [period, setPeriod] = useState<Period>('mes')
 
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const [editForm, setEditForm] = useState({
     type: 'percentage',
     percentage: '',
-    fixed: '',
   })
 
   const fetchAll = useCallback(async () => {
     if (!tenantId) return
     setLoading(true)
 
-    const [{ data: barbs }, { data: appts }] = await Promise.all([
+    const [{ data: barbs, error: barbsError }, { data: appts, error: apptsError }, { data: commissionRows, error: commissionsError }] = await Promise.all([
       supabase
         .from('barbeiros')
-        .select('*')
+        .select('id,nome,email,telefone,ativo,tenant_id')
         .eq('tenant_id', tenantId)
         .eq('ativo', true)
         .order('nome'),
@@ -119,9 +116,37 @@ export default function AdminComissoes() {
         .from('appointments')
         .select('id, barber, price, status, appointment_date')
         .eq('tenant_id', tenantId),
+
+      supabase
+        .from('barbers')
+        .select('id,name,email,tenant_id,commission_percentage,commission_type,ativo')
+        .eq('tenant_id', tenantId),
     ])
 
-    setBarbers(barbs ?? [])
+    if (barbsError || apptsError || commissionsError) {
+      setFeedback({ type: 'error', message: barbsError?.message || apptsError?.message || commissionsError?.message || 'Erro ao carregar comissões.' })
+    }
+
+    const merged = (barbs ?? []).map((barber: any) => {
+      const matchingRows = (commissionRows ?? []).filter((row: any) => {
+        const sameEmail = row.email && barber.email && row.email.toLowerCase() === barber.email.toLowerCase()
+        const sameName = row.name && barber.nome && row.name.toLowerCase() === barber.nome.toLowerCase()
+        return row.tenant_id === barber.tenant_id && (sameEmail || sameName)
+      })
+      const match = matchingRows.reduce((best: any, row: any) => {
+        if (!best) return row
+        return (row.commission_percentage || 0) > (best.commission_percentage || 0) ? row : best
+      }, null)
+
+      return {
+        ...barber,
+        commission_percentage: match?.commission_percentage ?? 0,
+        commission_type: 'percentage',
+        commissionSourceId: match?.id ?? null,
+      }
+    })
+
+    setBarbers(merged as Barber[])
     setAppointments(appts ?? [])
 
     setLoading(false)
@@ -133,39 +158,69 @@ export default function AdminComissoes() {
   }, [fetchAll])
 
   const openEdit = (b: Barber) => {
+    setFeedback(null)
     setEditingId(b.id)
 
     setEditForm({
-      type: b.commission_type ?? 'percentage',
+      type: 'percentage',
       percentage: String(b.commission_percentage ?? 0),
-      fixed: String(b.commission_fixed ?? 0),
     })
   }
 
   const saveCommission = async (barberId: string) => {
-    const payload = {
-      commission_type: editForm.type,
-
-      commission_percentage:
-        editForm.type === 'percentage'
-          ? parseFloat(editForm.percentage) || 0
-          : 0,
-
-      commission_fixed:
-        editForm.type === 'fixed'
-          ? parseFloat(editForm.fixed) || 0
-          : 0,
+    if (!tenantId) {
+      setFeedback({ type: 'error', message: 'Tenant não carregado. Recarregue a página e tente novamente.' })
+      return
     }
 
-    await supabase
-      .from('barbeiros')
+    const barber = barbers.find((b) => b.id === barberId)
+    if (!barber) {
+      setFeedback({ type: 'error', message: 'Barbeiro não encontrado para salvar comissão.' })
+      return
+    }
+
+    const percentage = Math.max(0, Math.min(100, parseFloat(editForm.percentage) || 0))
+    const payload = {
+      name: barber.nome,
+      email: barber.email || null,
+      tenant_id: tenantId,
+      ativo: true,
+      commission_type: 'percentage',
+      commission_percentage: percentage,
+    }
+
+    setSavingId(barberId)
+    setFeedback(null)
+
+    const updateMatches = supabase
+      .from('barbers')
       .update(payload)
-      .eq('id', barberId)
       .eq('tenant_id', tenantId)
+      .or(`email.eq.${barber.email},name.eq.${barber.nome}`)
+      .select('id,commission_percentage,commission_type')
+
+    const query = barber.commissionSourceId
+      ? updateMatches
+      : supabase.from('barbers').insert(payload).select('id,commission_percentage,commission_type').single()
+
+    const { data, error } = await query
+    const savedRow = Array.isArray(data) ? data[0] : data
+
+    setSavingId(null)
+
+    if (error) {
+      setFeedback({ type: 'error', message: `Não consegui salvar a comissão: ${error.message}` })
+      return
+    }
 
     setEditingId(null)
-
-    fetchAll()
+    setBarbers(prev => prev.map(b => b.id === barberId ? {
+      ...b,
+      commission_percentage: savedRow?.commission_percentage ?? percentage,
+      commission_type: 'percentage',
+      commissionSourceId: savedRow?.id ?? b.commissionSourceId,
+    } : b))
+    setFeedback({ type: 'success', message: 'Comissão salva e recalculada.' })
   }
 
   const totalCommissions = barbers.reduce((s, b) => {
@@ -229,6 +284,17 @@ export default function AdminComissoes() {
           ))}
         </div>
       </div>
+
+      {feedback && (
+        <div
+          style={{
+            ...styles.feedback,
+            ...(feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess),
+          }}
+        >
+          {feedback.message}
+        </div>
+      )}
 
       {/* STATS */}
 
@@ -295,6 +361,7 @@ export default function AdminComissoes() {
                 } = calcCommission(b, appointments, period)
 
                 const isEditing = editingId === b.id
+                const commissionPercentage = b.commission_percentage ?? 0
 
                 return (
                   <div
@@ -319,11 +386,7 @@ export default function AdminComissoes() {
                       </div>
 
                       <div style={{ ...styles.badge, maxWidth: isMobile ? '100%' : undefined, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {b.commission_type === 'fixed'
-                          ? `${formatCurrency(
-                              b.commission_fixed || 0
-                            )}`
-                          : `${b.commission_percentage}%`}
+                        {commissionPercentage}%
                       </div>
                     </div>
 
@@ -368,57 +431,30 @@ export default function AdminComissoes() {
                     {isEditing ? (
                       <div style={{ ...styles.editBox, flexDirection: isMobile ? 'column' : 'row' }}>
 
-                        <select
-                          value={editForm.type}
+                        <div style={{ ...styles.input, display: 'flex', alignItems: 'center', color: '#94a3b8' }}>
+                          Percentual
+                        </div>
+
+                        <input
+                          style={styles.input}
+                          placeholder="40"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={editForm.percentage}
                           onChange={(e) =>
                             setEditForm((p) => ({
                               ...p,
-                              type: e.target.value,
+                              percentage: e.target.value,
                             }))
                           }
-                          style={styles.input}
-                        >
-                          <option value="percentage">
-                            Percentual
-                          </option>
-
-                          <option value="fixed">
-                            Valor fixo
-                          </option>
-                        </select>
-
-                        {editForm.type === 'percentage' ? (
-                          <input
-                            style={styles.input}
-                            placeholder="40"
-                            type="number"
-                            value={editForm.percentage}
-                            onChange={(e) =>
-                              setEditForm((p) => ({
-                                ...p,
-                                percentage: e.target.value,
-                              }))
-                            }
-                          />
-                        ) : (
-                          <input
-                            style={styles.input}
-                            placeholder="25"
-                            type="number"
-                            value={editForm.fixed}
-                            onChange={(e) =>
-                              setEditForm((p) => ({
-                                ...p,
-                                fixed: e.target.value,
-                              }))
-                            }
-                          />
-                        )}
+                        />
 
                         <div style={styles.actions}>
 
                           <button
                             onClick={() => setEditingId(null)}
+                            disabled={savingId === b.id}
                             style={styles.cancelBtn}
                           >
                             <X size={16} />
@@ -426,9 +462,14 @@ export default function AdminComissoes() {
 
                           <button
                             onClick={() => saveCommission(b.id)}
-                            style={styles.saveBtn}
+                            disabled={savingId === b.id}
+                            style={{
+                              ...styles.saveBtn,
+                              opacity: savingId === b.id ? 0.65 : 1,
+                              cursor: savingId === b.id ? 'wait' : 'pointer',
+                            }}
                           >
-                            <Save size={16} />
+                            {savingId === b.id ? '...' : <Save size={16} />}
                           </button>
                         </div>
                       </div>
@@ -831,6 +872,27 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: 10,
     flexWrap: 'wrap',
+  },
+
+  feedback: {
+    borderRadius: 14,
+    padding: '12px 14px',
+    marginBottom: 18,
+    fontSize: 13,
+    fontWeight: 700,
+    border: '1px solid',
+  },
+
+  feedbackSuccess: {
+    background: 'rgba(16,185,129,0.1)',
+    borderColor: 'rgba(16,185,129,0.25)',
+    color: '#34d399',
+  },
+
+  feedbackError: {
+    background: 'rgba(239,68,68,0.1)',
+    borderColor: 'rgba(239,68,68,0.25)',
+    color: '#fca5a5',
   },
 
   input: {

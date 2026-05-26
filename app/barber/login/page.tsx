@@ -11,6 +11,7 @@ export default function BarberLoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -18,7 +19,7 @@ export default function BarberLoginPage() {
     setError('')
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     })
 
@@ -108,6 +109,8 @@ export default function BarberLoginPage() {
               placeholder="Digite seu email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
               className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-yellow-500"
             />
           </div>
@@ -116,14 +119,30 @@ export default function BarberLoginPage() {
             <label className="text-sm text-zinc-400 block mb-2">
               Senha
             </label>
-            <input
-              type="password"
-              placeholder="Digite sua senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-yellow-500"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Digite sua senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-5 py-4 pr-14 text-white outline-none focus:border-yellow-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
           </div>
+
+          <p className="text-xs text-zinc-500">
+            Esqueceu a senha? Peça para o administrador redefinir o acesso na aba Barbeiros.
+          </p>
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl p-4 text-sm">

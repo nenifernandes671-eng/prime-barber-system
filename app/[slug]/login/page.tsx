@@ -192,6 +192,7 @@ export default function SlugLoginPage({
               />
 
               <button
+                type="button"
                 onClick={() => setShowPass((v) => !v)}
                 style={styles.eyeBtn}
                 tabIndex={-1}

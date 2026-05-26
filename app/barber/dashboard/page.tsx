@@ -21,10 +21,10 @@ interface Appointment {
 interface Barber {
   id: string
   nome: string
+  email?: string | null
   tenant_id: string
   commission_percentage?: number
-  commission_type?: 'percentage' | 'fixed'
-  commission_fixed?: number
+  commission_type?: 'percentage'
 }
 
 interface BarberStats {
@@ -90,7 +90,7 @@ export default function BarberDashboard() {
 
       let { data: barberData, error } = await supabase
         .from('barbeiros')
-        .select('id, nome, tenant_id, commission_percentage, commission_type, commission_fixed')
+        .select('id, nome, email, tenant_id')
         .eq('user_id', user.id)
         .eq('ativo', true)
         .maybeSingle()
@@ -98,7 +98,7 @@ export default function BarberDashboard() {
       if (!barberData && user.email) {
         const fallback = await supabase
           .from('barbeiros')
-          .select('id, nome, tenant_id, commission_percentage, commission_type, commission_fixed')
+          .select('id, nome, email, tenant_id')
           .eq('email', user.email)
           .eq('ativo', true)
           .maybeSingle()
@@ -133,8 +133,34 @@ export default function BarberDashboard() {
         return
       }
 
-      setBarber(barberData)
-      await fetchAppointments(barberData)
+      const { data: commissionRows } = await supabase
+        .from('barbers')
+        .select('name, email, commission_percentage, commission_type')
+        .eq('tenant_id', barberData.tenant_id)
+        .or(`email.eq.${barberData.email ?? user.email},name.eq.${barberData.nome}`)
+
+      const normalizedEmail = (barberData.email || user.email || '').toLowerCase()
+      const normalizedName = (barberData.nome || '').toLowerCase()
+      const matchingByEmail = (commissionRows || []).filter((row: any) =>
+        row.email && row.email.toLowerCase() === normalizedEmail
+      )
+      const matchingByName = (commissionRows || []).filter((row: any) =>
+        row.name && row.name.toLowerCase() === normalizedName
+      )
+      const matchingRows = matchingByEmail.length > 0 ? matchingByEmail : matchingByName
+      const commissionConfig = matchingRows.reduce((best: any, row: any) => {
+        if (!best) return row
+        return (row.commission_percentage || 0) > (best.commission_percentage || 0) ? row : best
+      }, null)
+
+      const barberWithCommission = {
+        ...barberData,
+        commission_percentage: commissionConfig?.commission_percentage ?? 0,
+        commission_type: 'percentage' as const,
+      }
+
+      setBarber(barberWithCommission)
+      await fetchAppointments(barberWithCommission)
       setLoading(false)
     }
 
@@ -158,7 +184,6 @@ export default function BarberDashboard() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
     const calcCommission = (price: number) => {
-      if (currentBarber.commission_type === 'fixed') return currentBarber.commission_fixed || 0
       return price * ((currentBarber.commission_percentage || 0) / 100)
     }
 

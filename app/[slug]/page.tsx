@@ -187,6 +187,8 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           .mob-btn{display:flex!important;}
           .hero-text{padding:80px 24px 32px!important;}
           .hero-wrap{flex-direction:column!important;padding:0 0 40px!important;}
+          .services-layout{grid-template-columns:1fr!important;gap:28px!important;}
+          .services-copy{max-width:420px!important;}
         }
         @media(max-width:600px){
           .sv-grid{grid-template-columns:repeat(2,1fr)!important;}
@@ -195,6 +197,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           .trust-bar{flex-wrap:wrap;gap:14px!important;}
           .hero-title-txt{font-size:38px!important;}
           .hero-stat-row{gap:16px!important;}
+          .service-card-body{padding:12px!important;}
+          .service-card-title{font-size:13px!important;line-height:1.25!important;}
+          .service-card-desc{font-size:11px!important;line-height:1.45!important;}
+        }
+        @media(max-width:380px){
+          .sv-grid{grid-template-columns:1fr!important;}
+          .br-grid{grid-template-columns:1fr!important;}
         }
       `}</style>
 
@@ -391,8 +400,8 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
       {/* ── SERVIÇOS (fundo claro) ── */}
       <section id="servicos" style={{ padding:'80px 32px', background:'#f8f4ee' }}>
-        <div style={{ maxWidth:1100, margin:'0 auto', display:'grid', gridTemplateColumns:'260px 1fr', gap:60, alignItems:'start' }}>
-          <div>
+        <div className="services-layout" style={{ maxWidth:1100, margin:'0 auto', display:'grid', gridTemplateColumns:'260px 1fr', gap:60, alignItems:'start' }}>
+          <div className="services-copy">
             <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:GOLD, textTransform:'uppercase', margin:'0 0 12px' }}>NOSSOS SERVIÇOS</p>
             <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#1a1a1a', lineHeight:1.2, margin:'0 0 20px' }}>Escolha o serviço ideal para você</h2>
             <a href="#agendar" className="gold-btn" style={{ display:'inline-block', padding:'12px 24px', borderRadius:8, background:'transparent', border:`1.5px solid #1a1a1a`, color:'#1a1a1a', fontSize:13, fontWeight:600, textDecoration:'none', letterSpacing:0.3 }}>
@@ -413,9 +422,9 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                     </div>
                   </div>
                 )}
-                <div style={{ padding:'16px 18px' }}>
-                  <h4 style={{ fontSize:15, fontWeight:700, color:'#1a1a1a', margin:'0 0 4px' }}>{sv.name}</h4>
-                  <p style={{ fontSize:12, color:'#6b7280', margin:'0 0 8px', lineHeight:1.5 }}>{sv.description || 'Atendimento premium e acabamento perfeito.'}</p>
+                <div className="service-card-body" style={{ padding:'16px 18px' }}>
+                  <h4 className="service-card-title" style={{ fontSize:15, fontWeight:700, color:'#1a1a1a', margin:'0 0 4px' }}>{sv.name}</h4>
+                  <p className="service-card-desc" style={{ fontSize:12, color:'#6b7280', margin:'0 0 8px', lineHeight:1.5 }}>{sv.description || 'Atendimento premium e acabamento perfeito.'}</p>
                   {sv.duration && <p style={{ fontSize:11, color:'#9ca3af', margin:'0 0 6px' }}>⏱ {sv.duration} min</p>}
                   <p style={{ fontSize:20, fontWeight:800, color:GOLD, margin:0, fontFamily:"'Playfair Display',serif" }}>R$ {sv.price?.toFixed(2)}</p>
                 </div>

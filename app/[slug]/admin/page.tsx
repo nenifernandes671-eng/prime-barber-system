@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 
 type ChartPeriod = 'este-ano' | 'este-mes' | 'esta-semana'
+type DateMode = 'day' | 'month'
 
 const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#f97316']
 
@@ -40,10 +41,23 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`
 }
 
+function localMonthKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
 function formatSelectedDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function formatSelectedMonth(month: string) {
+  return new Date(`${month}-01T12:00:00`).toLocaleDateString('pt-BR', {
     month: 'long',
     year: 'numeric',
   })
@@ -62,7 +76,9 @@ export default function AdminPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
+  const [dateMode, setDateMode] = useState<DateMode>('day')
   const [selectedDate, setSelectedDate] = useState(localDateKey())
+  const [selectedMonth, setSelectedMonth] = useState(localMonthKey())
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('este-ano')
   const [chartDropdown, setChartDropdown] = useState(false)
   const [tenantId, setTenantId] = useState<string | null>(null)
@@ -99,13 +115,22 @@ export default function AdminPage() {
   }, [])
 
   async function fetchAll(currentTenantId: string) {
-    const [{ data: appts, error }, { data: barberData }] = await Promise.all([
+    const [{ data: appts, error }, { data: barberData }, { data: commissionRows }] = await Promise.all([
       supabase.from('appointments').select('*').eq('tenant_id', currentTenantId).order('appointment_date', { ascending: false }),
-      supabase.from('barbeiros').select('nome, commission_percentage, commission_type, commission_fixed').eq('tenant_id', currentTenantId).eq('ativo', true),
+      supabase.from('barbeiros').select('nome, email, tenant_id').eq('tenant_id', currentTenantId).eq('ativo', true),
+      supabase.from('barbers').select('name, email, tenant_id, commission_percentage, commission_type').eq('tenant_id', currentTenantId),
     ])
     if (error) { console.log(error); return }
+    const mergedBarbers = (barberData || []).map((barber: any) => {
+      const match = (commissionRows || []).find((row: any) => {
+        const sameEmail = row.email && barber.email && row.email.toLowerCase() === barber.email.toLowerCase()
+        const sameName = row.name && barber.nome && row.name.toLowerCase() === barber.nome.toLowerCase()
+        return row.tenant_id === barber.tenant_id && (sameEmail || sameName)
+      })
+      return { ...barber, commission_percentage: match?.commission_percentage ?? 0, commission_type: 'percentage' }
+    })
     setAppointments(appts || [])
-    setBarbers(barberData || [])
+    setBarbers(mergedBarbers)
     generateMonthlyData(appts || [], 'este-ano')
     setRecentAppointments((appts || []).slice(0, 5))
     setLoading(false)
@@ -181,23 +206,25 @@ export default function AdminPage() {
     router.push(`/${slug}/login`)
   }
 
-  const dayAppointments = appointments.filter(a => a.appointment_date === selectedDate)
-  const allActive = dayAppointments.filter(a => a.status !== 'cancelled')
-  const finished = dayAppointments.filter(a => a.status === 'finished' || a.status === 'completed')
-  const cancelled = dayAppointments.filter(a => a.status === 'cancelled')
+  const periodAppointments = appointments.filter(a => {
+    if (dateMode === 'month') return String(a.appointment_date ?? '').startsWith(selectedMonth)
+    return a.appointment_date === selectedDate
+  })
+  const allActive = periodAppointments.filter(a => a.status !== 'cancelled')
+  const finished = periodAppointments.filter(a => a.status === 'finished' || a.status === 'completed')
+  const cancelled = periodAppointments.filter(a => a.status === 'cancelled')
   const totalRevenue = allActive.reduce((s, a) => s + (a.price || 0), 0)
   const totalCommissions = allActive.reduce((s, a) => {
     const barber = barbers.find(b => b.nome === a.barber)
     if (!barber) return s
-    if (barber.commission_type === 'fixed') return s + (barber.commission_fixed || 0)
     return s + (a.price || 0) * ((barber.commission_percentage || 0) / 100)
   }, 0)
   const totalProfit = totalRevenue - totalCommissions
   const avgTicket = allActive.length > 0 ? totalRevenue / allActive.length : 0
-  const cancelRate = dayAppointments.length > 0 ? ((cancelled.length / dayAppointments.length) * 100).toFixed(1) : '0.0'
-  const todayCount = dayAppointments.filter(a => a.status !== 'cancelled').length
+  const cancelRate = periodAppointments.length > 0 ? ((cancelled.length / periodAppointments.length) * 100).toFixed(1) : '0.0'
+  const todayCount = periodAppointments.filter(a => a.status !== 'cancelled').length
 
-  const filtered = dayAppointments.filter(a => {
+  const filtered = periodAppointments.filter(a => {
     const matchSearch = (a.client_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (a.service ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (a.barber ?? '').toLowerCase().includes(search.toLowerCase())
@@ -231,6 +258,63 @@ export default function AdminPage() {
   }
 
   const newAppointments = recentAppointments.filter(a => a.status === 'scheduled' || a.status === 'pending')
+  const dateLabel = dateMode === 'month' ? formatSelectedMonth(selectedMonth) : formatSelectedDate(selectedDate)
+  const chartData = dateMode === 'month'
+    ? (() => {
+        const [year, month] = selectedMonth.split('-').map(Number)
+        const daysInMonth = new Date(year, month, 0).getDate()
+        const grouped: Record<string, { month: string; revenue: number }> = {}
+        for (let day = 1; day <= daysInMonth; day++) {
+          const key = String(day).padStart(2, '0')
+          grouped[key] = { month: key, revenue: 0 }
+        }
+        allActive.forEach((a) => {
+          const day = String(new Date(`${a.appointment_date}T12:00:00`).getDate()).padStart(2, '0')
+          if (grouped[day]) grouped[day].revenue += a.price || 0
+        })
+        return Object.values(grouped)
+      })()
+    : [{ month: formatSelectedDate(selectedDate).split(',')[0], revenue: totalRevenue }]
+
+  const DatePeriodControl = ({ mobile = false }: { mobile?: boolean }) => (
+    <div style={{ ...S.dateControl, width: mobile ? '100%' : undefined }}>
+      <div style={S.dateModeGroup}>
+        {(['day', 'month'] as DateMode[]).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => {
+              setDateMode(mode)
+              setCurrentPage(1)
+            }}
+            style={{
+              ...S.dateModeBtn,
+              ...(dateMode === mode ? S.dateModeBtnActive : {}),
+            }}
+          >
+            {mode === 'day' ? 'Dia' : 'Mês'}
+          </button>
+        ))}
+      </div>
+
+      <label title={dateMode === 'day' ? 'Escolher dia' : 'Escolher mês'} style={{ ...S.dateChip, flex: 1 }}>
+        <Calendar size={14} style={{ color: '#64748b', flexShrink: 0 }} />
+        <span style={{ fontSize: 13, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {dateLabel}
+        </span>
+        <input
+          type={dateMode === 'day' ? 'date' : 'month'}
+          value={dateMode === 'day' ? selectedDate : selectedMonth}
+          onChange={(e) => {
+            if (dateMode === 'day') setSelectedDate(e.target.value)
+            else setSelectedMonth(e.target.value)
+            setCurrentPage(1)
+          }}
+          style={S.dateInput}
+        />
+      </label>
+    </div>
+  )
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -271,22 +355,7 @@ export default function AdminPage() {
         </div>
 
         <div style={{ display: isMobile ? 'none' : 'flex', alignItems: 'center', gap: 12 }} className="header-right">
-          {/* ✅ CORRIGIDO: chip de data agora é só informativo, sem dropdown confuso */}
-          <label title="Filtrar dashboard por dia" style={S.dateChip}>
-            <Calendar size={14} style={{ color: '#64748b' }} />
-            <span style={{ fontSize: 13, color: '#94a3b8' }}>
-              {formatSelectedDate(selectedDate)}
-            </span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value)
-                setCurrentPage(1)
-              }}
-              style={S.dateInput}
-            />
-          </label>
+          <DatePeriodControl />
 
           {/* Notificações */}
           <div ref={notifRef} style={{ position: 'relative' }}>
@@ -381,25 +450,15 @@ export default function AdminPage() {
 
       {/* ── Stats Grid ── */}
       {isMobile && (
-        <label title="Filtrar dashboard por dia" style={{ ...S.dateChip, width: '100%', justifyContent: 'center', marginBottom: 16 }}>
-          <Calendar size={14} style={{ color: '#64748b' }} />
-          <span style={{ fontSize: 13, color: '#94a3b8' }}>{formatSelectedDate(selectedDate)}</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => {
-              setSelectedDate(e.target.value)
-              setCurrentPage(1)
-            }}
-            style={S.dateInput}
-          />
-        </label>
+        <div style={{ marginBottom: 16 }}>
+          <DatePeriodControl mobile />
+        </div>
       )}
 
       <div style={{ ...S.statsGrid, gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : S.statsGrid.gridTemplateColumns, gap: isMobile ? 10 : S.statsGrid.gap }} className="stats-grid">
         <StatCard icon="💵" label="Receita Total" value={fmt(totalRevenue)} color="#22c55e" sub={`${allActive.length} atendimentos`} percent="+12,5%" />
         <StatCard icon="📈" label="Lucro Líquido" value={fmt(totalProfit)} color="#3b82f6" sub="após comissões" percent="+8,2%" />
-        <StatCard icon="✂️" label="Agendamentos no dia" value={String(todayCount)} color="#a855f7" sub="agendamentos" percent="+25%" />
+        <StatCard icon="✂️" label="Agendamentos no período" value={String(todayCount)} color="#a855f7" sub="agendamentos" percent="+25%" />
         <StatCard icon="🎯" label="Ticket Médio" value={fmt(avgTicket)} color="#f59e0b" sub="por atendimento" percent="+5,7%" />
       </div>
 
@@ -410,7 +469,7 @@ export default function AdminPage() {
             <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>📊</span>Receita</h2>
             <div style={{ position: 'relative' }}>
               <button type="button" style={{ ...S.periodBtn, cursor: 'default' }}>
-                Dia selecionado
+                {dateMode === 'day' ? 'Dia selecionado' : 'Mês selecionado'}
               </button>
               {chartDropdown && (
                 <div style={S.dropdown}>
@@ -436,7 +495,7 @@ export default function AdminPage() {
           </div>
           <div style={{ height: isMobile ? 200 : 260 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[{ month: formatSelectedDate(selectedDate).split(',')[0], revenue: totalRevenue }]} barSize={42}>
+              <BarChart data={chartData} barSize={dateMode === 'month' ? 18 : 42}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="month" stroke="#334155" tick={{ fontSize: 11, fill: '#64748b' }} interval={0} />
                 <YAxis stroke="#334155" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={v => `R$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
@@ -454,7 +513,7 @@ export default function AdminPage() {
         <div style={{ ...S.summaryCard, padding: isMobile ? 16 : S.summaryCard.padding, borderRadius: isMobile ? 16 : S.summaryCard.borderRadius }}>
           <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>📋</span>Resumo</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-            <SummaryItem label="Total de agendamentos" value={String(dayAppointments.length)} color="#60a5fa" />
+            <SummaryItem label="Total de agendamentos" value={String(periodAppointments.length)} color="#60a5fa" />
             <SummaryItem label="Finalizados" value={String(finished.length)} color="#10b981" />
             <SummaryItem label="Cancelados" value={String(cancelled.length)} color="#ef4444" />
             <SummaryItem label="Taxa de cancelamento" value={`${cancelRate}%`} color="#f59e0b" />
@@ -629,7 +688,11 @@ const S: Record<string, React.CSSProperties> = {
   mobileHeader: { marginBottom: 16, display: 'block' },
   headerSub: { fontSize: 12, color: '#64748b', margin: '0 0 4px', textTransform: 'uppercase' as const, letterSpacing: 1.4, fontWeight: 700 },
   headerTitle: { fontSize: 'clamp(24px,4vw,36px)', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-1px' },
-  dateChip: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(10px)', cursor: 'pointer', position: 'relative' },
+  dateControl: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 310 },
+  dateModeGroup: { display: 'flex', padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' },
+  dateModeBtn: { border: 'none', borderRadius: 9, padding: '8px 11px', background: 'transparent', color: '#64748b', fontSize: 12, fontWeight: 800, cursor: 'pointer' },
+  dateModeBtnActive: { background: 'rgba(37,99,235,0.9)', color: '#fff', boxShadow: '0 8px 20px rgba(37,99,235,0.22)' },
+  dateChip: { minHeight: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(10px)', cursor: 'pointer', position: 'relative' },
   dateInput: { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' },
   iconBtn: { position: 'relative', width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', backdropFilter: 'blur(10px)' },
   notifBadge: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', backgroundColor: '#3b82f6', color: '#fff', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },

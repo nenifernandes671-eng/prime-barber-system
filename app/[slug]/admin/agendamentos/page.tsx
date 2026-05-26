@@ -33,6 +33,14 @@ const STATUS_COLOR: Record<string, string> = {
   pending: '#f59e0b', confirmed: '#3b82f6', completed: '#10b981',
   cancelled: '#ef4444', scheduled: '#8b5cf6', finished: '#10b981',
 }
+const MOBILE_STATUS_LABEL: Record<string, string> = {
+  pending: 'Pendente',
+  confirmed: 'Confirm.',
+  completed: 'Concl.',
+  cancelled: 'Cancel.',
+  scheduled: 'Agend.',
+  finished: 'Final.',
+}
 const FILTERS = ['todos', 'scheduled', 'pending', 'confirmed', 'completed', 'finished', 'cancelled'] as const
 type Filter = typeof FILTERS[number]
 
@@ -178,11 +186,11 @@ const todayCount = appointments.filter(a =>
 
       {/* Filtros */}
       <div style={{ ...styles.toolbar, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : styles.toolbar.alignItems }}>
-        <div style={{ ...styles.filters, overflowX: isMobile ? 'auto' : undefined, flexWrap: isMobile ? 'nowrap' : styles.filters.flexWrap, paddingBottom: isMobile ? 2 : undefined }}>
+        <div style={{ ...styles.filters, flexWrap: isMobile ? 'wrap' : styles.filters.flexWrap, gap: isMobile ? 6 : styles.filters.gap }}>
           {FILTERS.map(flt => (
             <button key={flt} onClick={() => setFilter(flt)}
-              style={{ ...styles.filterBtn, ...(filter === flt ? styles.filterActive : {}) }}>
-              {flt === 'todos' ? 'Todos' : STATUS_LABEL[flt]}
+              style={{ ...styles.filterBtn, ...(isMobile ? styles.filterBtnMobile : {}), ...(filter === flt ? styles.filterActive : {}) }}>
+              {flt === 'todos' ? 'Todos' : isMobile ? MOBILE_STATUS_LABEL[flt] : STATUS_LABEL[flt]}
             </button>
           ))}
         </div>
@@ -311,6 +319,7 @@ const styles: Record<string, React.CSSProperties> = {
   toolbar: { display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' as const, alignItems: 'center' },
   filters: { display: 'flex', gap: 8, flexWrap: 'wrap' as const },
   filterBtn: { padding: '6px 14px', borderRadius: 20, border: '1px solid #2d3748', background: 'transparent', color: '#64748b', fontSize: 13, cursor: 'pointer' },
+  filterBtnMobile: { flex: '0 0 auto', padding: '7px 10px', fontSize: 12, whiteSpace: 'nowrap' },
   filterActive: { backgroundColor: '#1e2d45', borderColor: '#3b82f6', color: '#60a5fa' },
   searchInput: { marginLeft: 'auto', padding: '8px 14px', borderRadius: 10, border: '1px solid #2d3748', background: '#161b27', color: '#f1f5f9', fontSize: 14, outline: 'none', minWidth: 220 },
   loadingWrap: { display: 'flex', justifyContent: 'center', padding: 80 },

@@ -113,6 +113,16 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         </div>
       )}
 
+      {tenant?.plano === 'basic' && (
+        <div style={{ background: 'linear-gradient(135deg,rgba(37,99,235,0.16),rgba(245,158,11,0.08))', border: '1px solid rgba(96,165,250,0.22)', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+          <p style={{ fontSize: 12, color: '#f8fafc', margin: '0 0 5px', fontWeight: 900 }}>Seja Pro</p>
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 9px', lineHeight: 1.4 }}>Libere barbeiros ilimitados, comissões e lembretes via WhatsApp.</p>
+          <Link href="/pricing" style={{ display: 'inline-flex', width: '100%', justifyContent: 'center', padding: '8px 10px', borderRadius: 9, background: '#2563eb', color: '#fff', fontSize: 11, fontWeight: 800, textDecoration: 'none' }}>
+            Fazer upgrade
+          </Link>
+        </div>
+      )}
+
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
         {menuItems.map((item) => {
           const active = pathname === item.path
