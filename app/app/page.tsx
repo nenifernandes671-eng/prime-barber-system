@@ -26,19 +26,32 @@ const LAST_CLIENT_SLUG_KEY = 'nexbarber:last-client-slug'
 function cleanSlug(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
+
+  const sanitize = (input: string) => input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9-]/g, '')
+
+  if (!trimmed.includes('.') && !trimmed.includes('/')) {
+    return sanitize(trimmed)
+  }
+
   try {
     const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
     const firstPath = url.pathname.split('/').filter(Boolean)[0]
-    return firstPath || ''
+    if (firstPath) return sanitize(firstPath)
+
+    const host = url.hostname.replace(/^www\./, '')
+    if (host === 'nexbarber.com.br') return ''
+    return sanitize(host.split('.')[0] || '')
   } catch {
-    return trimmed
+    const fallback = trimmed
       .replace(/^https?:\/\//, '')
       .replace(/^www\./, '')
       .split('/')[0]
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9-]/g, '')
+      .split('.')[0]
+    return fallback ? sanitize(fallback) : ''
   }
 }
 

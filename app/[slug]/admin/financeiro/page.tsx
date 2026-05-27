@@ -4,10 +4,6 @@ import { useEffect, useState, useMemo, type ElementType } from 'react'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
-  ResponsiveContainer, CartesianGrid, Tooltip,
-  XAxis, YAxis, BarChart, Bar, PieChart, Pie, Cell,
-} from 'recharts'
-import {
   Banknote,
   BarChart3,
   CalendarDays,
@@ -109,16 +105,6 @@ function useIsMobile() {
     return () => window.removeEventListener('resize', fn)
   }, [])
   return m
-}
-
-function ChartTip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{ background: '#0f172a', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 10, padding: '10px 14px' }}>
-      <p style={{ color: '#64748b', fontSize: 11, margin: '0 0 3px' }}>{label}</p>
-      <p style={{ color: '#3b82f6', fontSize: 15, fontWeight: 800, margin: 0 }}>{fmt(payload[0].value)}</p>
-    </div>
-  )
 }
 
 function PaymentMethodSelect({
@@ -295,7 +281,7 @@ export default function FinanceiroPage() {
   )
 
   const card: React.CSSProperties = {
-    background: 'rgba(15,23,42,0.8)',
+    background: isMobile ? '#0f172a' : 'rgba(15,23,42,0.8)',
     border: '1px solid rgba(255,255,255,0.06)',
     borderRadius: 18,
     padding: isMobile ? '16px' : '22px',
@@ -325,12 +311,18 @@ export default function FinanceiroPage() {
   const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9' }}>
+    <div className="finance-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9', isolation: 'isolate' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .pay-btn:hover { opacity: 0.85; }
         .period-btn { transition: all 0.15s; }
         .row-hover:hover { background: rgba(255,255,255,0.02) !important; }
+        @media (max-width: 768px) {
+          .finance-page {
+            background: #020617;
+            contain: paint;
+          }
+        }
       `}</style>
 
       {/* ── HEADER ── */}
@@ -391,35 +383,23 @@ export default function FinanceiroPage() {
               <p style={{ color: '#334155', fontSize: 14 }}>Sem dados no período</p>
             </div>
           ) : (
-            isMobile ? (
-              <div style={{ height: '100%', display: 'flex', alignItems: 'stretch', gap: 5, padding: '8px 2px 0', overflow: 'hidden' }}>
-                {chartData.map((item, index) => {
-                  const hasValue = item.value > 0
-                  const height = hasValue ? Math.max(8, (item.value / chartMax) * 100) : 4
-                  const showLabel = chartData.length <= 12 || index === 0 || index === chartData.length - 1 || hasValue
-                  return (
-                    <div key={`${item.label}-${index}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-                      <div style={{ width: '100%', minWidth: 4, maxWidth: 18, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                        <div style={{ width: '100%', height: `${height}%`, borderRadius: '6px 6px 2px 2px', background: hasValue ? '#3b82f6' : 'rgba(59,130,246,0.22)' }} />
-                      </div>
-                      <span style={{ minHeight: 12, fontSize: 9, lineHeight: '12px', color: showLabel ? '#475569' : 'transparent', whiteSpace: 'nowrap' }}>
-                        {item.label}
-                      </span>
+            <div style={{ height: '100%', display: 'flex', alignItems: 'stretch', gap: isMobile ? 5 : 8, padding: isMobile ? '8px 2px 0' : '8px 8px 0', overflow: 'hidden' }}>
+              {chartData.map((item, index) => {
+                const hasValue = item.value > 0
+                const height = hasValue ? Math.max(8, (item.value / chartMax) * 100) : 4
+                const showLabel = chartData.length <= 12 || index === 0 || index === chartData.length - 1 || hasValue || (!isMobile && index % 2 === 0)
+                return (
+                  <div key={`${item.label}-${index}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                    <div style={{ width: '100%', minWidth: 4, maxWidth: isMobile ? 18 : 34, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                      <div title={`${item.label}: ${fmt(item.value)}`} style={{ width: '100%', height: `${height}%`, borderRadius: '6px 6px 2px 2px', background: hasValue ? '#3b82f6' : 'rgba(59,130,246,0.22)' }} />
                     </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis dataKey="label" stroke="transparent" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} interval={chartData.length > 16 ? 2 : 0} />
-                  <YAxis stroke="transparent" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} tickFormatter={v => `R$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} width={50} />
-                  <Tooltip content={<ChartTip />} cursor={{ stroke: 'rgba(59,130,246,0.15)', strokeWidth: 1 }} />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} minPointSize={4} />
-                </BarChart>
-              </ResponsiveContainer>
-            )
+                    <span style={{ minHeight: 12, fontSize: isMobile ? 9 : 10, lineHeight: '12px', color: showLabel ? '#475569' : 'transparent', whiteSpace: 'nowrap' }}>
+                      {item.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -433,56 +413,26 @@ export default function FinanceiroPage() {
           {pieData.length === 0 ? (
             <p style={{ color: '#475569', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>Sem dados</p>
           ) : (
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              {isMobile ? (
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {pieData.map(p => {
-                    const Icon = PAYMENT_ICONS[p.key] || WalletCards
-                    const pct = pieTotal > 0 ? Math.round((p.value / pieTotal) * 100) : 0
-                    const color = PIE_COLORS[p.key] || '#94a3b8'
-                    return (
-                      <div key={p.key} style={{ display: 'grid', gap: 7 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                            <Icon size={18} color={color} strokeWidth={2.4} />
-                            <span style={{ fontSize: 14, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                          </div>
-                          <span style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 800, flexShrink: 0 }}>{fmt(p.value)}</span>
-                        </div>
-                        <div style={{ height: 8, width: '100%', borderRadius: 999, background: 'rgba(148,163,184,0.12)', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: color }} />
-                        </div>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pieData.map(p => {
+                const Icon = PAYMENT_ICONS[p.key] || WalletCards
+                const pct = pieTotal > 0 ? Math.round((p.value / pieTotal) * 100) : 0
+                const color = PIE_COLORS[p.key] || '#94a3b8'
+                return (
+                  <div key={p.key} style={{ display: 'grid', gap: 7 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <Icon size={18} color={color} strokeWidth={2.4} />
+                        <span style={{ fontSize: isMobile ? 14 : 13, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                       </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div style={{ width: 100, height: 100, flexShrink: 0 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={28} outerRadius={46} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                        {pieData.map((e, i) => <Cell key={i} fill={PIE_COLORS[e.key] || '#94a3b8'} />)}
-                      </Pie>
-                      <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} formatter={(v: any) => [fmt(Number(v)), '']} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-              {!isMobile && (
-                <div style={{ flex: 1 }}>
-                  {pieData.map(p => {
-                    const Icon = PAYMENT_ICONS[p.key] || WalletCards
-                    return (
-                    <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Icon size={14} color={PIE_COLORS[p.key] || '#94a3b8'} strokeWidth={2.4} />
-                        <span style={{ fontSize: 12, color: '#cbd5e1' }}>{p.name}</span>
-                      </div>
-                      <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 700 }}>{fmt(p.value)}</span>
+                      <span style={{ fontSize: isMobile ? 14 : 13, color: '#f1f5f9', fontWeight: 800, flexShrink: 0 }}>{fmt(p.value)}</span>
                     </div>
-                  )})}
-                </div>
-              )}
+                    <div style={{ height: 8, width: '100%', borderRadius: 999, background: 'rgba(148,163,184,0.12)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: color }} />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
