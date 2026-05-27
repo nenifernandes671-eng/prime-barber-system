@@ -321,6 +321,17 @@ export default function FinanceiroPage() {
     { icon: Users, v: new Set(filtered.map(a => a.client_name)).size, l: 'Clientes únicos' },
     { icon: BarChart3, v: filtered.length > 0 ? `${((cancelled / filtered.length) * 100).toFixed(1)}%` : '0%', l: 'Taxa cancelamento' },
   ]
+  const chartMax = Math.max(...chartData.map(item => item.value), 1)
+  const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0)
+  let pieStart = 0
+  const donutGradient = pieTotal > 0
+    ? `conic-gradient(${pieData.map(item => {
+        const end = pieStart + (item.value / pieTotal) * 100
+        const segment = `${PIE_COLORS[item.key] || '#94a3b8'} ${pieStart}% ${end}%`
+        pieStart = end
+        return segment
+      }).join(', ')})`
+    : 'conic-gradient(#1e293b 0% 100%)'
 
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9' }}>
@@ -358,7 +369,7 @@ export default function FinanceiroPage() {
           const Icon = k.icon
           return (
           <div key={k.label} style={{ ...card, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: k.color, filter: 'blur(60px)', opacity: 0.15, top: -40, right: -20, pointerEvents: 'none' }} />
+            <div style={{ display: isMobile ? 'none' : 'block', position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: k.color, filter: 'blur(60px)', opacity: 0.15, top: -40, right: -20, pointerEvents: 'none' }} />
             <div style={{ width: 36, height: 36, borderRadius: 10, background: k.color + '20', border: `1px solid ${k.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
               <Icon size={18} strokeWidth={2.4} color={k.color} />
             </div>
@@ -389,15 +400,35 @@ export default function FinanceiroPage() {
               <p style={{ color: '#334155', fontSize: 14 }}>Sem dados no período</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis dataKey="label" stroke="transparent" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} interval={isMobile ? 'preserveStartEnd' : chartData.length > 16 ? 2 : 0} />
-                <YAxis stroke="transparent" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} tickFormatter={v => `R$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} width={isMobile ? 38 : 50} />
-                <Tooltip content={<ChartTip />} cursor={{ stroke: 'rgba(59,130,246,0.15)', strokeWidth: 1 }} />
-                <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} minPointSize={4} />
-              </BarChart>
-            </ResponsiveContainer>
+            isMobile ? (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'stretch', gap: 5, padding: '8px 2px 0', overflow: 'hidden' }}>
+                {chartData.map((item, index) => {
+                  const hasValue = item.value > 0
+                  const height = hasValue ? Math.max(8, (item.value / chartMax) * 100) : 4
+                  const showLabel = chartData.length <= 12 || index === 0 || index === chartData.length - 1 || hasValue
+                  return (
+                    <div key={`${item.label}-${index}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                      <div style={{ width: '100%', minWidth: 4, maxWidth: 18, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                        <div style={{ width: '100%', height: `${height}%`, borderRadius: '6px 6px 2px 2px', background: hasValue ? '#3b82f6' : 'rgba(59,130,246,0.22)' }} />
+                      </div>
+                      <span style={{ minHeight: 12, fontSize: 9, lineHeight: '12px', color: showLabel ? '#475569' : 'transparent', whiteSpace: 'nowrap' }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="label" stroke="transparent" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} interval={chartData.length > 16 ? 2 : 0} />
+                  <YAxis stroke="transparent" tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={false} tickFormatter={v => `R$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} width={50} />
+                  <Tooltip content={<ChartTip />} cursor={{ stroke: 'rgba(59,130,246,0.15)', strokeWidth: 1 }} />
+                  <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} minPointSize={4} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
           )}
         </div>
       </div>
@@ -412,16 +443,22 @@ export default function FinanceiroPage() {
             <p style={{ color: '#475569', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>Sem dados</p>
           ) : (
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              <div style={{ width: 100, height: 100, flexShrink: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={28} outerRadius={46} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                      {pieData.map((e, i) => <Cell key={i} fill={PIE_COLORS[e.key] || '#94a3b8'} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} formatter={(v: any) => [fmt(Number(v)), '']} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              {isMobile ? (
+                <div style={{ width: 108, height: 108, flexShrink: 0, borderRadius: '50%', background: donutGradient, position: 'relative' }}>
+                  <div style={{ position: 'absolute', inset: 34, borderRadius: '50%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)' }} />
+                </div>
+              ) : (
+                <div style={{ width: 100, height: 100, flexShrink: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={28} outerRadius={46} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                        {pieData.map((e, i) => <Cell key={i} fill={PIE_COLORS[e.key] || '#94a3b8'} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} formatter={(v: any) => [fmt(Number(v)), '']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               <div style={{ flex: 1 }}>
                 {pieData.map(p => {
                   const Icon = PAYMENT_ICONS[p.key] || WalletCards
