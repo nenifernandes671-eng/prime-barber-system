@@ -20,10 +20,16 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
       {
-        src: '/icons/nexbarber-512.png',
+        src: '/icons/nexbarber-maskable-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',
+      },
+      {
+        src: '/icons/nexbarber-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
       },
     ],
   }

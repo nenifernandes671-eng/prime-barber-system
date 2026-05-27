@@ -330,11 +330,16 @@ export default function AppStartPage() {
           border-radius: 15px;
           display: grid;
           place-items: center;
-          background: linear-gradient(135deg, #f7d66b, #b98728);
-          color: #070a12;
-          box-shadow: 0 18px 45px rgba(214,178,74,0.22);
-          font-weight: 950;
-          letter-spacing: -1px;
+          background: #070a12;
+          border: 1px solid rgba(214,178,74,0.24);
+          box-shadow: 0 18px 45px rgba(59,130,246,0.18);
+          overflow: hidden;
+        }
+        .brand-mark img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
         .brand-name {
           margin: 0;
@@ -597,7 +602,9 @@ export default function AppStartPage() {
       <div className="app-wrap">
         <header className="app-top">
           <a className="brand" href="/">
-            <div className="brand-mark">NB</div>
+            <div className="brand-mark">
+              <img src="/icons/nexbarber-192.png" alt="" />
+            </div>
             <div>
               <p className="brand-name">NexBarber</p>
               <p className="brand-sub">App da barbearia</p>

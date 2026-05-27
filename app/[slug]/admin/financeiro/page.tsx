@@ -323,15 +323,6 @@ export default function FinanceiroPage() {
   ]
   const chartMax = Math.max(...chartData.map(item => item.value), 1)
   const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0)
-  let pieStart = 0
-  const donutGradient = pieTotal > 0
-    ? `conic-gradient(${pieData.map(item => {
-        const end = pieStart + (item.value / pieTotal) * 100
-        const segment = `${PIE_COLORS[item.key] || '#94a3b8'} ${pieStart}% ${end}%`
-        pieStart = end
-        return segment
-      }).join(', ')})`
-    : 'conic-gradient(#1e293b 0% 100%)'
 
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9' }}>
@@ -444,8 +435,26 @@ export default function FinanceiroPage() {
           ) : (
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
               {isMobile ? (
-                <div style={{ width: 108, height: 108, flexShrink: 0, borderRadius: '50%', background: donutGradient, position: 'relative' }}>
-                  <div style={{ position: 'absolute', inset: 34, borderRadius: '50%', background: '#0f172a', border: '1px solid rgba(255,255,255,0.05)' }} />
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {pieData.map(p => {
+                    const Icon = PAYMENT_ICONS[p.key] || WalletCards
+                    const pct = pieTotal > 0 ? Math.round((p.value / pieTotal) * 100) : 0
+                    const color = PIE_COLORS[p.key] || '#94a3b8'
+                    return (
+                      <div key={p.key} style={{ display: 'grid', gap: 7 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <Icon size={18} color={color} strokeWidth={2.4} />
+                            <span style={{ fontSize: 14, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                          </div>
+                          <span style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 800, flexShrink: 0 }}>{fmt(p.value)}</span>
+                        </div>
+                        <div style={{ height: 8, width: '100%', borderRadius: 999, background: 'rgba(148,163,184,0.12)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <div style={{ width: 100, height: 100, flexShrink: 0 }}>
@@ -459,19 +468,21 @@ export default function FinanceiroPage() {
                   </ResponsiveContainer>
                 </div>
               )}
-              <div style={{ flex: 1 }}>
-                {pieData.map(p => {
-                  const Icon = PAYMENT_ICONS[p.key] || WalletCards
-                  return (
-                  <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Icon size={14} color={PIE_COLORS[p.key] || '#94a3b8'} strokeWidth={2.4} />
-                      <span style={{ fontSize: 12, color: '#cbd5e1' }}>{p.name}</span>
+              {!isMobile && (
+                <div style={{ flex: 1 }}>
+                  {pieData.map(p => {
+                    const Icon = PAYMENT_ICONS[p.key] || WalletCards
+                    return (
+                    <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Icon size={14} color={PIE_COLORS[p.key] || '#94a3b8'} strokeWidth={2.4} />
+                        <span style={{ fontSize: 12, color: '#cbd5e1' }}>{p.name}</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 700 }}>{fmt(p.value)}</span>
                     </div>
-                    <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 700 }}>{fmt(p.value)}</span>
-                  </div>
-                )})}
-              </div>
+                  )})}
+                </div>
+              )}
             </div>
           )}
         </div>
