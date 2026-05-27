@@ -78,7 +78,7 @@ const PIE_COLORS: Record<string, string> = {
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 const PAYMENT_LABELS: Record<string, string> = {
   pix: 'PIX',
-  cartao: 'Cartao',
+  cartao: 'Cartão',
   dinheiro: 'Dinheiro',
   outros: 'Outros',
 }
@@ -150,7 +150,7 @@ function PaymentMethodSelect({
     >
       <option value="outros">Outros</option>
       <option value="pix">PIX</option>
-      <option value="cartao">Cartao</option>
+      <option value="cartao">Cartão</option>
       <option value="dinheiro">Dinheiro</option>
     </select>
   )
