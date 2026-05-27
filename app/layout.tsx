@@ -15,11 +15,25 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "NexBarber",
   description: "Sistema SaaS para barbearias",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "NexBarber",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/nexbarber-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/nexbarber-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/nexbarber-192.png", sizes: "192x192", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#070A12",
 };
 
 export default function RootLayout({
