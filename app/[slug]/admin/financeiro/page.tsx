@@ -1,12 +1,26 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, type ElementType } from 'react'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
   ResponsiveContainer, CartesianGrid, Tooltip,
   XAxis, YAxis, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts'
+import {
+  Banknote,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  CircleDollarSign,
+  CreditCard,
+  Hourglass,
+  Smartphone,
+  Target,
+  Users,
+  WalletCards,
+  XCircle,
+} from 'lucide-react'
 
 interface Appointment {
   id: number
@@ -18,6 +32,10 @@ interface Appointment {
   payment_method: string
   payment_status: string
   status: string
+}
+interface BarberPhoto {
+  nome: string
+  avatar_url?: string | null
 }
 
 type Period = 'hoje' | 'semana' | 'mes' | 'tudo'
@@ -58,6 +76,30 @@ const PIE_COLORS: Record<string, string> = {
   pix: '#3b82f6', cartao: '#10b981', dinheiro: '#f59e0b', outros: '#8b5cf6',
 }
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+const PAYMENT_LABELS: Record<string, string> = {
+  pix: 'PIX',
+  cartao: 'Cartao',
+  dinheiro: 'Dinheiro',
+  outros: 'Outros',
+}
+const PAYMENT_ICONS: Record<string, ElementType> = {
+  pix: Smartphone,
+  cartao: CreditCard,
+  dinheiro: Banknote,
+  outros: WalletCards,
+}
+
+function nameKey(name?: string | null) {
+  return (name || '').trim().toLowerCase()
+}
+
+function normalizePaymentMethod(method?: string | null) {
+  const raw = (method || '').toLowerCase()
+  if (raw.includes('pix')) return 'pix'
+  if (raw.includes('cart') || raw.includes('card') || raw.includes('credito') || raw.includes('debito')) return 'cartao'
+  if (raw.includes('din') || raw.includes('cash')) return 'dinheiro'
+  return 'outros'
+}
 
 function useIsMobile() {
   const [m, setM] = useState(false)
@@ -79,6 +121,41 @@ function ChartTip({ active, payload, label }: any) {
   )
 }
 
+function PaymentMethodSelect({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value?: string | null
+  onChange: (value: string) => void
+  compact?: boolean
+}) {
+  return (
+    <select
+      value={normalizePaymentMethod(value)}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => onChange(event.target.value)}
+      style={{
+        width: compact ? 118 : 132,
+        maxWidth: '100%',
+        background: 'rgba(15,23,42,0.9)',
+        border: '1px solid rgba(148,163,184,0.18)',
+        borderRadius: 8,
+        color: '#cbd5e1',
+        padding: compact ? '5px 8px' : '7px 10px',
+        fontSize: compact ? 11 : 12,
+        fontWeight: 700,
+        outline: 'none',
+      }}
+    >
+      <option value="outros">Outros</option>
+      <option value="pix">PIX</option>
+      <option value="cartao">Cartao</option>
+      <option value="dinheiro">Dinheiro</option>
+    </select>
+  )
+}
+
 export default function FinanceiroPage() {
   const pathname = usePathname()
   const slug = pathname.split('/').filter(Boolean)[0]
@@ -90,25 +167,52 @@ export default function FinanceiroPage() {
   const [search, setSearch] = useState('')
   const [chartMode, setChartMode] = useState<'diario' | 'mensal'>('diario')
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [barberPhotos, setBarberPhotos] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function init() {
       const { data: t } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
       if (!t) return
       setTenantId(t.id)
-      const { data } = await supabase
-        .from('appointments').select('*')
-        .eq('tenant_id', t.id)
-        .order('appointment_date', { ascending: false })
+      const [{ data }, { data: barberRows }] = await Promise.all([
+        supabase
+          .from('appointments').select('*')
+          .eq('tenant_id', t.id)
+          .order('appointment_date', { ascending: false }),
+        supabase
+          .from('barbeiros')
+          .select('nome, avatar_url')
+          .eq('tenant_id', t.id),
+      ])
       setAppts(data ?? [])
+      setBarberPhotos(Object.fromEntries(
+        ((barberRows ?? []) as BarberPhoto[])
+          .filter(barber => barber.avatar_url)
+          .map(barber => [nameKey(barber.nome), barber.avatar_url as string])
+      ))
       setLoading(false)
     }
     if (slug) init()
   }, [slug])
 
-  async function markPaid(id: number) {
-    await supabase.from('appointments').update({ payment_status: 'paid' }).eq('id', id).eq('tenant_id', tenantId)
-    setAppts(prev => prev.map(a => a.id === id ? { ...a, payment_status: 'paid' } : a))
+  async function markPaid(id: number, method = 'outros') {
+    const paymentMethod = normalizePaymentMethod(method)
+    await supabase
+      .from('appointments')
+      .update({ payment_status: 'paid', payment_method: paymentMethod })
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+    setAppts(prev => prev.map(a => a.id === id ? { ...a, payment_status: 'paid', payment_method: paymentMethod } : a))
+  }
+
+  async function updatePaymentMethod(id: number, method: string) {
+    const paymentMethod = normalizePaymentMethod(method)
+    await supabase
+      .from('appointments')
+      .update({ payment_method: paymentMethod })
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+    setAppts(prev => prev.map(a => a.id === id ? { ...a, payment_method: paymentMethod } : a))
   }
 
   const filtered = useMemo(() => appts.filter(a => {
@@ -161,13 +265,12 @@ export default function FinanceiroPage() {
   const pieData = useMemo(() => {
     const g: Record<string, number> = {}
     rev.forEach(a => {
-      const m = (a.payment_method || 'outros').toLowerCase()
-      const key = m.includes('pix') ? 'pix' : m.includes('cart') ? 'cartao' : m.includes('din') ? 'dinheiro' : 'outros'
+      const key = normalizePaymentMethod(a.payment_method)
       g[key] = (g[key] || 0) + (a.price || 0)
     })
     return Object.entries(g).map(([key, value]) => ({
       key, value,
-      name: key === 'pix' ? 'PIX' : key === 'cartao' ? 'Cartão' : key === 'dinheiro' ? 'Dinheiro' : 'Outros'
+      name: PAYMENT_LABELS[key] || 'Outros'
     }))
   }, [rev])
 
@@ -178,8 +281,10 @@ export default function FinanceiroPage() {
       if (!g[b]) g[b] = { n: 0, r: 0 }
       g[b].n++; g[b].r += a.price || 0
     })
-    return Object.entries(g).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.r - a.r)
-  }, [rev])
+    return Object.entries(g)
+      .map(([name, v]) => ({ name, ...v, avatar_url: barberPhotos[nameKey(name)] || null }))
+      .sort((a, b) => b.r - a.r)
+  }, [rev, barberPhotos])
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16 }}>
@@ -204,10 +309,17 @@ export default function FinanceiroPage() {
   ]
 
   const kpis = [
-    { icon: '💰', label: 'Receita Total', value: fmt(totalRev), color: '#3b82f6' },
-    { icon: '✅', label: 'Recebido', value: fmt(totalPaid), color: '#10b981' },
-    { icon: '⏳', label: 'Pendente', value: fmt(totalPend), color: '#f59e0b' },
-    { icon: '🎯', label: 'Ticket Médio', value: fmt(avgTicket), color: '#8b5cf6' },
+    { icon: CircleDollarSign, label: 'Receita Total', value: fmt(totalRev), color: '#3b82f6' },
+    { icon: CheckCircle2, label: 'Recebido', value: fmt(totalPaid), color: '#10b981' },
+    { icon: Hourglass, label: 'Pendente', value: fmt(totalPend), color: '#f59e0b' },
+    { icon: Target, label: 'Ticket Médio', value: fmt(avgTicket), color: '#8b5cf6' },
+  ]
+
+  const miniStats = [
+    { icon: CalendarDays, v: rev.length, l: 'Atendimentos' },
+    { icon: XCircle, v: cancelled, l: 'Cancelamentos' },
+    { icon: Users, v: new Set(filtered.map(a => a.client_name)).size, l: 'Clientes únicos' },
+    { icon: BarChart3, v: filtered.length > 0 ? `${((cancelled / filtered.length) * 100).toFixed(1)}%` : '0%', l: 'Taxa cancelamento' },
   ]
 
   return (
@@ -242,16 +354,18 @@ export default function FinanceiroPage() {
 
       {/* ── KPI CARDS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        {kpis.map(k => (
+        {kpis.map(k => {
+          const Icon = k.icon
+          return (
           <div key={k.label} style={{ ...card, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: k.color, filter: 'blur(60px)', opacity: 0.15, top: -40, right: -20, pointerEvents: 'none' }} />
             <div style={{ width: 36, height: 36, borderRadius: 10, background: k.color + '20', border: `1px solid ${k.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
-              {k.icon}
+              <Icon size={18} strokeWidth={2.4} color={k.color} />
             </div>
             <p style={{ margin: '0 0 4px', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{k.label}</p>
             <h3 style={{ margin: 0, fontSize: isMobile ? 16 : 22, fontWeight: 900, color: '#f1f5f9' }}>{k.value}</h3>
           </div>
-        ))}
+        )})}
       </div>
 
       {/* ── CHART ── */}
@@ -309,15 +423,17 @@ export default function FinanceiroPage() {
                 </ResponsiveContainer>
               </div>
               <div style={{ flex: 1 }}>
-                {pieData.map(p => (
+                {pieData.map(p => {
+                  const Icon = PAYMENT_ICONS[p.key] || WalletCards
+                  return (
                   <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: PIE_COLORS[p.key] || '#94a3b8' }} />
+                      <Icon size={14} color={PIE_COLORS[p.key] || '#94a3b8'} strokeWidth={2.4} />
                       <span style={{ fontSize: 12, color: '#cbd5e1' }}>{p.name}</span>
                     </div>
                     <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 700 }}>{fmt(p.value)}</span>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           )}
@@ -330,9 +446,13 @@ export default function FinanceiroPage() {
             <p style={{ color: '#475569', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>Sem dados</p>
           ) : barberData.map((b, i) => (
             <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottom: i < barberData.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
-                {['🧔','👨‍🦱','👱','🧑‍🦲'][i % 4]}
-              </div>
+              {b.avatar_url ? (
+                <img src={b.avatar_url} alt={b.name} style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(59,130,246,0.25)' }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#93c5fd', flexShrink: 0 }}>
+                  {(b.name || '?').slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</p>
                 <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>{b.n} atendimentos</p>
@@ -345,18 +465,15 @@ export default function FinanceiroPage() {
 
       {/* ── STATS MINI ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 20 }}>
-        {[
-          { icon: '📅', v: rev.length, l: 'Atendimentos' },
-          { icon: '❌', v: cancelled, l: 'Cancelamentos' },
-          { icon: '👥', v: new Set(filtered.map(a => a.client_name)).size, l: 'Clientes únicos' },
-          { icon: '📊', v: filtered.length > 0 ? `${((cancelled / filtered.length) * 100).toFixed(1)}%` : '0%', l: 'Taxa cancelamento' },
-        ].map((s, i) => (
+        {miniStats.map((s, i) => {
+          const Icon = s.icon
+          return (
           <div key={i} style={{ ...card, textAlign: 'center', padding: '14px 10px' }}>
-            <span style={{ fontSize: 20 }}>{s.icon}</span>
+            <Icon size={20} color="#93c5fd" strokeWidth={2.4} />
             <p style={{ margin: '6px 0 2px', fontSize: 20, fontWeight: 900, color: '#f1f5f9' }}>{s.v}</p>
             <p style={{ margin: 0, fontSize: 11, color: '#475569' }}>{s.l}</p>
           </div>
-        ))}
+        )})}
       </div>
 
       {/* ── TABELA ── */}
@@ -388,15 +505,18 @@ export default function FinanceiroPage() {
                     </div>
                     <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#10b981' }}>{fmt(a.price)}</p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: '#475569' }}>{fmtDate(a.appointment_date)}</span>
                       <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: isCancelled ? 'rgba(239,68,68,0.12)' : isPaid ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)', color: isCancelled ? '#ef4444' : isPaid ? '#10b981' : '#f59e0b' }}>
                         {isCancelled ? 'Cancelado' : isPaid ? 'Pago' : 'Pendente'}
                       </span>
                     </div>
+                    {!isCancelled && (
+                      <PaymentMethodSelect value={a.payment_method} onChange={(method) => updatePaymentMethod(a.id, method)} compact />
+                    )}
                     {!isPaid && !isCancelled && (
-                      <button className="pay-btn" onClick={() => markPaid(a.id)} style={{ padding: '5px 12px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      <button className="pay-btn" onClick={() => markPaid(a.id, a.payment_method)} style={{ padding: '5px 12px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                         ✓ Pago
                       </button>
                     )}
@@ -411,14 +531,14 @@ export default function FinanceiroPage() {
             <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Cliente','Serviço','Barbeiro','Valor','Data','Status',''].map(h => (
+                  {['Cliente','Serviço','Barbeiro','Valor','Data','Pagamento','Status',''].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '10px 12px', color: '#334155', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={7} style={{ padding: '32px 0', textAlign: 'center', color: '#475569', fontSize: 13 }}>Nenhum resultado</td></tr>
+                  <tr><td colSpan={8} style={{ padding: '32px 0', textAlign: 'center', color: '#475569', fontSize: 13 }}>Nenhum resultado</td></tr>
                 ) : filtered.map(a => {
                   const isPaid = a.payment_status === 'paid'
                   const isCancelled = a.status === 'cancelled' || a.status === 'canceled'
@@ -437,13 +557,20 @@ export default function FinanceiroPage() {
                       <td style={{ padding: '13px 12px', fontSize: 14, fontWeight: 800, color: '#10b981' }}>{fmt(a.price)}</td>
                       <td style={{ padding: '13px 12px', fontSize: 13, color: '#64748b' }}>{fmtDate(a.appointment_date)}</td>
                       <td style={{ padding: '13px 12px' }}>
+                        {!isCancelled ? (
+                          <PaymentMethodSelect value={a.payment_method} onChange={(method) => updatePaymentMethod(a.id, method)} />
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#475569' }}>-</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '13px 12px' }}>
                         <span style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, background: isCancelled ? 'rgba(239,68,68,0.12)' : isPaid ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)', color: isCancelled ? '#ef4444' : isPaid ? '#10b981' : '#f59e0b' }}>
                           {isCancelled ? 'Cancelado' : isPaid ? 'Pago' : 'Pendente'}
                         </span>
                       </td>
                       <td style={{ padding: '13px 12px' }}>
                         {!isPaid && !isCancelled && (
-                          <button className="pay-btn" onClick={() => markPaid(a.id)} style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                          <button className="pay-btn" onClick={() => markPaid(a.id, a.payment_method)} style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                             ✓ Pago
                           </button>
                         )}
@@ -459,7 +586,10 @@ export default function FinanceiroPage() {
         {/* CONTAS A RECEBER */}
         {totalPend > 0 && (
           <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>⏳ Total pendente</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>
+              <Hourglass size={16} color="#f59e0b" strokeWidth={2.4} />
+              Total pendente
+            </span>
             <span style={{ fontSize: 18, fontWeight: 900, color: '#f59e0b' }}>{fmt(totalPend)}</span>
           </div>
         )}
