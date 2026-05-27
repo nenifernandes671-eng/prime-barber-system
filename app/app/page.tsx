@@ -7,12 +7,18 @@ import {
   CalendarCheck,
   Crown,
   ExternalLink,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
   Scissors,
   ShieldCheck,
   Sparkles,
   Store,
   UserRound,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getTenantAccess } from '@/lib/subscription-access'
 
 function cleanSlug(value: string) {
   const trimmed = value.trim()
@@ -36,16 +42,149 @@ function cleanSlug(value: string) {
 export default function AppStartPage() {
   const router = useRouter()
   const [barbershop, setBarbershop] = useState('')
-  const [adminShop, setAdminShop] = useState('')
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [ownerPassword, setOwnerPassword] = useState('')
+  const [barberEmail, setBarberEmail] = useState('')
+  const [barberPassword, setBarberPassword] = useState('')
+  const [ownerLoading, setOwnerLoading] = useState(false)
+  const [barberLoading, setBarberLoading] = useState(false)
+  const [ownerError, setOwnerError] = useState('')
+  const [barberError, setBarberError] = useState('')
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false)
+  const [showBarberPassword, setShowBarberPassword] = useState(false)
 
   function goToShop() {
     const slug = cleanSlug(barbershop)
     if (slug) router.push(`/${slug}`)
   }
 
-  function goToAdmin() {
-    const slug = cleanSlug(adminShop)
-    if (slug) router.push(`/${slug}/admin/login`)
+  async function signInOwner(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!ownerEmail || !ownerPassword) {
+      setOwnerError('Preencha e-mail e senha.')
+      return
+    }
+
+    setOwnerLoading(true)
+    setOwnerError('')
+    setBarberError('')
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: ownerEmail.trim().toLowerCase(),
+      password: ownerPassword,
+    })
+
+    if (error || !data.user) {
+      setOwnerError('E-mail ou senha incorretos.')
+      setOwnerLoading(false)
+      return
+    }
+
+    const { data: memberships, error: membershipError } = await supabase
+      .from('tenant_users')
+      .select('tenant_id, role')
+      .eq('user_id', data.user.id)
+      .in('role', ['admin', 'owner'])
+      .limit(1)
+
+    if (membershipError || !memberships?.length) {
+      await supabase.auth.signOut()
+      setOwnerError('Esta conta nao possui acesso de dono.')
+      setOwnerLoading(false)
+      return
+    }
+
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('slug')
+      .eq('id', memberships[0].tenant_id)
+      .maybeSingle()
+
+    if (!tenant?.slug) {
+      await supabase.auth.signOut()
+      setOwnerError('Nao encontrei a barbearia desta conta.')
+      setOwnerLoading(false)
+      return
+    }
+
+    router.push(`/${tenant.slug}/admin`)
+  }
+
+  async function signInBarber(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!barberEmail || !barberPassword) {
+      setBarberError('Preencha e-mail e senha.')
+      return
+    }
+
+    setBarberLoading(true)
+    setBarberError('')
+    setOwnerError('')
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: barberEmail.trim().toLowerCase(),
+      password: barberPassword,
+    })
+
+    if (error || !data.user) {
+      setBarberError('E-mail ou senha incorretos.')
+      setBarberLoading(false)
+      return
+    }
+
+    let { data: barber, error: barberLookupError } = await supabase
+      .from('barbeiros')
+      .select('id, ativo, tenant_id')
+      .eq('user_id', data.user.id)
+      .maybeSingle()
+
+    if (!barber && data.user.email) {
+      const fallback = await supabase
+        .from('barbeiros')
+        .select('id, ativo, tenant_id')
+        .eq('email', data.user.email)
+        .maybeSingle()
+
+      barber = fallback.data
+      barberLookupError = fallback.error
+
+      if (barber) {
+        await supabase
+          .from('barbeiros')
+          .update({ user_id: data.user.id })
+          .eq('id', barber.id)
+          .eq('tenant_id', barber.tenant_id)
+      }
+    }
+
+    if (barberLookupError || !barber) {
+      await supabase.auth.signOut()
+      setBarberError('Esta conta nao possui acesso de barbeiro.')
+      setBarberLoading(false)
+      return
+    }
+
+    if (!barber.ativo) {
+      await supabase.auth.signOut()
+      setBarberError('Seu acesso de barbeiro esta desativado.')
+      setBarberLoading(false)
+      return
+    }
+
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('status, trial_ends_at')
+      .eq('id', barber.tenant_id)
+      .maybeSingle()
+
+    if (!getTenantAccess(tenant).allowed) {
+      await supabase.auth.signOut()
+      setBarberError('A assinatura desta barbearia esta bloqueada ou vencida.')
+      setBarberLoading(false)
+      return
+    }
+
+    router.push('/barber/dashboard')
   }
 
   return (
@@ -244,6 +383,21 @@ export default function AppStartPage() {
           grid-template-columns: 1fr auto;
           gap: 10px;
         }
+        .login-stack {
+          display: grid;
+          gap: 10px;
+        }
+        .input-wrap {
+          position: relative;
+        }
+        .field-icon {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #768196;
+          pointer-events: none;
+        }
         .input {
           width: 100%;
           min-width: 0;
@@ -257,9 +411,40 @@ export default function AppStartPage() {
           font-weight: 700;
           outline: none;
         }
+        .input.has-icon {
+          padding-left: 42px;
+        }
+        .input.has-action {
+          padding-right: 46px;
+        }
         .input:focus {
           border-color: rgba(214,178,74,0.65);
           box-shadow: 0 0 0 4px rgba(214,178,74,0.1);
+        }
+        .password-toggle {
+          position: absolute;
+          right: 11px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 30px;
+          height: 30px;
+          border: 0;
+          border-radius: 9px;
+          display: grid;
+          place-items: center;
+          background: rgba(255,255,255,0.04);
+          color: #aab3c4;
+          cursor: pointer;
+        }
+        .auth-error {
+          border: 1px solid rgba(239,68,68,0.28);
+          background: rgba(239,68,68,0.1);
+          color: #fca5a5;
+          border-radius: 12px;
+          padding: 10px 12px;
+          font-size: 12px;
+          font-weight: 800;
+          line-height: 1.35;
         }
         .btn {
           height: 48px;
@@ -277,6 +462,10 @@ export default function AppStartPage() {
           text-decoration: none;
           white-space: nowrap;
           box-shadow: 0 18px 42px rgba(214,178,74,0.2);
+        }
+        .btn:disabled {
+          cursor: wait;
+          opacity: 0.68;
         }
         .btn.secondary {
           background: rgba(255,255,255,0.06);
@@ -368,9 +557,42 @@ export default function AppStartPage() {
                 <div>
                   <h2 className="choice-title">Sou barbeiro</h2>
                   <p className="choice-copy">Entre no seu painel para ver seus horários, clientes e comissões.</p>
-                  <a className="btn" href="/barber/login">
-                    Login do barbeiro <ArrowRight size={16} />
-                  </a>
+                  <form className="login-stack" onSubmit={signInBarber}>
+                    <div className="input-wrap">
+                      <Mail className="field-icon" size={16} />
+                      <input
+                        className="input has-icon"
+                        type="email"
+                        value={barberEmail}
+                        onChange={(event) => setBarberEmail(event.target.value)}
+                        placeholder="E-mail do barbeiro"
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div className="input-wrap">
+                      <Lock className="field-icon" size={16} />
+                      <input
+                        className="input has-icon has-action"
+                        type={showBarberPassword ? 'text' : 'password'}
+                        value={barberPassword}
+                        onChange={(event) => setBarberPassword(event.target.value)}
+                        placeholder="Senha"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowBarberPassword((value) => !value)}
+                        aria-label={showBarberPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {showBarberPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {barberError && <div className="auth-error">{barberError}</div>}
+                    <button className="btn" type="submit" disabled={barberLoading}>
+                      {barberLoading ? 'Entrando...' : 'Entrar como barbeiro'} <ArrowRight size={16} />
+                    </button>
+                  </form>
                 </div>
               </div>
             </article>
@@ -380,19 +602,43 @@ export default function AppStartPage() {
                 <div className="choice-icon"><Crown size={25} /></div>
                 <div>
                   <h2 className="choice-title">Sou dono</h2>
-                  <p className="choice-copy">Acesse o painel administrativo da sua barbearia ou crie sua conta.</p>
-                  <div className="form-row">
-                    <input
-                      className="input"
-                      value={adminShop}
-                      onChange={(event) => setAdminShop(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === 'Enter') goToAdmin() }}
-                      placeholder="Link da sua barbearia"
-                    />
-                    <button className="btn" onClick={goToAdmin}>
-                      Entrar <ArrowRight size={16} />
+                  <p className="choice-copy">Acesse o painel administrativo sem precisar lembrar o link da barbearia.</p>
+                  <form className="login-stack" onSubmit={signInOwner}>
+                    <div className="input-wrap">
+                      <Mail className="field-icon" size={16} />
+                      <input
+                        className="input has-icon"
+                        type="email"
+                        value={ownerEmail}
+                        onChange={(event) => setOwnerEmail(event.target.value)}
+                        placeholder="E-mail do dono"
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div className="input-wrap">
+                      <Lock className="field-icon" size={16} />
+                      <input
+                        className="input has-icon has-action"
+                        type={showOwnerPassword ? 'text' : 'password'}
+                        value={ownerPassword}
+                        onChange={(event) => setOwnerPassword(event.target.value)}
+                        placeholder="Senha"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowOwnerPassword((value) => !value)}
+                        aria-label={showOwnerPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {showOwnerPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {ownerError && <div className="auth-error">{ownerError}</div>}
+                    <button className="btn" type="submit" disabled={ownerLoading}>
+                      {ownerLoading ? 'Entrando...' : 'Entrar como dono'} <ArrowRight size={16} />
                     </button>
-                  </div>
+                  </form>
                   <div className="split-actions" style={{ marginTop: 10 }}>
                     <a className="btn secondary" href="/pricing">Criar barbearia</a>
                   </div>
