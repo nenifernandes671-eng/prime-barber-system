@@ -40,6 +40,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [barbers, setBarbers]   = useState<Barber[]>([])
   const [bookedTimes, setBookedTimes] = useState<string[]>([])
   const [mobileNav, setMobileNav] = useState(false)
+  const [showAppReturn, setShowAppReturn] = useState(false)
   const [tenantChecked, setTenantChecked] = useState(false)
 
   const [selectedService, setSelectedService] = useState<Service | null>(null)
@@ -55,6 +56,12 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const isPro = tenant?.plano === 'pro' || tenant?.plano === 'premium'
   const availableTimes = ALL_TIMES.filter(t => !bookedTimes.includes(t))
   const heroImage = tenant?.hero_url || DEFAULT_HERO
+
+  useEffect(() => {
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    const fromApp = new URLSearchParams(window.location.search).get('from') === 'app'
+    setShowAppReturn(Boolean(standalone || fromApp))
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -134,7 +141,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             O link acessado nao existe ou ainda nao foi configurado.
           </p>
-          <a href="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, textDecoration: 'none', fontWeight: 800, fontSize: 13 }}>
+          <a href="/app" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, textDecoration: 'none', fontWeight: 800, fontSize: 13 }}>
             Voltar para NexBarber
           </a>
         </div>
@@ -195,6 +202,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         .nav-link{color:#e2d9c8;text-decoration:none;font-size:14px;font-weight:500;letter-spacing:0.5px;transition:color 0.2s;position:relative;padding-bottom:4px;}
         .nav-link:hover{color:#c9a84c;}
         .nav-link.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:#c9a84c;border-radius:2px;}
+        .app-return{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:10px;border:1px solid rgba(201,168,76,0.35);color:#e8c96a;text-decoration:none;font-size:12px;font-weight:800;letter-spacing:.4px;background:rgba(201,168,76,0.08);white-space:nowrap;}
         .sv-card{cursor:pointer;transition:all 0.2s;border:1.5px solid #e8e0d0;}
         .sv-card:hover{border-color:#c9a84c;box-shadow:0 8px 32px rgba(201,168,76,0.15);transform:translateY(-3px);}
         .sv-card.sel{border-color:#c9a84c!important;box-shadow:0 8px 32px rgba(201,168,76,0.2);}
@@ -220,12 +228,14 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           .booking-float{position:relative!important;top:auto!important;right:auto!important;margin:0 auto!important;max-width:480px;}
           .nav-links{display:none!important;}
           .mob-btn{display:flex!important;}
+          .app-return{font-size:11px;padding:7px 10px;}
           .hero-text{padding:80px 24px 32px!important;}
           .hero-wrap{flex-direction:column!important;padding:0 0 40px!important;}
           .services-layout{grid-template-columns:1fr!important;gap:28px!important;}
           .services-copy{max-width:420px!important;}
         }
         @media(max-width:600px){
+          .gold-btn{display:none!important;}
           .sv-grid{grid-template-columns:repeat(2,1fr)!important;}
           .br-grid{grid-template-columns:repeat(2,1fr)!important;}
           .t-grid{grid-template-columns:repeat(3,1fr)!important;}
@@ -253,6 +263,8 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
               <p style={{ margin:0, fontSize:9, color:GOLD, letterSpacing:3, textTransform:'uppercase' }}>Barbearia</p>
             </div>
           </div>
+
+          {showAppReturn && <a href="/app" className="app-return">← Voltar</a>}
 
           {/* Links */}
           <div className="nav-links" style={{ display:'flex', gap:32, alignItems:'center' }}>

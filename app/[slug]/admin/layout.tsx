@@ -192,8 +192,8 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 768px) {
           .admin-sidebar-desktop { display: none !important; }
-          .admin-mobile-header { display: flex !important; }
-          .admin-main { padding-top: 56px; }
+          .admin-mobile-header { display: flex !important; background: #08101e !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+          .admin-main { padding-top: 56px; background: #020617 !important; }
           .admin-main-inner { padding: 16px 14px 80px !important; }
         }
       `}</style>

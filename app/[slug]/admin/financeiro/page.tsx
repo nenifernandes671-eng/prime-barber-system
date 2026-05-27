@@ -311,7 +311,7 @@ export default function FinanceiroPage() {
   const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <div className="finance-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9', isolation: 'isolate' }}>
+    <div className="finance-page" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9', background: '#020617' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .pay-btn:hover { opacity: 0.85; }
@@ -320,7 +320,10 @@ export default function FinanceiroPage() {
         @media (max-width: 768px) {
           .finance-page {
             background: #020617;
-            contain: paint;
+          }
+          .finance-page * {
+            box-shadow: none !important;
+            text-shadow: none !important;
           }
         }
       `}</style>
@@ -352,7 +355,7 @@ export default function FinanceiroPage() {
           const Icon = k.icon
           return (
           <div key={k.label} style={{ ...card, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ display: isMobile ? 'none' : 'block', position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: k.color, filter: 'blur(60px)', opacity: 0.15, top: -40, right: -20, pointerEvents: 'none' }} />
+            {!isMobile && <div style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: k.color, filter: 'blur(60px)', opacity: 0.15, top: -40, right: -20, pointerEvents: 'none' }} />}
             <div style={{ width: 36, height: 36, borderRadius: 10, background: k.color + '20', border: `1px solid ${k.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
               <Icon size={18} strokeWidth={2.4} color={k.color} />
             </div>

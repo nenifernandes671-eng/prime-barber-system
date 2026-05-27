@@ -74,7 +74,6 @@ export default function AppStartPage() {
 
     async function restoreAccess() {
       const lastClientSlug = localStorage.getItem(LAST_CLIENT_SLUG_KEY) || ''
-      const lastAccess = localStorage.getItem(LAST_ACCESS_KEY)
 
       if (lastClientSlug) setBarbershop(lastClientSlug)
 
@@ -82,9 +81,6 @@ export default function AppStartPage() {
       if (!active) return
 
       if (!user) {
-        if (lastAccess === 'client' && lastClientSlug) {
-          router.replace(`/${lastClientSlug}`)
-        }
         return
       }
 
@@ -158,7 +154,7 @@ export default function AppStartPage() {
     localStorage.setItem(LAST_ACCESS_KEY, 'client')
     localStorage.setItem(LAST_CLIENT_SLUG_KEY, slug)
     setBarbershop(slug)
-    router.push(`/${slug}`)
+    router.push(`/${slug}?from=app`)
   }
 
   async function signInOwner(event: React.FormEvent<HTMLFormElement>) {
@@ -663,7 +659,7 @@ export default function AppStartPage() {
                       onChange={(event) => setBarbershop(event.target.value)}
                       onBlur={() => setBarbershop((value) => cleanSlug(value))}
                       onKeyDown={(event) => { if (event.key === 'Enter') goToShop() }}
-                      placeholder="Digite só: domnenem"
+                      placeholder="Digite o link da barbearia"
                       autoCapitalize="none"
                       autoCorrect="off"
                     />
@@ -671,7 +667,7 @@ export default function AppStartPage() {
                       Abrir agenda <ArrowRight size={16} />
                     </button>
                   </div>
-                  <p className="input-hint">Nao precisa colocar o dominio. Use apenas <strong>domnenem</strong>.</p>
+                  <p className="input-hint">Nao precisa colocar o dominio. Use apenas o nome do link da barbearia.</p>
                 </div>
               </div>
             </article>
