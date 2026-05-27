@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowRight,
@@ -19,6 +19,9 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
+
+const LAST_ACCESS_KEY = 'nexbarber:last-access'
+const LAST_CLIENT_SLUG_KEY = 'nexbarber:last-client-slug'
 
 function cleanSlug(value: string) {
   const trimmed = value.trim()
@@ -53,9 +56,96 @@ export default function AppStartPage() {
   const [showOwnerPassword, setShowOwnerPassword] = useState(false)
   const [showBarberPassword, setShowBarberPassword] = useState(false)
 
+  useEffect(() => {
+    let active = true
+
+    async function restoreAccess() {
+      const lastClientSlug = localStorage.getItem(LAST_CLIENT_SLUG_KEY) || ''
+      const lastAccess = localStorage.getItem(LAST_ACCESS_KEY)
+
+      if (lastClientSlug) setBarbershop(lastClientSlug)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!active) return
+
+      if (!user) {
+        if (lastAccess === 'client' && lastClientSlug) {
+          router.replace(`/${lastClientSlug}`)
+        }
+        return
+      }
+
+      const { data: memberships } = await supabase
+        .from('tenant_users')
+        .select('tenant_id, role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'owner'])
+        .limit(1)
+
+      if (!active) return
+
+      if (memberships?.length) {
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('slug')
+          .eq('id', memberships[0].tenant_id)
+          .maybeSingle()
+
+        if (!active) return
+
+        if (tenant?.slug) {
+          localStorage.setItem(LAST_ACCESS_KEY, 'owner')
+          router.replace(`/${tenant.slug}/admin`)
+          return
+        }
+      }
+
+      let { data: barber } = await supabase
+        .from('barbeiros')
+        .select('id, ativo, tenant_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!barber && user.email) {
+        const fallback = await supabase
+          .from('barbeiros')
+          .select('id, ativo, tenant_id')
+          .eq('email', user.email)
+          .maybeSingle()
+
+        barber = fallback.data
+      }
+
+      if (!active || !barber?.ativo) return
+
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('status, trial_ends_at')
+        .eq('id', barber.tenant_id)
+        .maybeSingle()
+
+      if (!active) return
+
+      if (getTenantAccess(tenant).allowed) {
+        localStorage.setItem(LAST_ACCESS_KEY, 'barber')
+        router.replace('/barber/dashboard')
+      }
+    }
+
+    restoreAccess()
+
+    return () => {
+      active = false
+    }
+  }, [router])
+
   function goToShop() {
     const slug = cleanSlug(barbershop)
-    if (slug) router.push(`/${slug}`)
+    if (!slug) return
+    localStorage.setItem(LAST_ACCESS_KEY, 'client')
+    localStorage.setItem(LAST_CLIENT_SLUG_KEY, slug)
+    setBarbershop(slug)
+    router.push(`/${slug}`)
   }
 
   async function signInOwner(event: React.FormEvent<HTMLFormElement>) {
@@ -107,6 +197,7 @@ export default function AppStartPage() {
       return
     }
 
+    localStorage.setItem(LAST_ACCESS_KEY, 'owner')
     router.push(`/${tenant.slug}/admin`)
   }
 
@@ -184,6 +275,7 @@ export default function AppStartPage() {
       return
     }
 
+    localStorage.setItem(LAST_ACCESS_KEY, 'barber')
     router.push('/barber/dashboard')
   }
 
@@ -378,6 +470,15 @@ export default function AppStartPage() {
           font-size: 14px;
           line-height: 1.55;
         }
+        .input-hint {
+          margin: 8px 0 0;
+          color: #6f7a8f;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .input-hint strong {
+          color: #d6b24a;
+        }
         .form-row {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -540,13 +641,17 @@ export default function AppStartPage() {
                       className="input"
                       value={barbershop}
                       onChange={(event) => setBarbershop(event.target.value)}
+                      onBlur={() => setBarbershop((value) => cleanSlug(value))}
                       onKeyDown={(event) => { if (event.key === 'Enter') goToShop() }}
-                      placeholder="Ex: domnenem"
+                      placeholder="Digite só: domnenem"
+                      autoCapitalize="none"
+                      autoCorrect="off"
                     />
                     <button className="btn" onClick={goToShop}>
                       Abrir agenda <ArrowRight size={16} />
                     </button>
                   </div>
+                  <p className="input-hint">Nao precisa colocar o dominio. Use apenas <strong>domnenem</strong>.</p>
                 </div>
               </div>
             </article>
