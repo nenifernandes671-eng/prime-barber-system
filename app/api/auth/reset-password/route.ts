@@ -36,7 +36,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+    const requestOrigin = new URL(req.url).origin
+    const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL
+    const appUrl = requestOrigin.includes('localhost')
+      ? configuredAppUrl || requestOrigin
+      : requestOrigin
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: cleanEmail,
