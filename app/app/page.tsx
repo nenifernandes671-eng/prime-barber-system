@@ -94,6 +94,10 @@ export default function AppStartPage() {
       if (!active) return
 
       if (memberships?.length) {
+        if (!user.user_metadata?.password_set) {
+          return
+        }
+
         const { data: tenant } = await supabase
           .from('tenants')
           .select('slug')
@@ -204,6 +208,16 @@ export default function AppStartPage() {
       setOwnerError('Nao encontrei a barbearia desta conta.')
       setOwnerLoading(false)
       return
+    }
+
+    if (!data.user.user_metadata?.password_set) {
+      await supabase.auth.updateUser({
+        data: {
+          ...data.user.user_metadata,
+          password_set: true,
+          slug: tenant.slug,
+        },
+      })
     }
 
     localStorage.setItem(LAST_ACCESS_KEY, 'owner')

@@ -102,6 +102,16 @@ export default function SlugLoginPage({
       return
     }
 
+    if (!data.user.user_metadata?.password_set) {
+      await supabase.auth.updateUser({
+        data: {
+          ...data.user.user_metadata,
+          password_set: true,
+          slug,
+        },
+      })
+    }
+
     router.push(`/${slug}/admin`)
   }
 
