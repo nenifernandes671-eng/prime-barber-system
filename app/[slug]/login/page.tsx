@@ -116,19 +116,21 @@ export default function SlugLoginPage({
     setError('')
     setResetMessage('')
 
-    const redirectTo = `${window.location.origin}/set-password`
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo,
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), slug }),
     })
 
     setResetLoading(false)
 
-    if (resetError) {
-      setError('Não consegui enviar o e-mail de redefinição agora.')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setError(data.error || 'Não consegui enviar o e-mail de redefinição agora.')
       return
     }
 
-    setResetMessage('Enviamos um e-mail com o link para redefinir sua senha.')
+    setResetMessage('Se este e-mail estiver cadastrado, enviamos o link para redefinir sua senha.')
   }
 
   const handleKeyDown = (
