@@ -98,7 +98,9 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const SidebarContent = () => (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, padding: '0 8px' }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>✂</div>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#0b1220', border: '1px solid rgba(96,165,250,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+          <img src="/icons/nexbarber-192.png" alt="NexBarber" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
         <div style={{ overflow: 'hidden' }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenant?.nome ?? slug.toUpperCase()}</p>
           <p style={{ fontSize: 10, color: '#475569', margin: 0 }}>Painel Admin</p>
@@ -158,14 +160,14 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#070b14', fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9' }}>
-      <aside style={{ width: 240, minHeight: '100vh', background: 'rgba(8,15,30,0.95)', borderRight: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', padding: '20px 14px', position: 'sticky', top: 0, height: '100vh' }}
+      <aside style={{ width: 240, minHeight: '100vh', background: 'rgba(8,15,30,0.95)', borderRight: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', padding: '20px 14px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', overscrollBehavior: 'contain', scrollbarWidth: 'thin', scrollbarColor: '#1e3a8a transparent' }}
         className="admin-sidebar-desktop">
         <SidebarContent />
       </aside>
 
       <div className="admin-mobile-header" style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 40, background: 'rgba(8,15,30,0.95)', borderBottom: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', padding: '12px 18px', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>✂</span>
+          <img src="/icons/nexbarber-192.png" alt="NexBarber" style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
           <p style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{tenant?.nome ?? slug}</p>
         </div>
         <button onClick={() => setMobileOpen(v => !v)} style={{ background: 'transparent', border: 'none', color: '#f1f5f9', cursor: 'pointer' }}>
@@ -195,6 +197,16 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           .admin-mobile-header { display: flex !important; background: #08101e !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
           .admin-main { padding-top: 56px; background: #020617 !important; }
           .admin-main-inner { padding: 16px 14px 80px !important; }
+        }
+        @media (max-height: 760px) and (min-width: 769px) {
+          .admin-sidebar-desktop {
+            padding-top: 14px !important;
+            padding-bottom: 14px !important;
+          }
+          .admin-sidebar-desktop nav a {
+            padding-top: 9px !important;
+            padding-bottom: 9px !important;
+          }
         }
       `}</style>
     </div>

@@ -329,13 +329,13 @@ export default function FinanceiroPage() {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 18, padding: isMobile ? 0 : '20px 22px', borderRadius: isMobile ? 0 : 22, background: isMobile ? 'transparent' : 'linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.70))', border: isMobile ? 'none' : '1px solid rgba(148,163,184,0.08)' }}>
         <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: '#f1f5f9' }}>Financeiro</h1>
         <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>Receitas, pagamentos e desempenho</p>
       </div>
 
       {/* ── PERIOD PILLS ── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
         {periods.map(p => (
           <button key={p.key} className="period-btn" onClick={() => setPeriod(p.key)} style={{
             padding: '8px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',

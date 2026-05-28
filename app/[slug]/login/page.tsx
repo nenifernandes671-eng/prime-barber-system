@@ -17,6 +17,8 @@ export default function SlugLoginPage({
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetMessage, setResetMessage] = useState('')
   const [showPass, setShowPass] = useState(false)
 
   // ✅ NOVO
@@ -103,6 +105,32 @@ export default function SlugLoginPage({
     router.push(`/${slug}/admin`)
   }
 
+  const handlePasswordReset = async () => {
+    if (!email.trim()) {
+      setResetMessage('')
+      setError('Digite seu e-mail para receber o link de redefinição.')
+      return
+    }
+
+    setResetLoading(true)
+    setError('')
+    setResetMessage('')
+
+    const redirectTo = `${window.location.origin}/set-password`
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    })
+
+    setResetLoading(false)
+
+    if (resetError) {
+      setError('Não consegui enviar o e-mail de redefinição agora.')
+      return
+    }
+
+    setResetMessage('Enviamos um e-mail com o link para redefinir sua senha.')
+  }
+
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>
   ) => {
@@ -146,7 +174,9 @@ export default function SlugLoginPage({
 
       <div style={styles.card}>
         <div style={styles.topSection}>
-          <div style={styles.iconWrap}>✂</div>
+          <div style={styles.iconWrap}>
+            <img src="/icons/nexbarber-192.png" alt="NexBarber" style={styles.logoImg} />
+          </div>
 
           <h1 style={styles.title}>Painel Admin</h1>
 
@@ -209,6 +239,13 @@ export default function SlugLoginPage({
             </div>
           )}
 
+          {resetMessage && (
+            <div style={styles.successBox}>
+              <span>✓</span>
+              {resetMessage}
+            </div>
+          )}
+
           <button
             onClick={handleLogin}
             disabled={loading}
@@ -218,6 +255,18 @@ export default function SlugLoginPage({
             }}
           >
             {loading ? 'Entrando...' : 'Entrar no Painel'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePasswordReset}
+            disabled={resetLoading}
+            style={{
+              ...styles.resetBtn,
+              opacity: resetLoading ? 0.7 : 1,
+            }}
+          >
+            {resetLoading ? 'Enviando...' : 'Esqueci minha senha'}
           </button>
         </div>
 
@@ -357,6 +406,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 28,
     marginBottom: 16,
     border: '1px solid #2d3f5a',
+    overflow: 'hidden',
+  },
+
+  logoImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   },
 
   title: {
@@ -443,6 +499,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#f87171',
   },
 
+  successBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#10b98118',
+    border: '1px solid #10b98135',
+    borderRadius: 10,
+    padding: '10px 14px',
+    fontSize: 13,
+    color: '#34d399',
+  },
+
   submitBtn: {
     marginTop: 4,
     padding: '13px',
@@ -455,6 +523,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     letterSpacing: 0.3,
+  },
+
+  resetBtn: {
+    marginTop: -8,
+    padding: '6px 8px',
+    border: 'none',
+    background: 'transparent',
+    color: '#93c5fd',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
   },
 
   footer: {
