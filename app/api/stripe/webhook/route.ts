@@ -16,6 +16,24 @@ function subscriptionEndDate(subscription: Stripe.Subscription | null | undefine
   return rawEnd ? new Date(rawEnd * 1000).toISOString() : null
 }
 
+function resolveAppUrl(req: NextRequest) {
+  const forwardedHost = req.headers.get('x-forwarded-host')
+  const forwardedProto = req.headers.get('x-forwarded-proto') || 'https'
+  const host = forwardedHost || req.headers.get('host')
+  const requestOrigin = host ? `${forwardedProto}://${host}` : new URL(req.url).origin
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL
+
+  if (requestOrigin && !requestOrigin.includes('localhost')) {
+    return requestOrigin
+  }
+
+  if (configuredAppUrl && !configuredAppUrl.includes('localhost')) {
+    return configuredAppUrl
+  }
+
+  return 'https://www.nexbarber.com.br'
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text()
   const signature = req.headers.get('stripe-signature')!
@@ -122,7 +140,7 @@ const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.gene
   type: 'magiclink',
   email,
   options: {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/set-password`,
+    redirectTo: `${resolveAppUrl(req)}/set-password`,
   },
 })
 

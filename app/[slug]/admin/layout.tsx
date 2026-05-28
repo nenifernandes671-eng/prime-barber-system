@@ -45,7 +45,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
 
       // ✅ Se ainda não definiu senha, redireciona
       if (!user.user_metadata?.password_set) {
-        router.push(`/${slug}/set-password`)
+        router.push('/set-password')
         return
       }
 

@@ -15,6 +15,24 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#039;')
 }
 
+function resolveAppUrl(req: NextRequest) {
+  const forwardedHost = req.headers.get('x-forwarded-host')
+  const forwardedProto = req.headers.get('x-forwarded-proto') || 'https'
+  const host = forwardedHost || req.headers.get('host')
+  const requestOrigin = host ? `${forwardedProto}://${host}` : new URL(req.url).origin
+  const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL
+
+  if (requestOrigin && !requestOrigin.includes('localhost')) {
+    return requestOrigin
+  }
+
+  if (configuredAppUrl && !configuredAppUrl.includes('localhost')) {
+    return configuredAppUrl
+  }
+
+  return 'https://www.nexbarber.com.br'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { email, slug } = await req.json()
@@ -36,11 +54,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const requestOrigin = new URL(req.url).origin
-    const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL
-    const appUrl = requestOrigin.includes('localhost')
-      ? configuredAppUrl || requestOrigin
-      : requestOrigin
+    const appUrl = resolveAppUrl(req)
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: cleanEmail,
