@@ -27,7 +27,7 @@ async function requireAdmin(req: NextRequest, tenantId: string) {
     .maybeSingle()
 
   if (error) return jsonError(error.message, 500)
-  if (!membership || membership.role !== 'admin') return jsonError('Acesso negado.', 403)
+  if (!membership || !['admin', 'owner'].includes(membership.role)) return jsonError('Acesso negado.', 403)
 
   return { user: userData.user }
 }
@@ -36,12 +36,12 @@ async function loadAssets(tenantId: string) {
   const [{ data: barbers, error: barbersError }, { data: services, error: servicesError }] = await Promise.all([
     supabaseAdmin
       .from('barbeiros')
-      .select('id,nome,avatar_url')
+      .select('*')
       .eq('tenant_id', tenantId)
       .order('nome'),
     supabaseAdmin
       .from('services')
-      .select('id,name,price,photo_url')
+      .select('*')
       .eq('tenant_id', tenantId)
       .order('name'),
   ])

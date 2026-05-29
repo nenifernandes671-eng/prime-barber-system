@@ -66,7 +66,7 @@ async function requireAdmin(req: NextRequest, tenantId: string) {
     .maybeSingle()
 
   if (error) return jsonError(error.message, 500)
-  if (!membership || membership.role !== 'admin') return jsonError('Acesso negado.', 403)
+  if (!membership || !['admin', 'owner'].includes(membership.role)) return jsonError('Acesso negado.', 403)
 
   return { user: userData.user }
 }
