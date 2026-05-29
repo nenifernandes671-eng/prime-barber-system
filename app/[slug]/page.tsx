@@ -7,7 +7,6 @@ import { getTenantAccess } from '@/lib/subscription-access'
 interface Service { id: string; name: string; price: number; duration: number; description?: string; photo_url?: string }
 interface Barber  { id: string; nome: string; avatar_url?: string }
 interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string }
-interface AppointmentTime { appointment_time?: string }
 
 const ALL_TIMES = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00']
 const GOLD = '#c9a84c'
@@ -93,11 +92,14 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
   async function fetchTimes(date: string, barber: Barber) {
     if (!tenant) return
-    const { data } = await supabase
-      .from('appointments').select('appointment_time')
-      .eq('tenant_id', tenant.id).eq('appointment_date', date)
-      .eq('barber', barber.nome).neq('status', 'cancelled')
-    setBookedTimes(((data ?? []) as AppointmentTime[]).map((x) => x.appointment_time?.slice(0, 5)).filter(Boolean) as string[])
+    const params = new URLSearchParams({
+      tenant_id: tenant.id,
+      barber_id: barber.id,
+      date,
+    })
+    const response = await fetch(`/api/public/appointments?${params.toString()}`)
+    const payload = await response.json().catch(() => ({}))
+    setBookedTimes(response.ok ? (payload.bookedTimes ?? []) : [])
   }
 
   function handleDateChange(date: string) {
@@ -115,14 +117,29 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       setError('Por favor, preencha todos os campos.'); return
     }
     setSubmitting(true); setError('')
-    const { error: err } = await supabase.from('appointments').insert({
-      tenant_id: tenant!.id, client_name: clientName, phone: clientPhone,
-      service: selectedService.name, price: selectedService.price,
-      barber: selectedBarber.nome, appointment_date: selectedDate,
-      appointment_time: selectedTime, status: 'scheduled', payment_status: 'pending',
+    const response = await fetch('/api/public/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_id: tenant!.id,
+        service_id: selectedService.id,
+        barber_id: selectedBarber.id,
+        client_name: clientName,
+        phone: clientPhone,
+        appointment_date: selectedDate,
+        appointment_time: selectedTime,
+      }),
     })
+    const payload = await response.json().catch(() => ({}))
     setSubmitting(false)
-    if (err) { setError('Erro ao agendar. Tente novamente.'); return }
+    if (!response.ok) {
+      setError(payload.error ?? 'Erro ao agendar. Tente novamente.')
+      if (response.status === 409) {
+        setSelectedTime('')
+        fetchTimes(selectedDate, selectedBarber)
+      }
+      return
+    }
     setSuccess(true)
   }
 
