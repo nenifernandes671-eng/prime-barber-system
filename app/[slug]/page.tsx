@@ -242,7 +242,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           .services-copy{max-width:420px!important;}
         }
         @media(max-width:600px){
-          .gold-btn{display:none!important;}
+          nav .gold-btn{display:none!important;}
           .sv-grid{grid-template-columns:repeat(2,1fr)!important;}
           .br-grid{grid-template-columns:repeat(2,1fr)!important;}
           .t-grid{grid-template-columns:repeat(3,1fr)!important;}
