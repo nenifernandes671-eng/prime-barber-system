@@ -168,14 +168,18 @@ const canUploadPhotos = hasFeature(
     if (!currentTenantId) return
     if (!canUploadPhotos) return
     setSaving(barberId)
-    const ext = file.name.split('.').pop()
-    const path = `barbers/${barberId}.${ext}`
-    const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, { upsert: true })
+    const path = `barbers/${barberId}`
+    const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, {
+      upsert: true,
+      cacheControl: '60',
+      contentType: file.type || 'image/jpeg',
+    })
     if (upErr) { alert('Erro no upload: ' + upErr.message); setSaving(null); return }
     const { data: { publicUrl } } = supabase.storage.from('barbershop-media').getPublicUrl(path)
-    const result = await saveAssetChange('update_barber_photo', { barber_id: barberId, avatar_url: publicUrl })
+    const displayUrl = `${publicUrl}?v=${Date.now()}`
+    const result = await saveAssetChange('update_barber_photo', { barber_id: barberId, avatar_url: displayUrl })
     if (!result.ok) { alert('Erro ao salvar foto: ' + result.error); setSaving(null); return }
-    setBarbers(prev => prev.map(b => b.id === barberId ? { ...b, avatar_url: publicUrl } : b))
+    setBarbers(prev => prev.map(b => b.id === barberId ? { ...b, avatar_url: displayUrl } : b))
     setSaving(null)
     setSaved(barberId)
     setTimeout(() => setSaved(null), 2000)
@@ -185,14 +189,18 @@ const canUploadPhotos = hasFeature(
     if (!currentTenantId) return
     if (!canUploadPhotos) return
     setSaving(serviceId)
-    const ext = file.name.split('.').pop()
-    const path = `services/${serviceId}.${ext}`
-    const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, { upsert: true })
+    const path = `services/${serviceId}`
+    const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, {
+      upsert: true,
+      cacheControl: '60',
+      contentType: file.type || 'image/jpeg',
+    })
     if (upErr) { alert('Erro no upload: ' + upErr.message); setSaving(null); return }
     const { data: { publicUrl } } = supabase.storage.from('barbershop-media').getPublicUrl(path)
-    const result = await saveAssetChange('update_service_photo', { service_id: serviceId, photo_url: publicUrl })
+    const displayUrl = `${publicUrl}?v=${Date.now()}`
+    const result = await saveAssetChange('update_service_photo', { service_id: serviceId, photo_url: displayUrl })
     if (!result.ok) { alert('Erro ao salvar foto: ' + result.error); setSaving(null); return }
-    setServices(prev => prev.map(s => s.id === serviceId ? { ...s, photo_url: publicUrl } : s))
+    setServices(prev => prev.map(s => s.id === serviceId ? { ...s, photo_url: displayUrl } : s))
     setSaving(null)
     setSaved(serviceId)
     setTimeout(() => setSaved(null), 2000)

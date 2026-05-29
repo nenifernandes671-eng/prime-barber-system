@@ -75,10 +75,17 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         return
       }
       setTenant(t)
-      const { data: sv } = await supabase.from('services').select('*').eq('tenant_id', t.id).order('price')
-      const { data: br } = await supabase.from('barbeiros').select('*').eq('tenant_id', t.id).eq('ativo', true)
-      setServices(sv ?? [])
-      setBarbers(br ?? [])
+      const response = await fetch(`/api/public/tenant-assets?tenant_id=${encodeURIComponent(t.id)}`)
+      const assets = await response.json().catch(() => ({}))
+      if (response.ok) {
+        setServices(assets.services ?? [])
+        setBarbers(assets.barbers ?? [])
+      } else {
+        const { data: sv } = await supabase.from('services').select('*').eq('tenant_id', t.id).order('price')
+        const { data: br } = await supabase.from('barbeiros').select('*').eq('tenant_id', t.id).eq('ativo', true)
+        setServices(sv ?? [])
+        setBarbers(br ?? [])
+      }
       setTenantChecked(true)
     }
     load()

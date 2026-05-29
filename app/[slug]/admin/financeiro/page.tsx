@@ -157,26 +157,36 @@ export default function FinanceiroPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: t } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
-      if (!t) return
-      setTenantId(t.id)
-      const [{ data }, { data: barberRows }] = await Promise.all([
-        supabase
+      try {
+        const { data: t } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
+        if (!t) return
+        setTenantId(t.id)
+
+        const { data } = await supabase
           .from('appointments').select('*')
           .eq('tenant_id', t.id)
-          .order('appointment_date', { ascending: false }),
-        supabase
-          .from('barbeiros')
-          .select('nome, avatar_url')
-          .eq('tenant_id', t.id),
-      ])
-      setAppts(data ?? [])
-      setBarberPhotos(Object.fromEntries(
-        ((barberRows ?? []) as BarberPhoto[])
-          .filter(barber => barber.avatar_url)
-          .map(barber => [nameKey(barber.nome), barber.avatar_url as string])
-      ))
-      setLoading(false)
+          .order('appointment_date', { ascending: false })
+
+        let barberRows: BarberPhoto[] = []
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        if (token) {
+          const response = await fetch(`/api/admin/settings-assets?tenant_id=${encodeURIComponent(t.id)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          const assets = await response.json().catch(() => ({}))
+          if (response.ok) barberRows = assets.barbers ?? []
+        }
+
+        setAppts(data ?? [])
+        setBarberPhotos(Object.fromEntries(
+          barberRows
+            .filter(barber => barber.avatar_url)
+            .map(barber => [nameKey(barber.nome), barber.avatar_url as string])
+        ))
+      } finally {
+        setLoading(false)
+      }
     }
     if (slug) init()
   }, [slug])
