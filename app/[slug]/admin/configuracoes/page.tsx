@@ -67,15 +67,50 @@ const canUploadPhotos = hasFeature(
     loadUser()
   }, [])
 
+  async function getAuthToken() {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token ?? null
+  }
+
+  async function saveAssetChange(action: string, payload: Record<string, unknown>) {
+    const token = await getAuthToken()
+    if (!token || !currentTenantId) return { ok: false, error: 'Sessao expirada. Entre novamente.' }
+
+    const response = await fetch('/api/admin/settings-assets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, tenant_id: currentTenantId, ...payload }),
+    })
+    const data = await response.json().catch(() => ({}))
+    return response.ok ? { ok: true, ...data } : { ok: false, error: data.error ?? 'Erro ao salvar configuracoes.' }
+  }
+
   async function fetchData() {
     if (!currentTenantId) return
     setLoading(true)
-    const [{ data: b }, { data: s }] = await Promise.all([
-      supabase.from('barbeiros').select('id,nome,avatar_url').eq('tenant_id', currentTenantId),
-      supabase.from('services').select('id,name,price,photo_url').eq('tenant_id', currentTenantId),
-    ])
-    setBarbers(b ?? [])
-    setServices(s ?? [])
+    const token = await getAuthToken()
+    if (!token) {
+      setBarbers([])
+      setServices([])
+      setLoading(false)
+      return
+    }
+
+    const response = await fetch(`/api/admin/settings-assets?tenant_id=${encodeURIComponent(currentTenantId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await response.json().catch(() => ({}))
+    if (response.ok) {
+      setBarbers(data.barbers ?? [])
+      setServices(data.services ?? [])
+    } else {
+      console.error(data.error ?? 'Erro ao carregar configuracoes.')
+      setBarbers([])
+      setServices([])
+    }
     setLoading(false)
   }
 
@@ -138,7 +173,8 @@ const canUploadPhotos = hasFeature(
     const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, { upsert: true })
     if (upErr) { alert('Erro no upload: ' + upErr.message); setSaving(null); return }
     const { data: { publicUrl } } = supabase.storage.from('barbershop-media').getPublicUrl(path)
-    await supabase.from('barbeiros').update({ avatar_url: publicUrl }).eq('id', barberId).eq('tenant_id', currentTenantId)
+    const result = await saveAssetChange('update_barber_photo', { barber_id: barberId, avatar_url: publicUrl })
+    if (!result.ok) { alert('Erro ao salvar foto: ' + result.error); setSaving(null); return }
     setBarbers(prev => prev.map(b => b.id === barberId ? { ...b, avatar_url: publicUrl } : b))
     setSaving(null)
     setSaved(barberId)
@@ -154,7 +190,8 @@ const canUploadPhotos = hasFeature(
     const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, { upsert: true })
     if (upErr) { alert('Erro no upload: ' + upErr.message); setSaving(null); return }
     const { data: { publicUrl } } = supabase.storage.from('barbershop-media').getPublicUrl(path)
-    await supabase.from('services').update({ photo_url: publicUrl }).eq('id', serviceId).eq('tenant_id', currentTenantId)
+    const result = await saveAssetChange('update_service_photo', { service_id: serviceId, photo_url: publicUrl })
+    if (!result.ok) { alert('Erro ao salvar foto: ' + result.error); setSaving(null); return }
     setServices(prev => prev.map(s => s.id === serviceId ? { ...s, photo_url: publicUrl } : s))
     setSaving(null)
     setSaved(serviceId)
@@ -163,13 +200,15 @@ const canUploadPhotos = hasFeature(
 
   async function removeBarberPhoto(barberId: string) {
     if (!currentTenantId) return
-    await supabase.from('barbeiros').update({ avatar_url: null }).eq('id', barberId).eq('tenant_id', currentTenantId)
+    const result = await saveAssetChange('update_barber_photo', { barber_id: barberId, avatar_url: null })
+    if (!result.ok) { alert('Erro ao remover foto: ' + result.error); return }
     setBarbers(prev => prev.map(b => b.id === barberId ? { ...b, avatar_url: undefined } : b))
   }
 
   async function removeServicePhoto(serviceId: string) {
     if (!currentTenantId) return
-    await supabase.from('services').update({ photo_url: null }).eq('id', serviceId).eq('tenant_id', currentTenantId)
+    const result = await saveAssetChange('update_service_photo', { service_id: serviceId, photo_url: null })
+    if (!result.ok) { alert('Erro ao remover foto: ' + result.error); return }
     setServices(prev => prev.map(s => s.id === serviceId ? { ...s, photo_url: undefined } : s))
   }
 

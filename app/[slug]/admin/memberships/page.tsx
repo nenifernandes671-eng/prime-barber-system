@@ -35,38 +35,6 @@ interface Membro {
 
 type ModalMode = 'plano' | 'membro' | null
 
-type DefaultMembershipPlan = Omit<Plan, 'id' | 'created_at'>
-
-const DEFAULT_MEMBERSHIP_PLANS: DefaultMembershipPlan[] = [
-  {
-    nome: 'Mensal Corte',
-    descricao: 'Plano mensal para manter o cliente recorrente.',
-    preco: 79.9,
-    frequencia: 'mensal',
-    beneficios: ['1 corte por mes', 'Prioridade no agendamento', 'Aviso de vencimento'],
-    cor: '#3b82f6',
-    ativo: true,
-  },
-  {
-    nome: 'Mensal Premium',
-    descricao: 'Plano mensal com corte e barba.',
-    preco: 119.9,
-    frequencia: 'mensal',
-    beneficios: ['1 corte por mes', '1 barba por mes', 'Atendimento prioritario'],
-    cor: '#f59e0b',
-    ativo: true,
-  },
-  {
-    nome: 'Mensal VIP',
-    descricao: 'Plano mensal para clientes VIP.',
-    preco: 169.9,
-    frequencia: 'mensal',
-    beneficios: ['Corte e barba', 'Produtos com desconto', 'Horario preferencial'],
-    cor: '#8b5cf6',
-    ativo: true,
-  },
-]
-
 const todayYmd = () =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
@@ -81,7 +49,6 @@ const addDaysYmd = (days: number) => {
   return base.toISOString().split('T')[0]
 }
 
-const isExpiredMembership = (date: string) => date < todayYmd()
 const isDueSoonMembership = (date: string) => date >= todayYmd() && date <= addDaysYmd(7)
 
 /* ── SQL (copie e rode no Supabase SQL Editor) ──────────────────────────────
@@ -158,68 +125,55 @@ export default function AdminMemberships() {
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
-  useEffect(() => { if (tenantId) { fetchPlans(); fetchMembros() } }, [tenantId])
+  useEffect(() => { if (tenantId) fetchMembershipData() }, [tenantId])
 
-  const fetchPlans = async () => {
-    if (!tenantId) return
-    setLoadingPlans(true)
-    const { data, error } = await supabase.from('membership_plans').select('*')
-      .eq('tenant_id', tenantId).order('preco')
-
-    if (!error && data) {
-      if (data.length > 0) {
-        setPlans(data)
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('membership_plans')
-          .insert(DEFAULT_MEMBERSHIP_PLANS.map(plan => ({ ...plan, tenant_id: tenantId })))
-          .select('*')
-
-        if (!insertError && inserted) {
-          setPlans(inserted.sort((a, b) => Number(a.preco) - Number(b.preco)))
-          setFeedback({ type: 'success', msg: 'Criei planos mensais padrao para voce comecar.' })
-        } else {
-          setPlans([])
-        }
-      }
-    } else {
-      setPlans([])
-    }
-    setLoadingPlans(false)
+  const getAuthToken = async () => {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token ?? null
   }
 
-  const fetchMembros = async () => {
+  const membershipRequest = async (action: string, payload: Record<string, unknown> = {}) => {
     if (!tenantId) return
+    const token = await getAuthToken()
+    if (!token) throw new Error('Sessao expirada. Entre novamente.')
+
+    const response = await fetch('/api/admin/memberships', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, tenant_id: tenantId, ...payload }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error ?? 'Erro ao salvar memberships.')
+    return data
+  }
+
+  const fetchMembershipData = async () => {
+    if (!tenantId) return
+    setLoadingPlans(true)
     setLoadingMembros(true)
-    const { data } = await supabase.from('memberships')
-      .select('*, membership_plans(nome)')
-      .eq('tenant_id', tenantId)
-      .order('vencimento')
+    try {
+      const token = await getAuthToken()
+      if (!token) throw new Error('Sessao expirada. Entre novamente.')
 
-    if (data) {
-      const mapped = data.map((m: any) => ({
-        ...m,
-        plano_nome: m.membership_plans?.nome ?? '-',
-        status: m.status === 'ativo' && isExpiredMembership(m.vencimento) ? 'vencido' : m.status,
-      }))
+      const response = await fetch(`/api/admin/memberships?tenant_id=${encodeURIComponent(tenantId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error ?? 'Erro ao carregar memberships.')
 
-      const expiredIds = mapped
-        .filter((m: any) => m.status === 'vencido' && data.find((item: any) => item.id === m.id)?.status === 'ativo')
-        .map((m: any) => m.id)
-
-      if (expiredIds.length) {
-        await supabase
-          .from('memberships')
-          .update({ status: 'vencido' })
-          .in('id', expiredIds)
-          .eq('tenant_id', tenantId)
-      }
-
-      setMembros(mapped)
-    } else {
+      setPlans(data.plans ?? [])
+      setMembros(data.membros ?? [])
+    } catch (error: any) {
+      setPlans([])
       setMembros([])
+      setFeedback({ type: 'error', msg: error.message ?? 'Erro ao carregar memberships.' })
+    } finally {
+      setLoadingPlans(false)
+      setLoadingMembros(false)
     }
-    setLoadingMembros(false)
   }
 
   const openNewPlan = () => {
@@ -240,24 +194,30 @@ export default function AdminMemberships() {
     if (!planNome || !planPreco) { setFeedback({ type: 'error', msg: 'Nome e preço são obrigatórios.' }); return }
     setSavingPlan(true); setFeedback(null)
     const payload = {
-      tenant_id: tenantId,
       nome: planNome.trim(), descricao: planDesc.trim(), preco: parseFloat(planPreco),
       frequencia: planFreq, beneficios: planBeneficios.split('\n').map(b => b.trim()).filter(Boolean),
       cor: planCor, ativo: planAtivo,
     }
-    const { error } = editingPlan
-      ? await supabase.from('membership_plans').update(payload).eq('id', editingPlan.id).eq('tenant_id', tenantId)
-      : await supabase.from('membership_plans').insert(payload)
-    if (error) setFeedback({ type: 'error', msg: 'Erro: ' + error.message })
-    else { setFeedback({ type: 'success', msg: editingPlan ? 'Plano atualizado!' : 'Plano criado!' }); setModal(null); fetchPlans() }
+    try {
+      await membershipRequest('save_plan', { plan_id: editingPlan?.id, payload })
+      setFeedback({ type: 'success', msg: editingPlan ? 'Plano atualizado!' : 'Plano criado!' })
+      setModal(null)
+      fetchMembershipData()
+    } catch (error: any) {
+      setFeedback({ type: 'error', msg: 'Erro: ' + error.message })
+    }
     setSavingPlan(false)
   }
 
   const deletePlan = async (id: string) => {
     if (!confirm('Excluir este plano?')) return
-    const { error } = await supabase.from('membership_plans').delete().eq('id', id).eq('tenant_id', tenantId)
-    if (error) setFeedback({ type: 'error', msg: 'Erro ao excluir: ' + error.message })
-    else { setFeedback({ type: 'success', msg: 'Plano excluído.' }); fetchPlans() }
+    try {
+      await membershipRequest('delete_plan', { plan_id: id })
+      setFeedback({ type: 'success', msg: 'Plano excluido.' })
+      fetchMembershipData()
+    } catch (error: any) {
+      setFeedback({ type: 'error', msg: 'Erro ao excluir: ' + error.message })
+    }
   }
 
   const openNewMembro = () => {
@@ -297,22 +257,28 @@ export default function AdminMemberships() {
     const vencimento = calcVencimento(memInicio, plan?.frequencia ?? 'mensal')
     const payload = {
       nome: memNome.trim(), email: memEmail.trim(), telefone: memTelefone.trim(),
-      tenant_id: tenantId,
       plano_id: memPlanoId, status: memStatus, inicio: memInicio,
       vencimento, valor_pago: plan?.preco ?? 0,
     }
-    const { error } = editingMembro
-      ? await supabase.from('memberships').update(payload).eq('id', editingMembro.id).eq('tenant_id', tenantId)
-      : await supabase.from('memberships').insert(payload)
-    if (error) setFeedback({ type: 'error', msg: 'Erro: ' + error.message })
-    else { setFeedback({ type: 'success', msg: editingMembro ? 'Membro atualizado!' : 'Membro adicionado!' }); setModal(null); fetchMembros() }
+    try {
+      await membershipRequest('save_member', { member_id: editingMembro?.id, payload })
+      setFeedback({ type: 'success', msg: editingMembro ? 'Membro atualizado!' : 'Membro adicionado!' })
+      setModal(null)
+      fetchMembershipData()
+    } catch (error: any) {
+      setFeedback({ type: 'error', msg: 'Erro: ' + error.message })
+    }
     setSavingMembro(false)
   }
 
   const deleteMembro = async (id: string) => {
     if (!confirm('Remover este membro?')) return
-    await supabase.from('memberships').delete().eq('id', id).eq('tenant_id', tenantId)
-    fetchMembros()
+    try {
+      await membershipRequest('delete_member', { member_id: id })
+      fetchMembershipData()
+    } catch (error: any) {
+      setFeedback({ type: 'error', msg: 'Erro ao remover: ' + error.message })
+    }
   }
 
   const filteredMembros = membros.filter(m => {
