@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useTenant } from '@/lib/tenant-context'
+import { useTenantId } from '@/lib/useTenantId'
 import { Camera, Lock, Upload, X, Check, Crown, Copy, ExternalLink } from 'lucide-react'
 import { hasFeature } from '@/lib/permissions'
 
@@ -14,6 +15,8 @@ export default function ConfiguracoesPage() {
   const pathname = usePathname()
   const slug = pathname.split('/').filter(Boolean)[0]
   const { tenant } = useTenant()
+  const tenantId = useTenantId()
+  const currentTenantId = tenantId || tenant?.id || null
 
   const [barbers, setBarbers] = useState<Barber[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -49,9 +52,12 @@ const canUploadPhotos = hasFeature(
       setNome(tenant.nome ?? '')
       setTelefone((tenant as any).telefone ?? '')
       setEndereco((tenant as any).endereco ?? '')
-      fetchData()
     }
   }, [tenant])
+
+  useEffect(() => {
+    if (currentTenantId) fetchData()
+  }, [currentTenantId])
 
   useEffect(() => {
     async function loadUser() {
@@ -62,10 +68,11 @@ const canUploadPhotos = hasFeature(
   }, [])
 
   async function fetchData() {
-    if (!tenant) return
+    if (!currentTenantId) return
+    setLoading(true)
     const [{ data: b }, { data: s }] = await Promise.all([
-      supabase.from('barbeiros').select('id,nome,avatar_url').eq('tenant_id', tenant.id),
-      supabase.from('services').select('id,name,price,photo_url').eq('tenant_id', tenant.id),
+      supabase.from('barbeiros').select('id,nome,avatar_url').eq('tenant_id', currentTenantId),
+      supabase.from('services').select('id,name,price,photo_url').eq('tenant_id', currentTenantId),
     ])
     setBarbers(b ?? [])
     setServices(s ?? [])
@@ -123,7 +130,7 @@ const canUploadPhotos = hasFeature(
   }
 
   async function uploadBarberPhoto(barberId: string, file: File) {
-    if (!tenant) return
+    if (!currentTenantId) return
     if (!canUploadPhotos) return
     setSaving(barberId)
     const ext = file.name.split('.').pop()
@@ -131,7 +138,7 @@ const canUploadPhotos = hasFeature(
     const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, { upsert: true })
     if (upErr) { alert('Erro no upload: ' + upErr.message); setSaving(null); return }
     const { data: { publicUrl } } = supabase.storage.from('barbershop-media').getPublicUrl(path)
-    await supabase.from('barbeiros').update({ avatar_url: publicUrl }).eq('id', barberId).eq('tenant_id', tenant.id)
+    await supabase.from('barbeiros').update({ avatar_url: publicUrl }).eq('id', barberId).eq('tenant_id', currentTenantId)
     setBarbers(prev => prev.map(b => b.id === barberId ? { ...b, avatar_url: publicUrl } : b))
     setSaving(null)
     setSaved(barberId)
@@ -139,7 +146,7 @@ const canUploadPhotos = hasFeature(
   }
 
   async function uploadServicePhoto(serviceId: string, file: File) {
-    if (!tenant) return
+    if (!currentTenantId) return
     if (!canUploadPhotos) return
     setSaving(serviceId)
     const ext = file.name.split('.').pop()
@@ -147,7 +154,7 @@ const canUploadPhotos = hasFeature(
     const { error: upErr } = await supabase.storage.from('barbershop-media').upload(path, file, { upsert: true })
     if (upErr) { alert('Erro no upload: ' + upErr.message); setSaving(null); return }
     const { data: { publicUrl } } = supabase.storage.from('barbershop-media').getPublicUrl(path)
-    await supabase.from('services').update({ photo_url: publicUrl }).eq('id', serviceId).eq('tenant_id', tenant.id)
+    await supabase.from('services').update({ photo_url: publicUrl }).eq('id', serviceId).eq('tenant_id', currentTenantId)
     setServices(prev => prev.map(s => s.id === serviceId ? { ...s, photo_url: publicUrl } : s))
     setSaving(null)
     setSaved(serviceId)
@@ -155,14 +162,14 @@ const canUploadPhotos = hasFeature(
   }
 
   async function removeBarberPhoto(barberId: string) {
-    if (!tenant) return
-    await supabase.from('barbeiros').update({ avatar_url: null }).eq('id', barberId).eq('tenant_id', tenant.id)
+    if (!currentTenantId) return
+    await supabase.from('barbeiros').update({ avatar_url: null }).eq('id', barberId).eq('tenant_id', currentTenantId)
     setBarbers(prev => prev.map(b => b.id === barberId ? { ...b, avatar_url: undefined } : b))
   }
 
   async function removeServicePhoto(serviceId: string) {
-    if (!tenant) return
-    await supabase.from('services').update({ photo_url: null }).eq('id', serviceId).eq('tenant_id', tenant.id)
+    if (!currentTenantId) return
+    await supabase.from('services').update({ photo_url: null }).eq('id', serviceId).eq('tenant_id', currentTenantId)
     setServices(prev => prev.map(s => s.id === serviceId ? { ...s, photo_url: undefined } : s))
   }
 

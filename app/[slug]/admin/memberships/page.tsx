@@ -35,6 +35,55 @@ interface Membro {
 
 type ModalMode = 'plano' | 'membro' | null
 
+type DefaultMembershipPlan = Omit<Plan, 'id' | 'created_at'>
+
+const DEFAULT_MEMBERSHIP_PLANS: DefaultMembershipPlan[] = [
+  {
+    nome: 'Mensal Corte',
+    descricao: 'Plano mensal para manter o cliente recorrente.',
+    preco: 79.9,
+    frequencia: 'mensal',
+    beneficios: ['1 corte por mes', 'Prioridade no agendamento', 'Aviso de vencimento'],
+    cor: '#3b82f6',
+    ativo: true,
+  },
+  {
+    nome: 'Mensal Premium',
+    descricao: 'Plano mensal com corte e barba.',
+    preco: 119.9,
+    frequencia: 'mensal',
+    beneficios: ['1 corte por mes', '1 barba por mes', 'Atendimento prioritario'],
+    cor: '#f59e0b',
+    ativo: true,
+  },
+  {
+    nome: 'Mensal VIP',
+    descricao: 'Plano mensal para clientes VIP.',
+    preco: 169.9,
+    frequencia: 'mensal',
+    beneficios: ['Corte e barba', 'Produtos com desconto', 'Horario preferencial'],
+    cor: '#8b5cf6',
+    ativo: true,
+  },
+]
+
+const todayYmd = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+
+const addDaysYmd = (days: number) => {
+  const base = new Date(`${todayYmd()}T12:00:00-03:00`)
+  base.setDate(base.getDate() + days)
+  return base.toISOString().split('T')[0]
+}
+
+const isExpiredMembership = (date: string) => date < todayYmd()
+const isDueSoonMembership = (date: string) => date >= todayYmd() && date <= addDaysYmd(7)
+
 /* ── SQL (copie e rode no Supabase SQL Editor) ──────────────────────────────
 CREATE TABLE IF NOT EXISTS membership_plans (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -112,24 +161,66 @@ export default function AdminMemberships() {
   useEffect(() => { if (tenantId) { fetchPlans(); fetchMembros() } }, [tenantId])
 
   const fetchPlans = async () => {
-  if (!tenantId) return
-  setLoadingPlans(true)
-  const { data } = await supabase.from('membership_plans').select('*')
-    .eq('tenant_id', tenantId).order('preco')
-  if (data) setPlans(data)
-  setLoadingPlans(false)
-}
+    if (!tenantId) return
+    setLoadingPlans(true)
+    const { data, error } = await supabase.from('membership_plans').select('*')
+      .eq('tenant_id', tenantId).order('preco')
+
+    if (!error && data) {
+      if (data.length > 0) {
+        setPlans(data)
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('membership_plans')
+          .insert(DEFAULT_MEMBERSHIP_PLANS.map(plan => ({ ...plan, tenant_id: tenantId })))
+          .select('*')
+
+        if (!insertError && inserted) {
+          setPlans(inserted.sort((a, b) => Number(a.preco) - Number(b.preco)))
+          setFeedback({ type: 'success', msg: 'Criei planos mensais padrao para voce comecar.' })
+        } else {
+          setPlans([])
+        }
+      }
+    } else {
+      setPlans([])
+    }
+    setLoadingPlans(false)
+  }
 
   const fetchMembros = async () => {
-  if (!tenantId) return
-  setLoadingMembros(true)
-  const { data } = await supabase.from('memberships')
-    .select('*, membership_plans(nome)')
-    .eq('tenant_id', tenantId)
-    .order('vencimento')
-  if (data) setMembros(data.map((m: any) => ({ ...m, plano_nome: m.membership_plans?.nome ?? '—' })))
-  setLoadingMembros(false)
-}
+    if (!tenantId) return
+    setLoadingMembros(true)
+    const { data } = await supabase.from('memberships')
+      .select('*, membership_plans(nome)')
+      .eq('tenant_id', tenantId)
+      .order('vencimento')
+
+    if (data) {
+      const mapped = data.map((m: any) => ({
+        ...m,
+        plano_nome: m.membership_plans?.nome ?? '-',
+        status: m.status === 'ativo' && isExpiredMembership(m.vencimento) ? 'vencido' : m.status,
+      }))
+
+      const expiredIds = mapped
+        .filter((m: any) => m.status === 'vencido' && data.find((item: any) => item.id === m.id)?.status === 'ativo')
+        .map((m: any) => m.id)
+
+      if (expiredIds.length) {
+        await supabase
+          .from('memberships')
+          .update({ status: 'vencido' })
+          .in('id', expiredIds)
+          .eq('tenant_id', tenantId)
+      }
+
+      setMembros(mapped)
+    } else {
+      setMembros([])
+    }
+    setLoadingMembros(false)
+  }
 
   const openNewPlan = () => {
     setEditingPlan(null)
@@ -170,9 +261,16 @@ export default function AdminMemberships() {
   }
 
   const openNewMembro = () => {
+    const activePlans = plans.filter(p => p.ativo)
+    if (!activePlans.length) {
+      setTab('planos')
+      setFeedback({ type: 'error', msg: 'Crie um plano ativo antes de adicionar um membro.' })
+      openNewPlan()
+      return
+    }
     setEditingMembro(null)
     setMemNome(''); setMemEmail(''); setMemTelefone('')
-    setMemPlanoId(plans[0]?.id ?? ''); setMemInicio(new Date().toISOString().split('T')[0]); setMemStatus('ativo')
+    setMemPlanoId(activePlans[0]?.id ?? ''); setMemInicio(new Date().toISOString().split('T')[0]); setMemStatus('ativo')
     setModal('membro')
   }
 
@@ -224,7 +322,7 @@ export default function AdminMemberships() {
   })
 
   const statsAtivos = membros.filter(m => m.status === 'ativo').length
-  const statsVencidos = membros.filter(m => m.status === 'vencido').length
+  const statsAVencer = membros.filter(m => m.status === 'ativo' && isDueSoonMembership(m.vencimento)).length
   const statsReceita = membros.filter(m => m.status === 'ativo').reduce((sum, m) => sum + (m.valor_pago ?? 0), 0)
 
   const statusColor: Record<string, string> = { ativo: '#22c55e', vencido: '#f97316', cancelado: '#ef4444' }
@@ -300,7 +398,7 @@ export default function AdminMemberships() {
       <div style={s.statsRow}>
         {[
           { label: 'Membros ativos', value: statsAtivos, icon: '✅', color: '#22c55e' },
-          { label: 'A vencer', value: statsVencidos, icon: '⏰', color: '#f97316' },
+          { label: 'A vencer em 7 dias', value: statsAVencer, icon: '⏰', color: '#f97316' },
           { label: 'Receita mensal', value: `R$ ${statsReceita.toFixed(2)}`, icon: '💰', color: '#3b82f6' },
           { label: 'Planos disponíveis', value: plans.filter(p => p.ativo).length, icon: '📋', color: '#8b5cf6' },
         ].map((stat, i) => (
@@ -502,12 +600,15 @@ export default function AdminMemberships() {
               </div>
               <ModalField label="Plano *">
                 <select style={s.modalInput} value={memPlanoId} onChange={e => setMemPlanoId(e.target.value)}>
-                  <option value="">Selecione um plano</option>
+                  <option value="">{plans.some(p => p.ativo) ? 'Selecione um plano' : 'Nenhum plano ativo cadastrado'}</option>
                   {plans.filter(p => p.ativo).map(p => (
                     <option key={p.id} value={p.id}>{p.nome} — R$ {p.preco.toFixed(2)}{freqLabel[p.frequencia]}</option>
                   ))}
                 </select>
               </ModalField>
+              <div style={{ padding: '10px 14px', backgroundColor: '#0a0d14', borderRadius: 8, border: '1px solid #1e2535', fontSize: 12, color: '#94a3b8', lineHeight: 1.5 }}>
+                Dica: cadastre o e-mail e telefone do cliente para usar avisos de vencimento por e-mail e WhatsApp quando a automacao estiver ativa.
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <ModalField label="Início da assinatura">
                   <input style={s.modalInput} type="date" value={memInicio} onChange={e => setMemInicio(e.target.value)} />
