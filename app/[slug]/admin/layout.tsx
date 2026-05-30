@@ -2,48 +2,119 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState, use } from 'react'
+import { useEffect, useMemo, useState, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TenantProvider, useTenant } from '@/lib/tenant-context'
 import {
-  LayoutDashboard, CalendarDays, DollarSign, Scissors,
-  Users, Settings, HandCoins, Wrench, Menu, X, Crown,
+  LayoutDashboard, CalendarDays, DollarSign, Scissors, Users, Settings,
+  HandCoins, Wrench, Menu, X, Crown, LogOut, ChevronRight,
+  ShieldCheck, Copy, CheckCircle2,ReceiptText,
 } from 'lucide-react'
+
+function fmtDate(value?: string | null) {
+  if (!value) return 'Vencimento não informado'
+  return new Date(value).toLocaleDateString('pt-BR')
+}
+
+function daysLeft(value?: string | null) {
+  if (!value) return null
+  const end = new Date(value).getTime()
+  const now = Date.now()
+  return Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)))
+}
+
+function progressPercent(start?: string | null, end?: string | null) {
+  if (!start || !end) return 78
+  const s = new Date(start).getTime()
+  const e = new Date(end).getTime()
+  const n = Date.now()
+  if (e <= s) return 100
+  return Math.min(100, Math.max(0, Math.round(((n - s) / (e - s)) * 100)))
+}
 
 function AdminLayoutInner({ slug, children }: { slug: string; children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { tenant, loading, isTrialing, trialDaysLeft, hasAccess, accessReason } = useTenant()
+
   const [checking, setChecking] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [adminEmail, setAdminEmail] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const t = tenant as any
+  const planName = t?.plano ? String(t.plano).toUpperCase() : 'PRO'
+  const tenantName = t?.nome ?? slug
+  const initial = tenantName?.slice(0, 2).toUpperCase() || 'NB'
+  const emailInitial = adminEmail?.slice(0, 1).toUpperCase() || 'A'
+  const periodEnd = t?.trial_ends_at ?? null
+  const periodStart = t?.created_at ?? null
+  const remainingDays = daysLeft(periodEnd)
+  const planProgress = progressPercent(periodStart, periodEnd)
+  const isActive = t?.status === 'active'
+  const isTrial = t?.status === 'trial'
+
+  const publicBookingUrl = useMemo(() => {
+    if (typeof window === 'undefined') return `/${slug}`
+    return `${window.location.origin}/${slug}`
+  }, [slug])
+
+  async function copyBookingLink() {
+    await navigator.clipboard.writeText(publicBookingUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1600)
+  }
 
   const menuItems = [
-    { name: 'Dashboard',     path: `/${slug}/admin`,               icon: LayoutDashboard },
-    { name: 'Agendamentos',  path: `/${slug}/admin/agendamentos`,  icon: CalendarDays },
-    { name: 'Financeiro',    path: `/${slug}/admin/financeiro`,    icon: DollarSign },
-    { name: 'Barbeiros',     path: `/${slug}/admin/barbeiros`,     icon: Scissors },
-    { name: 'Clientes',      path: `/${slug}/admin/clientes`,      icon: Users },
-    { name: 'Serviços',      path: `/${slug}/admin/servicos`,      icon: Wrench },
-    { name: 'Memberships',   path: `/${slug}/admin/memberships`,   icon: Crown },
-    { name: 'Comissões',     path: `/${slug}/admin/comissoes`,     icon: HandCoins },
+    { name: 'Dashboard', path: `/${slug}/admin`, icon: LayoutDashboard },
+    { name: 'Agendamentos', path: `/${slug}/admin/agendamentos`, icon: CalendarDays },
+    { name: 'Financeiro', path: `/${slug}/admin/financeiro`, icon: DollarSign },
+    { name: 'Despesas', path: `/${slug}/admin/despesas`, icon: ReceiptText },
+    { name: 'Barbeiros', path: `/${slug}/admin/barbeiros`, icon: Scissors },
+    { name: 'Clientes', path: `/${slug}/admin/clientes`, icon: Users },
+    { name: 'Serviços', path: `/${slug}/admin/servicos`, icon: Wrench },
+    { name: 'Memberships', path: `/${slug}/admin/memberships`, icon: Crown },
+    { name: 'Comissões', path: `/${slug}/admin/comissoes`, icon: HandCoins },
     { name: 'Configurações', path: `/${slug}/admin/configuracoes`, icon: Settings },
   ]
 
   useEffect(() => {
-    if (pathname === `/${slug}/login`) { setChecking(false); return }
+    if (pathname === `/${slug}/login`) {
+      setChecking(false)
+      return
+    }
+
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push(`/${slug}/login`); return }
-      const { data: tenantData } = await supabase
-        .from('tenants').select('id').eq('slug', slug).maybeSingle()
-      if (!tenantData) { router.push(`/${slug}/login`); return }
-      const { data: membership } = await supabase
-        .from('tenant_users').select('role')
-        .eq('user_id', user.id).eq('tenant_id', tenantData.id).maybeSingle()
-      if (!membership) { router.push(`/${slug}/login`); return }
 
-      // ✅ Se ainda não definiu senha, redireciona
+      if (!user) {
+        router.push(`/${slug}/login`)
+        return
+      }
+
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('slug', slug)
+        .maybeSingle()
+
+      if (!tenantData) {
+        router.push(`/${slug}/login`)
+        return
+      }
+
+      const { data: membership } = await supabase
+        .from('tenant_users')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('tenant_id', tenantData.id)
+        .maybeSingle()
+
+      if (!membership) {
+        router.push(`/${slug}/login`)
+        return
+      }
+
       if (!user.user_metadata?.password_set) {
         router.push('/set-password')
         return
@@ -52,42 +123,52 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
       setAdminEmail(user.email ?? '')
       setChecking(false)
     }
+
     checkAuth()
   }, [pathname, slug, router])
 
-  useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push(`/${slug}/login`)
   }
 
-  if (loading || checking) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#070b14' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #1e2535', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  )
+  if (loading || checking) {
+    return (
+      <div className="admin-loading">
+        <div className="admin-loader" />
+        <style>{`
+          .admin-loading{min-height:100vh;background:#050816;display:grid;place-items:center}
+          .admin-loader{width:34px;height:34px;border-radius:999px;border:3px solid #1e293b;border-top-color:#3b82f6;animation:spin .8s linear infinite}
+          @keyframes spin{to{transform:rotate(360deg)}}
+        `}</style>
+      </div>
+    )
+  }
 
   if (!hasAccess) {
-    const title = accessReason === 'trial-expired'
-      ? 'Seu teste gratuito terminou'
-      : accessReason === 'subscription-expired'
-      ? 'Sua assinatura venceu'
-      : 'Acesso bloqueado'
+    const title =
+      accessReason === 'trial-expired'
+        ? 'Seu teste gratuito terminou'
+        : accessReason === 'subscription-expired'
+          ? 'Sua assinatura venceu'
+          : 'Acesso bloqueado'
 
     return (
-      <div style={{ minHeight: '100vh', background: '#070b14', color: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
-        <div style={{ width: '100%', maxWidth: 480, background: 'rgba(11,18,32,0.9)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 28, textAlign: 'center', boxShadow: '0 24px 70px rgba(0,0,0,0.45)' }}>
-          <div style={{ fontSize: 38, marginBottom: 12 }}>🔒</div>
-          <h1 style={{ fontSize: 26, margin: '0 0 10px', fontWeight: 900 }}>{title}</h1>
+      <div style={{ minHeight: '100vh', background: '#050816', color: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Inter','DM Sans','Segoe UI',sans-serif" }}>
+        <div style={{ width: '100%', maxWidth: 480, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(8,13,28,.98))', border: '1px solid rgba(148,163,184,.12)', borderRadius: 24, padding: 30, textAlign: 'center', boxShadow: '0 30px 90px rgba(0,0,0,.5)' }}>
+          <div style={{ fontSize: 42, marginBottom: 12 }}>🔒</div>
+          <h1 style={{ fontSize: 28, margin: '0 0 10px', fontWeight: 950 }}>{title}</h1>
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             Para continuar usando o painel e a página de agendamento da sua barbearia, regularize sua assinatura.
           </p>
-          <Link href="/pricing" style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '13px 18px', borderRadius: 12, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', textDecoration: 'none', fontWeight: 800 }}>
+          <Link href="/pricing" style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', textDecoration: 'none', fontWeight: 900 }}>
             Ver planos
           </Link>
-          <button onClick={handleLogout} style={{ marginTop: 12, width: '100%', padding: '11px 18px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.25)', background: 'transparent', color: '#f87171', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={handleLogout} style={{ marginTop: 12, width: '100%', padding: '12px 18px', borderRadius: 14, border: '1px solid rgba(239,68,68,.28)', background: 'transparent', color: '#f87171', fontWeight: 800, cursor: 'pointer' }}>
             Sair
           </button>
         </div>
@@ -96,118 +177,195 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   }
 
   const SidebarContent = () => (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, padding: '0 8px' }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#0b1220', border: '1px solid rgba(96,165,250,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-          <img src="/icons/nexbarber-192.png" alt="NexBarber" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    <div className="sidebar-content">
+      <div className="brand-area">
+        <div className="brand-logo">
+          <img src="/icons/nexbarber-192.png" alt="NexBarber" />
         </div>
-        <div style={{ overflow: 'hidden' }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenant?.nome ?? slug.toUpperCase()}</p>
-          <p style={{ fontSize: 10, color: '#475569', margin: 0 }}>Painel Admin</p>
+        <div className="brand-text">
+          <div><strong>NexBarber</strong><span>{planName}</span></div>
+          <small>Painel Admin</small>
         </div>
       </div>
 
+      <div className="tenant-card">
+        <div className="tenant-avatar">{initial}</div>
+        <div className="tenant-info">
+          <strong>{tenantName}</strong>
+          <span>{isTrial ? 'Teste ativo' : isActive ? 'Sistema ativo' : 'Status: ' + (t?.status ?? 'indefinido')}</span>
+          <button type="button" onClick={copyBookingLink} className="copy-link-btn">
+            {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+            {copied ? 'Link copiado' : 'Copiar agenda'}
+          </button>
+        </div>
+        <div className="tenant-status" />
+        <ChevronRight size={16} className="tenant-chevron" />
+      </div>
+
       {isTrialing && (
-        <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
-          <p style={{ fontSize: 11, color: '#fbbf24', margin: '0 0 4px', fontWeight: 700 }}>⏳ Período de teste</p>
-          <p style={{ fontSize: 11, color: '#92400e', margin: 0 }}>{trialDaysLeft} dias restantes</p>
-          <Link href="/pricing" style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, textDecoration: 'none' }}>Assinar agora →</Link>
+        <div className="trial-card">
+          <div>
+            <strong>Teste ativo</strong>
+            <span>{trialDaysLeft} dias restantes</span>
+          </div>
+          <Link href="/pricing">Assinar</Link>
         </div>
       )}
 
-      {tenant?.plano === 'basic' && (
-        <div style={{ background: 'linear-gradient(135deg,rgba(37,99,235,0.16),rgba(245,158,11,0.08))', border: '1px solid rgba(96,165,250,0.22)', borderRadius: 12, padding: 12, marginBottom: 16 }}>
-          <p style={{ fontSize: 12, color: '#f8fafc', margin: '0 0 5px', fontWeight: 900 }}>Seja Pro</p>
-          <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 9px', lineHeight: 1.4 }}>Libere barbeiros ilimitados, comissões e lembretes via WhatsApp.</p>
-          <Link href="/pricing" style={{ display: 'inline-flex', width: '100%', justifyContent: 'center', padding: '8px 10px', borderRadius: 9, background: '#2563eb', color: '#fff', fontSize: 11, fontWeight: 800, textDecoration: 'none' }}>
-            Fazer upgrade
-          </Link>
-        </div>
-      )}
-
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+      <nav className="sidebar-nav">
         {menuItems.map((item) => {
           const active = pathname === item.path
+          const Icon = item.icon
           return (
-            <Link key={item.path} href={item.path} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 14px', borderRadius: 12,
-              fontSize: 13, textDecoration: 'none',
-              background: active ? 'linear-gradient(90deg,rgba(37,99,235,0.22),rgba(37,99,235,0.08))' : 'transparent',
-              border: `1px solid ${active ? 'rgba(59,130,246,0.18)' : 'transparent'}`,
-              color: active ? '#fff' : '#94a3b8',
-              fontWeight: active ? 700 : 400,
-            }}>
-              <item.icon size={16} strokeWidth={2} />
+            <Link key={item.path} href={item.path} className={`sidebar-link ${active ? 'active' : ''}`}>
+              <span className="sidebar-icon"><Icon size={18} strokeWidth={2.25} /></span>
               <span>{item.name}</span>
-              {active && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: '#3b82f6' }} />}
+              {active && <i className="active-dot" />}
             </Link>
           )
         })}
       </nav>
 
-      <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid #1e2535', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px' }}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: '#1e2d45', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#60a5fa', flexShrink: 0 }}>A</div>
-          <p style={{ fontSize: 11, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{adminEmail}</p>
+      <div className="sidebar-footer">
+        <div className="plan-card">
+          <div className="plan-icon"><Crown size={18} /></div>
+          <span>Seu plano</span>
+          <strong>{planName}</strong>
+          <small>
+            {remainingDays !== null
+              ? `${remainingDays} dia${remainingDays !== 1 ? 's' : ''} restante${remainingDays !== 1 ? 's' : ''}`
+              : 'Vencimento não informado'}
+          </small>
+          <small>{fmtDate(periodStart)} → {fmtDate(periodEnd)}</small>
+          <div className="plan-progress">
+            <i style={{ width: `${planProgress}%` }} />
+          </div>
         </div>
-        <button onClick={handleLogout} style={{ width: '100%', padding: '9px', borderRadius: 9, border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-          ⏻ Sair
+
+        {planName !== 'PREMIUM' && (
+  <Link href="/pricing" className="upgrade-plan-btn">
+    Fazer upgrade
+  </Link>
+)}
+
+        <div className="account-card">
+          <div className="account-avatar">{emailInitial}</div>
+          <div>
+            <strong>{adminEmail || 'Administrador'}</strong>
+            <span>Administrador</span>
+          </div>
+          <ShieldCheck size={16} />
+        </div>
+
+        <button onClick={handleLogout} className="logout-btn">
+          <LogOut size={16} /> Sair
         </button>
       </div>
-    </>
+    </div>
   )
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#070b14', fontFamily: "'DM Sans','Segoe UI',sans-serif", color: '#f1f5f9' }}>
-      <aside style={{ width: 240, minHeight: '100vh', background: 'rgba(8,15,30,0.95)', borderRight: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', padding: '20px 14px', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', overscrollBehavior: 'contain', scrollbarWidth: 'thin', scrollbarColor: '#1e3a8a transparent' }}
-        className="admin-sidebar-desktop">
-        <SidebarContent />
-      </aside>
+    <div className="admin-shell">
+      <aside className="admin-sidebar admin-sidebar-desktop"><SidebarContent /></aside>
 
-      <div className="admin-mobile-header" style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 40, background: 'rgba(8,15,30,0.95)', borderBottom: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', padding: '12px 18px', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <img src="/icons/nexbarber-192.png" alt="NexBarber" style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{tenant?.nome ?? slug}</p>
+      <header className="admin-mobile-header">
+        <div className="mobile-brand">
+          <img src="/icons/nexbarber-192.png" alt="NexBarber" />
+          <div><strong>{tenantName}</strong><span>Painel Admin</span></div>
         </div>
-        <button onClick={() => setMobileOpen(v => !v)} style={{ background: 'transparent', border: 'none', color: '#f1f5f9', cursor: 'pointer' }}>
-          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+        <button onClick={() => setMobileOpen((v) => !v)} className="mobile-menu-btn">
+          {mobileOpen ? <X size={23} /> : <Menu size={23} />}
         </button>
-      </div>
+      </header>
 
       {mobileOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}>
-          <div onClick={() => setMobileOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
-          <aside style={{ position: 'relative', zIndex: 1, width: 250, height: '100vh', background: 'rgba(8,15,30,0.98)', display: 'flex', flexDirection: 'column', padding: '20px 14px', overflowY: 'auto' }}>
-            <SidebarContent />
-          </aside>
+        <div className="mobile-drawer">
+          <div className="mobile-overlay" onClick={() => setMobileOpen(false)} />
+          <aside className="admin-sidebar mobile-sidebar"><SidebarContent /></aside>
         </div>
       )}
 
-      <main style={{ flex: 1, background: `radial-gradient(circle at top left,rgba(37,99,235,0.12),transparent 22%),#070b14`, minHeight: '100vh' }} className="admin-main">
-        <div style={{ padding: '36px 40px', maxWidth: 1600, margin: '0 auto', boxSizing: 'border-box' }} className="admin-main-inner">
-          {children}
-        </div>
+      <main className="admin-main">
+        <div className="admin-main-inner">{children}</div>
       </main>
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 768px) {
-          .admin-sidebar-desktop { display: none !important; }
-          .admin-mobile-header { display: flex !important; background: #08101e !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-          .admin-main { padding-top: 56px; background: #020617 !important; }
-          .admin-main-inner { padding: 16px 14px 80px !important; }
-        }
-        @media (max-height: 760px) and (min-width: 769px) {
-          .admin-sidebar-desktop {
-            padding-top: 14px !important;
-            padding-bottom: 14px !important;
-          }
-          .admin-sidebar-desktop nav a {
-            padding-top: 9px !important;
-            padding-bottom: 9px !important;
-          }
-        }
+        :root{--admin-bg:#050816;--admin-muted:#94a3b8;--admin-text:#f8fafc}
+        *{box-sizing:border-box}
+        .admin-shell{min-height:100vh;display:flex;background:radial-gradient(circle at 18% 0%,rgba(37,99,235,.16),transparent 28%),radial-gradient(circle at 100% 20%,rgba(124,58,237,.10),transparent 26%),var(--admin-bg);color:var(--admin-text);font-family:'Inter','DM Sans','Segoe UI',sans-serif}
+        .admin-sidebar{width:292px;min-width:292px;min-height:100vh;background:radial-gradient(circle at top left,rgba(37,99,235,.18),transparent 34%),linear-gradient(180deg,rgba(8,15,30,.98),rgba(5,8,18,.99));border-right:1px solid rgba(148,163,184,.10);backdrop-filter:blur(22px);position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#1e3a8a transparent;box-shadow:24px 0 80px rgba(0,0,0,.26)}
+        .sidebar-content{min-height:100%;display:flex;flex-direction:column;padding:24px 18px;gap:18px}
+        .brand-area{display:flex;align-items:center;gap:13px;padding:4px 8px 10px}
+        .brand-logo{width:46px;height:46px;border-radius:15px;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,#0ea5e9,#2563eb,#7c3aed);box-shadow:0 16px 35px rgba(37,99,235,.28)}
+        .brand-logo img{width:100%;height:100%;object-fit:cover;display:block}
+        .brand-text{min-width:0}
+        .brand-text div{display:flex;align-items:center;gap:8px}
+        .brand-text strong{font-size:21px;font-weight:950;letter-spacing:-.05em;color:#fff;line-height:1}
+        .brand-text span{font-size:10px;font-weight:950;color:#fff;padding:4px 6px;border-radius:6px;background:linear-gradient(135deg,#2563eb,#4f46e5);box-shadow:0 8px 20px rgba(37,99,235,.30)}
+        .brand-text small{display:block;margin-top:4px;color:#64748b;font-size:11px;font-weight:700}
+        .tenant-card{position:relative;display:flex;align-items:center;gap:12px;padding:16px;border-radius:20px;background:radial-gradient(circle at right,rgba(16,185,129,.14),transparent 32%),linear-gradient(145deg,rgba(15,23,42,.92),rgba(8,13,28,.94));border:1px solid rgba(148,163,184,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 45px rgba(0,0,0,.20)}
+        .tenant-avatar{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;flex-shrink:0;background:linear-gradient(135deg,#0ea5e9,#2563eb,#4f46e5);color:white;font-size:16px;font-weight:950;box-shadow:0 14px 30px rgba(37,99,235,.28)}
+        .tenant-info{min-width:0;flex:1}
+        .tenant-info strong{display:block;font-size:14px;font-weight:950;color:#f8fafc;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+        .tenant-info span{display:block;margin-top:3px;font-size:12px;color:#94a3b8}
+        .copy-link-btn{margin-top:9px;border:1px solid rgba(59,130,246,.25);background:rgba(37,99,235,.12);color:#93c5fd;border-radius:10px;padding:7px 9px;font-size:11px;font-weight:900;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+        .tenant-status{width:9px;height:9px;border-radius:99px;background:#10b981;box-shadow:0 0 18px rgba(16,185,129,.9);flex-shrink:0}
+        .tenant-chevron{color:#94a3b8;flex-shrink:0}
+        .trial-card{padding:14px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.22)}
+        .trial-card strong{display:block;color:#fbbf24;font-size:13px;font-weight:950}
+        .trial-card span{display:block;margin-top:2px;color:#fcd34d;font-size:11px}
+        .trial-card a{color:#fff;background:#f59e0b;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:950;text-decoration:none}
+        .sidebar-nav{display:flex;flex-direction:column;gap:7px;flex:1;padding-top:6px}
+        .sidebar-link{position:relative;display:flex;align-items:center;gap:13px;min-height:46px;padding:12px 14px;border-radius:15px;text-decoration:none;color:#a8b3c7;font-size:14px;font-weight:760;border:1px solid transparent;transition:.18s ease}
+        .sidebar-link:hover{color:#fff;background:rgba(15,23,42,.78);border-color:rgba(148,163,184,.10);transform:translateX(2px)}
+        .sidebar-link.active{color:#fff;background:radial-gradient(circle at right,rgba(59,130,246,.24),transparent 34%),linear-gradient(135deg,rgba(37,99,235,.40),rgba(29,78,216,.16));border-color:rgba(59,130,246,.56);box-shadow:0 14px 34px rgba(37,99,235,.18),inset 0 1px 0 rgba(255,255,255,.05)}
+        .sidebar-icon{width:22px;display:grid;place-items:center;color:#93c5fd;flex-shrink:0}
+        .active-dot{margin-left:auto;width:6px;height:6px;border-radius:99px;background:#3b82f6;box-shadow:0 0 16px rgba(59,130,246,.9)}
+        .sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid rgba(148,163,184,.10);display:flex;flex-direction:column;gap:10px}
+        .plan-card{position:relative;overflow:hidden;border-radius:20px;padding:16px;background:radial-gradient(circle at top right,rgba(245,158,11,.28),transparent 26%),linear-gradient(145deg,rgba(15,23,42,.96),rgba(15,23,42,.70));border:1px solid rgba(148,163,184,.14)}
+        .plan-icon{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#111827;box-shadow:0 0 34px rgba(245,158,11,.45)}
+        .plan-card span{display:block;font-size:12px;color:#94a3b8}
+        .plan-card strong{display:block;margin-top:4px;font-size:16px;font-weight:950;color:#fff}
+        .plan-card small{display:block;margin-top:3px;color:#94a3b8;font-size:11px}
+        .plan-progress{margin-top:10px;width:100%;height:7px;border-radius:99px;overflow:hidden;background:rgba(148,163,184,.16)}
+        .plan-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2563eb,#7c3aed);box-shadow:0 0 18px rgba(124,58,237,.55)}
+        .account-card{display:flex;align-items:center;gap:10px;padding:12px;border-radius:16px;background:rgba(15,23,42,.62);border:1px solid rgba(148,163,184,.10)}
+        .account-avatar{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:rgba(37,99,235,.20);color:#93c5fd;font-size:13px;font-weight:950;flex-shrink:0}
+        .account-card div:nth-child(2){flex:1;min-width:0}
+        .account-card strong{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#cbd5e1;font-size:12px;font-weight:800}
+        .account-card span{display:block;margin-top:2px;color:#64748b;font-size:11px}
+        .account-card svg{color:#10b981;flex-shrink:0}
+        .logout-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;border-radius:14px;border:1px solid rgba(239,68,68,.30);background:rgba(239,68,68,.045);color:#f87171;font-size:13px;font-weight:900;cursor:pointer;transition:.18s ease}
+        .logout-btn:hover{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.50)}
+        .admin-main{flex:1;min-width:0;min-height:100vh}
+        .admin-main-inner{max-width:1680px;margin:0 auto;padding:36px 42px}
+        .admin-mobile-header{display:none;position:fixed;top:0;left:0;right:0;height:64px;z-index:40;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(8,15,30,.96);border-bottom:1px solid rgba(148,163,184,.10);backdrop-filter:blur(20px)}
+        .mobile-brand{display:flex;align-items:center;gap:10px}
+        .mobile-brand img{width:34px;height:34px;border-radius:12px}
+        .mobile-brand strong{display:block;font-size:14px;font-weight:950;color:#fff}
+        .mobile-brand span{display:block;font-size:11px;color:#94a3b8}
+        .mobile-menu-btn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;border:1px solid rgba(148,163,184,.14);background:rgba(15,23,42,.82);color:#f8fafc;cursor:pointer}
+        .mobile-drawer{position:fixed;inset:0;z-index:60}
+        .mobile-overlay{position:absolute;inset:0;background:rgba(0,0,0,.58);backdrop-filter:blur(3px)}
+        .mobile-sidebar{position:relative;z-index:1;height:100vh;width:min(88vw,310px);min-width:unset;animation:slideIn .18s ease}
+        @keyframes slideIn{from{transform:translateX(-20px);opacity:.6}to{transform:translateX(0);opacity:1}}
+        @media(max-width:1280px){.admin-sidebar{width:270px;min-width:270px}.admin-main-inner{padding:30px 32px}}
+        @media(max-width:768px){.admin-shell{display:block}.admin-sidebar-desktop{display:none!important}.admin-mobile-header{display:flex}.admin-main{padding-top:64px;background:#020617}.admin-main-inner{padding:16px 14px 86px!important}.sidebar-content{padding:22px 16px}.brand-text strong{font-size:20px}.sidebar-link{min-height:48px;font-size:14px}}
+        @media(max-height:760px) and (min-width:769px){.sidebar-content{gap:12px;padding-top:16px;padding-bottom:16px}.sidebar-link{min-height:40px;padding-top:9px;padding-bottom:9px}.tenant-card{padding:12px}.plan-card{padding:13px}}
+        .upgrade-plan-btn {
+  margin-top: 12px;
+  min-height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+  box-shadow: 0 14px 30px rgba(245, 158, 11, .25);
+}
       `}</style>
     </div>
   )
@@ -221,6 +379,7 @@ export default function SlugAdminLayout({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = use(params)
+
   return (
     <TenantProvider slug={slug}>
       <AdminLayoutInner slug={slug}>{children}</AdminLayoutInner>
