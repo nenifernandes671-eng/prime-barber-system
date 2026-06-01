@@ -6,9 +6,34 @@ import { getTenantAccess } from '@/lib/subscription-access'
 
 interface Service { id: string; name: string; price: number; duration: number; description?: string; photo_url?: string }
 interface Barber  { id: string; nome: string; avatar_url?: string }
-interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string }
+interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string; opening_time?: string; closing_time?: string; slot_interval?: number }
 
-const ALL_TIMES = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00']
+function timeToMinutes(time?: string) {
+  const [hours, minutes] = String(time || '08:00').split(':').map(Number)
+  return (hours || 0) * 60 + (minutes || 0)
+}
+
+function minutesToTime(total: number) {
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function generateTimes(openingTime?: string, closingTime?: string, interval?: number) {
+  const start = timeToMinutes(openingTime || '08:00')
+  const end = timeToMinutes(closingTime || '19:00')
+  const step = Number(interval || 30)
+
+  if (!step || step < 5 || start >= end) return []
+
+  const times: string[] = []
+
+  for (let current = start; current < end; current += step) {
+    times.push(minutesToTime(current))
+  }
+
+  return times
+}
 const GOLD = '#c9a84c'
 const GOLD2 = '#e8c96a'
 const DARK = '#0a0a0a'
@@ -53,7 +78,8 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [error, setError]                     = useState('')
 
   const isPro = tenant?.plano === 'pro' || tenant?.plano === 'premium'
-  const availableTimes = ALL_TIMES.filter(t => !bookedTimes.includes(t))
+  const allTimes = generateTimes(tenant?.opening_time, tenant?.closing_time, tenant?.slot_interval)
+  const availableTimes = allTimes.filter(t => !bookedTimes.includes(t))
   const heroImage = tenant?.hero_url || DEFAULT_HERO
 
   useEffect(() => {
@@ -372,6 +398,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             <div style={{ padding:'22px 26px 18px', borderBottom:'3px solid #f0e8d0' }}>
               <h3 style={{ fontSize:20, fontWeight:800, color:'#1a1a1a', margin:'0 0 4px', fontFamily:"'Playfair Display',serif" }}>Agende seu horário</h3>
               <p style={{ fontSize:13, color:'#9ca3af', margin:0 }}>Rápido, fácil e online</p>
+              <p style={{ fontSize:12, color:'#b8973a', margin:'8px 0 0', fontWeight:700 }}>Funcionamento: {tenant?.opening_time || '08:00'} às {tenant?.closing_time || '19:00'}</p>
             </div>
 
             <div style={{ padding:'20px 26px', display:'flex', flexDirection:'column', gap:13 }}>
@@ -415,7 +442,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                     <p style={{ color:'#ef4444', fontSize:13, margin:0 }}>Sem horários nesta data.</p>
                   ) : (
                     <div className="t-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6 }}>
-                      {ALL_TIMES.map(t=>(
+                      {allTimes.map(t=>(
                         <button key={t} className={`t-btn${selectedTime===t?' sel':''}`} disabled={bookedTimes.includes(t)} onClick={()=>setSelectedTime(t)} style={{ padding:'9px 4px', borderRadius:7 }}>{t}</button>
                       ))}
                     </div>

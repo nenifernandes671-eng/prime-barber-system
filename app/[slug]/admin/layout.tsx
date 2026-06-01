@@ -8,8 +8,8 @@ import { TenantProvider, useTenant } from '@/lib/tenant-context'
 import {
   LayoutDashboard, CalendarDays, DollarSign, Scissors, Users, Settings,
   HandCoins, Wrench, Menu, X, Crown, LogOut, ChevronRight,
-  ShieldCheck, Copy, CheckCircle2,ReceiptText,
-} from 'lucide-react'
+  ShieldCheck, Copy, CheckCircle2,ReceiptText,MessageCircle,
+} from 'lucide-react' 
 
 function fmtDate(value?: string | null) {
   if (!value) return 'Vencimento não informado'
@@ -75,6 +75,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     { name: 'Serviços', path: `/${slug}/admin/servicos`, icon: Wrench },
     { name: 'Memberships', path: `/${slug}/admin/memberships`, icon: Crown },
     { name: 'Comissões', path: `/${slug}/admin/comissoes`, icon: HandCoins },
+    { name: 'WhatsApp', path: `/${slug}/admin/whatsapp`, icon: MessageCircle },
     { name: 'Configurações', path: `/${slug}/admin/configuracoes`, icon: Settings },
   ]
 
