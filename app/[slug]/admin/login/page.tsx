@@ -50,6 +50,20 @@ export default function SlugLoginPage({ params }: { params: Promise<{ slug: stri
       return
     }
 
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+
+    if (token) {
+      await fetch('/api/asaas/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ slug }),
+      }).catch(() => null)
+    }
+
     router.push(`/${slug}/admin`)
   }
 

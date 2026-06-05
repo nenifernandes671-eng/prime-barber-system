@@ -143,6 +143,18 @@ async function ensureOwnerUser(input: {
   const existingUser = await findAuthUserByEmail(input.email)
 
   if (existingUser) {
+    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+      password: input.password,
+      email_confirm: true,
+      user_metadata: {
+        ...(existingUser.user_metadata || {}),
+        nome: input.nome,
+        slug: input.slug,
+        role: 'admin',
+        password_set: true,
+      },
+    })
+
     return existingUser.id
   }
 

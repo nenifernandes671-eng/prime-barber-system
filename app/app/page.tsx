@@ -23,6 +23,14 @@ import { getTenantAccess } from '@/lib/subscription-access'
 const LAST_ACCESS_KEY = 'kortebarber:last-access'
 const LAST_CLIENT_SLUG_KEY = 'kortebarber:last-client-slug'
 
+type OwnerTenant = {
+  id: string
+  slug: string
+  status?: string | null
+  trial_ends_at?: string | null
+  created_at?: string | null
+}
+
 function cleanSlug(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
@@ -53,6 +61,22 @@ function cleanSlug(value: string) {
       .split('.')[0]
     return fallback ? sanitize(fallback) : ''
   }
+}
+
+function chooseOwnerTenant(tenants: OwnerTenant[]) {
+  if (!tenants.length) return null
+
+  const sorted = [...tenants].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
+    return bTime - aTime
+  })
+
+  return (
+    sorted.find((tenant) => getTenantAccess(tenant).allowed && tenant.status === 'active') ||
+    sorted.find((tenant) => getTenantAccess(tenant).allowed) ||
+    sorted[0]
+  )
 }
 
 export default function AppStartPage() {
@@ -98,13 +122,15 @@ export default function AppStartPage() {
           return
         }
 
-        const { data: tenant } = await supabase
+        const tenantIds = memberships.map((item) => item.tenant_id)
+        const { data: tenants } = await supabase
           .from('tenants')
-          .select('slug')
-          .eq('id', memberships[0].tenant_id)
-          .maybeSingle()
+          .select('id, slug, status, trial_ends_at, created_at')
+          .in('id', tenantIds)
 
         if (!active) return
+
+        const tenant = chooseOwnerTenant(tenants || [])
 
         if (tenant?.slug) {
           localStorage.setItem(LAST_ACCESS_KEY, 'owner')
@@ -197,11 +223,13 @@ export default function AppStartPage() {
       return
     }
 
-    const { data: tenant } = await supabase
+    const tenantIds = memberships.map((item) => item.tenant_id)
+    const { data: tenants } = await supabase
       .from('tenants')
-      .select('slug')
-      .eq('id', memberships[0].tenant_id)
-      .maybeSingle()
+      .select('id, slug, status, trial_ends_at, created_at')
+      .in('id', tenantIds)
+
+    const tenant = chooseOwnerTenant(tenants || [])
 
     if (!tenant?.slug) {
       await supabase.auth.signOut()
