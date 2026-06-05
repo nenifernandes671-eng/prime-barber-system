@@ -1,22 +1,22 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 
 export default function TermosPage() {
   return (
     <main style={styles.page}>
       <section style={styles.card}>
         <Link href="/" style={styles.back}>Voltar para o inicio</Link>
-        <p style={styles.kicker}>NexBarber</p>
+        <p style={styles.kicker}>KorteBarber</p>
         <h1 style={styles.title}>Termos de uso</h1>
         <p style={styles.muted}>Ultima atualizacao: maio de 2026</p>
 
         <div style={styles.content}>
           <p>
-            Ao contratar ou utilizar o NexBarber, voce concorda em usar a plataforma de forma
+            Ao contratar ou utilizar o KorteBarber, voce concorda em usar a plataforma de forma
             licita, mantendo seus dados de acesso protegidos e informando dados verdadeiros da
             sua barbearia.
           </p>
           <p>
-            O NexBarber fornece ferramentas para agenda online, gestao financeira, barbeiros,
+            O KorteBarber fornece ferramentas para agenda online, gestao financeira, barbeiros,
             servicos, clientes e assinaturas. Cada barbearia e responsavel pelos dados que cadastra,
             pelos atendimentos prestados e pela relacao com seus clientes.
           </p>

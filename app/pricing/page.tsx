@@ -37,17 +37,17 @@ const PLANS = [
       { text: 'Comissoes automaticas', active: true },
       { text: 'Lembrete via WhatsApp', active: true },
       { text: 'Assinaturas de clientes', active: true },
-      { text: 'Relatorios avancados', active: false },
+      { text: 'Relatorios avancados', active: true },
       { text: 'Suporte prioritario', active: true },
     ],
   },
   {
     key: 'premium',
     name: 'Premium',
-    price: 139,
+    price: 189,
     featured: false,
     badge: '',
-    description: 'Solucao completa sem limites',
+    description: 'Para redes e barbearias multiunidade',
     features: [
       { text: 'Agendamentos online', active: true },
       { text: 'Barbeiros ilimitados', active: true },
@@ -57,6 +57,9 @@ const PLANS = [
       { text: 'Lembrete via WhatsApp', active: true },
       { text: 'Assinaturas de clientes', active: true },
       { text: 'Relatorios avancados', active: true },
+      { text: 'Dashboard executivo', active: true },
+      { text: 'Multiunidade', active: true },
+      { text: 'Clientes inativos', active: true },
       { text: 'Suporte VIP', active: true },
     ],
   },
@@ -64,7 +67,18 @@ const PLANS = [
 
 export default function PricingPage() {
   const [modal, setModal] = useState(false)
-  const [form, setForm] = useState({ nome: '', email: '', slug: '', plano: '' })
+  const [form, setForm] = useState({
+    nome: '',
+    email: '',
+    cpfCnpj: '',
+    telefone: '',
+    cep: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    slug: '',
+    plano: '',
+  })
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -75,8 +89,37 @@ export default function PricingPage() {
   }
 
   async function handleCheckout() {
-    if (!form.nome || !form.email || !form.slug) {
+    if (
+      !form.nome ||
+      !form.email ||
+      !form.cpfCnpj ||
+      !form.telefone ||
+      !form.cep ||
+      !form.endereco ||
+      !form.numero ||
+      !form.bairro ||
+      !form.slug
+    ) {
       setFormError('Preencha todos os campos.')
+      return
+    }
+
+    const documentDigits = form.cpfCnpj.replace(/\D/g, '')
+    const telefoneDigits = form.telefone.replace(/\D/g, '')
+    const cepDigits = form.cep.replace(/\D/g, '')
+
+    if (![11, 14].includes(documentDigits.length)) {
+      setFormError('Informe um CPF ou CNPJ valido.')
+      return
+    }
+
+    if (![10, 11].includes(telefoneDigits.length)) {
+      setFormError('Informe um telefone valido com DDD.')
+      return
+    }
+
+    if (cepDigits.length !== 8) {
+      setFormError('Informe um CEP valido.')
       return
     }
 
@@ -95,7 +138,7 @@ export default function PricingPage() {
     setFormError('')
 
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      const res = await fetch('/api/asaas/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, slug: slugClean }),
@@ -119,7 +162,7 @@ export default function PricingPage() {
     <main className="pricing-page">
       <nav className="pricing-nav">
         <a className="brand" href="/">
-          <span>Nex</span>Barber
+          Korte<span>Barber</span>
         </a>
         <div className="nav-links">
           <a href="/#funcionalidades">Funcionalidades</a>
@@ -166,7 +209,7 @@ export default function PricingPage() {
       </section>
 
       <footer className="pricing-footer">
-        <div className="brand small"><span>Nex</span>Barber</div>
+        <div className="brand small">Korte<span>Barber</span></div>
         <div className="legal-links">
           <a href="/termos">Termos</a>
           <a href="/privacidade">Privacidade</a>
@@ -202,9 +245,65 @@ export default function PricingPage() {
             </label>
 
             <label>
+              CPF ou CNPJ
+              <input
+                value={form.cpfCnpj}
+                onChange={(e) => setForm({ ...form, cpfCnpj: e.target.value })}
+                placeholder="000.000.000-00"
+              />
+            </label>
+
+            <label>
+              Telefone
+              <input
+                value={form.telefone}
+                onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+                placeholder="(11) 98765-4321"
+              />
+            </label>
+
+            <label>
+              CEP
+              <input
+                value={form.cep}
+                onChange={(e) => setForm({ ...form, cep: e.target.value })}
+                placeholder="01310-000"
+              />
+            </label>
+
+            <label>
+              Endereco
+              <input
+                value={form.endereco}
+                onChange={(e) => setForm({ ...form, endereco: e.target.value })}
+                placeholder="Avenida Paulista"
+              />
+            </label>
+
+            <div className="address-grid">
+              <label>
+                Numero
+                <input
+                  value={form.numero}
+                  onChange={(e) => setForm({ ...form, numero: e.target.value })}
+                  placeholder="1000"
+                />
+              </label>
+
+              <label>
+                Bairro
+                <input
+                  value={form.bairro}
+                  onChange={(e) => setForm({ ...form, bairro: e.target.value })}
+                  placeholder="Bela Vista"
+                />
+              </label>
+            </div>
+
+            <label>
               Link publico
               <div className="slug-row">
-                <span>nexbarber.com.br/</span>
+                <span>kortebarber.com.br/</span>
                 <input
                   value={form.slug}
                   onChange={(e) => setForm({ ...form, slug: e.target.value })}
@@ -533,6 +632,8 @@ export default function PricingPage() {
         .modal-box {
           position: relative;
           width: min(460px, 100%);
+          max-height: calc(100vh - 32px);
+          overflow-y: auto;
           background: #151515;
           border: 1px solid rgba(201,168,76,0.22);
           padding: 34px;
@@ -577,6 +678,12 @@ export default function PricingPage() {
           color: #b8b8b8;
           font-size: 13px;
           font-weight: 700;
+        }
+
+        .address-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+          gap: 12px;
         }
 
         .modal-box input {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -22,15 +22,15 @@ function resolveAppUrl(req: NextRequest) {
   const requestOrigin = host ? `${forwardedProto}://${host}` : new URL(req.url).origin
   const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL
 
-  if (requestOrigin && !requestOrigin.includes('localhost')) {
-    return requestOrigin
-  }
-
   if (configuredAppUrl && !configuredAppUrl.includes('localhost')) {
-    return configuredAppUrl
+    return configuredAppUrl.replace(/\/$/, '')
   }
 
-  return 'https://www.nexbarber.com.br'
+  if (requestOrigin && !requestOrigin.includes('localhost')) {
+    return requestOrigin.replace(/\/$/, '')
+  }
+
+  return 'https://www.kortebarber.com.br'
 }
 
 export async function POST(req: NextRequest) {
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       email: cleanEmail,
       nome: tenant.nome || tenant.slug,
       resetLink,
+      redirectTo: `${appUrl}/set-password`,
     })
 
     return NextResponse.json({ ok: true })
@@ -90,15 +91,17 @@ async function sendResetEmail({
   email,
   nome,
   resetLink,
+  redirectTo,
 }: {
   email: string
   nome: string
   resetLink: string
+  redirectTo: string
 }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY
 
   if (!RESEND_API_KEY) {
-    console.log(`\nLINK de redefinicao para ${email}:\n${resetLink}\n`)
+    await sendSupabaseResetEmail(email, redirectTo)
     return
   }
 
@@ -110,13 +113,13 @@ async function sendResetEmail({
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM || 'NexBarber <onboarding@resend.dev>',
+      from: process.env.EMAIL_FROM || 'KorteBarber <onboarding@resend.dev>',
       to: email,
-      subject: 'Redefina sua senha no NexBarber',
+      subject: 'Redefina sua senha no KorteBarber',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#07101f;color:#f8fafc;border-radius:18px;overflow:hidden;">
           <div style="padding:30px 34px;background:linear-gradient(135deg,#0f172a,#111827);border-bottom:1px solid rgba(255,255,255,0.08);">
-            <p style="margin:0 0 10px;color:#e0b84a;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">NexBarber</p>
+            <p style="margin:0 0 10px;color:#e0b84a;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">KorteBarber</p>
             <h1 style="margin:0;color:#ffffff;font-size:26px;">Redefinir senha</h1>
           </div>
           <div style="padding:30px 34px;">
@@ -139,6 +142,17 @@ async function sendResetEmail({
   if (!res.ok) {
     const err = await res.text()
     console.error('Erro ao enviar reset via Resend:', err)
+    await sendSupabaseResetEmail(email, redirectTo)
+  }
+}
+
+async function sendSupabaseResetEmail(email: string, redirectTo: string) {
+  const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  })
+
+  if (error) {
+    console.error('Erro ao enviar reset via Supabase:', error)
     throw new Error('Falha ao enviar e-mail de redefinicao.')
   }
 }

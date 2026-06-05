@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useTenantId } from '@/lib/useTenantId'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useUnit } from '@/lib/unit-context'
+import { useTenant } from '@/lib/tenant-context'
 import {
   DollarSign,
   Scissors,
@@ -17,6 +19,7 @@ import {
 
 interface Barber {
   id: string
+  unit_id?: string | null
   nome: string
   email: string
   tenant_id?: string | null
@@ -28,6 +31,7 @@ interface Barber {
 
 interface Appointment {
   id: string
+  unit_id?: string | null
   barber: string
   price: number
   status: string
@@ -85,6 +89,9 @@ function calcCommission(
 export default function AdminComissoes() {
   const tenantId = useTenantId()
   const isMobile = useIsMobile()
+  const { isPremium } = useTenant()
+  const { selectedUnitId, selectedUnit } = useUnit()
+  const activeUnitId = isPremium ? selectedUnitId : 'all'
   const [barbers, setBarbers] = useState<Barber[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,23 +111,32 @@ export default function AdminComissoes() {
     if (!tenantId) return
     setLoading(true)
 
+    let barbersQuery = supabase
+      .from('barbeiros')
+      .select('id,nome,email,telefone,ativo,tenant_id,unit_id')
+      .eq('tenant_id', tenantId)
+      .eq('ativo', true)
+
+    let appointmentsQuery = supabase
+      .from('appointments')
+      .select('id, unit_id, barber, price, status, appointment_date')
+      .eq('tenant_id', tenantId)
+
+    let commissionRowsQuery = supabase
+      .from('barbers')
+      .select('id,name,email,tenant_id,unit_id,commission_percentage,commission_type,ativo')
+      .eq('tenant_id', tenantId)
+
+    if (activeUnitId !== 'all') {
+      barbersQuery = barbersQuery.eq('unit_id', activeUnitId)
+      appointmentsQuery = appointmentsQuery.eq('unit_id', activeUnitId)
+      commissionRowsQuery = commissionRowsQuery.eq('unit_id', activeUnitId)
+    }
+
     const [{ data: barbs, error: barbsError }, { data: appts, error: apptsError }, { data: commissionRows, error: commissionsError }] = await Promise.all([
-      supabase
-        .from('barbeiros')
-        .select('id,nome,email,telefone,ativo,tenant_id')
-        .eq('tenant_id', tenantId)
-        .eq('ativo', true)
-        .order('nome'),
-
-      supabase
-        .from('appointments')
-        .select('id, barber, price, status, appointment_date')
-        .eq('tenant_id', tenantId),
-
-      supabase
-        .from('barbers')
-        .select('id,name,email,tenant_id,commission_percentage,commission_type,ativo')
-        .eq('tenant_id', tenantId),
+      barbersQuery.order('nome'),
+      appointmentsQuery,
+      commissionRowsQuery,
     ])
 
     if (barbsError || apptsError || commissionsError) {
@@ -150,7 +166,7 @@ export default function AdminComissoes() {
     setAppointments(appts ?? [])
 
     setLoading(false)
-  }, [tenantId])
+  }, [tenantId, activeUnitId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -184,6 +200,7 @@ export default function AdminComissoes() {
       name: barber.nome,
       email: barber.email || null,
       tenant_id: tenantId,
+      unit_id: isPremium ? (activeUnitId !== 'all' ? activeUnitId : barber.unit_id || null) : null,
       ativo: true,
       commission_type: 'percentage',
       commission_percentage: percentage,
@@ -261,6 +278,7 @@ export default function AdminComissoes() {
 
           <p style={styles.subtitle}>
             Gerencie pagamentos e comissões dos barbeiros
+            {isPremium && activeUnitId !== 'all' ? ` · ${selectedUnit?.name || 'Unidade selecionada'}` : ''}
           </p>
         </div>
 
@@ -501,6 +519,14 @@ export default function AdminComissoes() {
             </div>
 
             <div style={styles.summaryList}>
+
+              {isPremium && (
+                <SummaryRow
+                  label="Unidade"
+                  value={activeUnitId === 'all' ? 'Todas' : selectedUnit?.name || 'Selecionada'}
+                  color="#60a5fa"
+                />
+              )}
 
               <SummaryRow
                 label="Total barbeiros"

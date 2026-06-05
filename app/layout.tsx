@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,12 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NexBarber",
+  title: "KorteBarber",
   description: "Sistema SaaS para barbearias",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "NexBarber",
+    title: "KorteBarber",
     statusBarStyle: "black-translucent",
   },
   icons: {
@@ -26,8 +26,8 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
       { url: "/favicon.png", sizes: "64x64", type: "image/png" },
-      { url: "/icons/nexbarber-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/nexbarber-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/kortebarber-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/kortebarber-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },

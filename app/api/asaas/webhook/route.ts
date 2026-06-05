@@ -19,7 +19,15 @@ function statusFromAsaasEvent(event: string) {
     return 'suspended'
   }
 
-  if (['PAYMENT_DELETED', 'PAYMENT_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'].includes(event)) {
+  if (
+    [
+      'PAYMENT_DELETED',
+      'PAYMENT_REFUNDED',
+      'PAYMENT_CHARGEBACK_REQUESTED',
+      'PAYMENT_CHARGEBACK_DISPUTE',
+      'PAYMENT_AWAITING_CHARGEBACK_REVERSAL',
+    ].includes(event)
+  ) {
     return 'cancelled'
   }
 
@@ -53,10 +61,11 @@ export async function POST(req: NextRequest) {
     const payload = await req.json()
     const event = String(payload.event || '')
     const payment = payload.payment || {}
-    const subscriptionId = payment.subscription || payload.subscription?.id || null
-    const customerId = payment.customer || payload.customer?.id || null
+    const subscription = payload.subscription || {}
+    const subscriptionId = payment.subscription || subscription.id || null
+    const customerId = payment.customer || subscription.customer || payload.customer?.id || null
     const externalReference =
-      payment.externalReference || payload.subscription?.externalReference || null
+      payment.externalReference || subscription.externalReference || payload.externalReference || null
 
     console.log('Asaas webhook recebido:', {
       event,
@@ -114,7 +123,7 @@ export async function POST(req: NextRequest) {
     console.error('Asaas webhook error:', err)
     return NextResponse.json(
       { error: err.message || 'Erro no webhook Asaas.' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

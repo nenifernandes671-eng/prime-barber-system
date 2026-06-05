@@ -31,7 +31,7 @@ interface Service {
   photo_url?: string
 }
 
-type Tab = 'barbearia' | 'barbeiros' | 'servicos'
+type Tab = 'barbearia' | 'landing' | 'barbeiros' | 'servicos'
 
 const cardStyle: React.CSSProperties = {
   background:
@@ -85,6 +85,15 @@ export default function ConfiguracoesPage() {
   const [closingTime, setClosingTime] = useState('19:00')
   const [slotInterval, setSlotInterval] = useState(30)
 
+  const [landingHeadline, setLandingHeadline] = useState('')
+  const [landingDescription, setLandingDescription] = useState('')
+  const [landingWhatsapp, setLandingWhatsapp] = useState('')
+  const [landingInstagram, setLandingInstagram] = useState('')
+  const [landingAddress, setLandingAddress] = useState('')
+  const [landingPrimaryColor, setLandingPrimaryColor] = useState('#c9a84c')
+  const [landingBannerUrl, setLandingBannerUrl] = useState('')
+  const [savingLandingBanner, setSavingLandingBanner] = useState(false)
+
   const [savingInfo, setSavingInfo] = useState(false)
   const [savedInfo, setSavedInfo] = useState(false)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
@@ -104,6 +113,8 @@ export default function ConfiguracoesPage() {
   const barberLoginUrl = `${appUrl}/barber/login`
 
   const canUploadPhotos = !!hasFeature(tenant?.plano, 'uploads')
+  const isPremium = tenant?.plano?.toLowerCase() === 'premium'
+
   useEffect(() => {
     if (tenant) {
       setNome(tenant.nome ?? '')
@@ -112,6 +123,13 @@ export default function ConfiguracoesPage() {
       setOpeningTime((tenant as any).opening_time ?? '08:00')
       setClosingTime((tenant as any).closing_time ?? '19:00')
       setSlotInterval((tenant as any).slot_interval ?? 30)
+      setLandingHeadline((tenant as any).landing_headline ?? 'Seu estilo,\\nnosso cuidado.')
+      setLandingDescription((tenant as any).landing_description ?? '')
+      setLandingWhatsapp((tenant as any).landing_whatsapp ?? (tenant as any).telefone ?? '')
+      setLandingInstagram((tenant as any).landing_instagram ?? '')
+      setLandingAddress((tenant as any).landing_address ?? (tenant as any).endereco ?? '')
+      setLandingPrimaryColor((tenant as any).landing_primary_color ?? '#c9a84c')
+      setLandingBannerUrl((tenant as any).landing_banner_url ?? (tenant as any).hero_url ?? '')
     }
   }, [tenant])
 
@@ -212,6 +230,13 @@ export default function ConfiguracoesPage() {
         opening_time: openingTime,
         closing_time: closingTime,
         slot_interval: Number(slotInterval),
+        landing_headline: landingHeadline,
+        landing_description: landingDescription,
+        landing_whatsapp: landingWhatsapp,
+        landing_instagram: landingInstagram,
+        landing_address: landingAddress,
+        landing_primary_color: landingPrimaryColor || '#c9a84c',
+        landing_banner_url: landingBannerUrl || null,
       })
       .eq('id', currentTenantId)
 
@@ -381,6 +406,67 @@ export default function ConfiguracoesPage() {
     setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, photo_url: undefined } : s)))
   }
 
+
+  async function uploadLandingBanner(file: File) {
+    if (!currentTenantId || !isPremium) return
+
+    setSavingLandingBanner(true)
+
+    const path = `landing/${currentTenantId}/banner`
+
+    const { error: uploadError } = await supabase.storage
+      .from('barbershop-media')
+      .upload(path, file, {
+        upsert: true,
+        cacheControl: '60',
+        contentType: file.type || 'image/jpeg',
+      })
+
+    if (uploadError) {
+      alert('Erro no upload do banner: ' + uploadError.message)
+      setSavingLandingBanner(false)
+      return
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('barbershop-media').getPublicUrl(path)
+
+    const displayUrl = `${publicUrl}?v=${Date.now()}`
+
+    const { error } = await supabase
+      .from('tenants')
+      .update({ landing_banner_url: displayUrl })
+      .eq('id', currentTenantId)
+
+    setSavingLandingBanner(false)
+
+    if (error) {
+      alert('Erro ao salvar banner: ' + error.message)
+      return
+    }
+
+    setLandingBannerUrl(displayUrl)
+    setSavedInfo(true)
+    setTimeout(() => setSavedInfo(false), 2500)
+  }
+
+  async function removeLandingBanner() {
+    if (!currentTenantId || !isPremium) return
+
+    const { error } = await supabase
+      .from('tenants')
+      .update({ landing_banner_url: null })
+      .eq('id', currentTenantId)
+
+    if (error) {
+      alert('Erro ao remover banner: ' + error.message)
+      return
+    }
+
+    setLandingBannerUrl('')
+  }
+
   const avatarColors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
 
   function getAvatarColor(name: string) {
@@ -434,7 +520,7 @@ export default function ConfiguracoesPage() {
           width: 'fit-content',
         }}
       >
-        {(['barbearia', 'barbeiros', 'servicos'] as const).map((item) => (
+        {(['barbearia', 'landing', 'barbeiros', 'servicos'] as const).map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
@@ -450,7 +536,7 @@ export default function ConfiguracoesPage() {
               color: tab === item ? '#60a5fa' : '#64748b',
             }}
           >
-            {item === 'barbearia' ? '🏪 Barbearia' : item === 'barbeiros' ? '✂ Barbeiros' : '🛠 Serviços'}
+            {item === 'barbearia' ? '🏪 Barbearia' : item === 'landing' ? '🚀 Landing Premium' : item === 'barbeiros' ? '✂ Barbeiros' : '🛠 Serviços'}
           </button>
         ))}
       </div>
@@ -663,6 +749,243 @@ export default function ConfiguracoesPage() {
               >
                 {savingAccount ? 'Salvando...' : 'Salvar conta'}
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+
+      {tab === 'landing' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {!isPremium && (
+            <UpgradeBanner text="A Landing Page Premium personalizada é exclusiva do plano Premium." />
+          )}
+
+          <section style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 13,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'rgba(201,168,76,0.14)',
+                  color: '#e8c96a',
+                }}
+              >
+                <Crown size={18} />
+              </div>
+
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>
+                  Landing Page Premium
+                </h2>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
+                  Personalize a página pública da barbearia com texto, banner, cor, WhatsApp e Instagram.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 16 }}>
+              <Field label="Título principal">
+                <textarea
+                  value={landingHeadline}
+                  onChange={(e) => setLandingHeadline(e.target.value)}
+                  placeholder="Seu estilo,\nnosso cuidado."
+                  disabled={!isPremium}
+                  rows={3}
+                  style={{ ...inputStyle, resize: 'vertical', minHeight: 86 }}
+                />
+              </Field>
+
+              <Field label="Descrição principal">
+                <textarea
+                  value={landingDescription}
+                  onChange={(e) => setLandingDescription(e.target.value)}
+                  placeholder="Agende seu horário e viva uma experiência premium."
+                  disabled={!isPremium}
+                  rows={4}
+                  style={{ ...inputStyle, resize: 'vertical', minHeight: 104 }}
+                />
+              </Field>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="WhatsApp da landing">
+                  <input
+                    value={landingWhatsapp}
+                    onChange={(e) => setLandingWhatsapp(e.target.value)}
+                    placeholder="(47) 99999-9999"
+                    disabled={!isPremium}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Instagram">
+                  <input
+                    value={landingInstagram}
+                    onChange={(e) => setLandingInstagram(e.target.value)}
+                    placeholder="@barbearia ou link completo"
+                    disabled={!isPremium}
+                    style={inputStyle}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Endereço exibido no rodapé">
+                <input
+                  value={landingAddress}
+                  onChange={(e) => setLandingAddress(e.target.value)}
+                  placeholder="Rua, número, bairro, cidade"
+                  disabled={!isPremium}
+                  style={inputStyle}
+                />
+              </Field>
+
+              <Field label="Cor principal da landing">
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <input
+                    type="color"
+                    value={landingPrimaryColor}
+                    onChange={(e) => setLandingPrimaryColor(e.target.value)}
+                    disabled={!isPremium}
+                    style={{ width: 54, height: 44, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                  />
+
+                  <input
+                    value={landingPrimaryColor}
+                    onChange={(e) => setLandingPrimaryColor(e.target.value)}
+                    disabled={!isPremium}
+                    placeholder="#c9a84c"
+                    style={inputStyle}
+                  />
+                </div>
+              </Field>
+            </div>
+
+            <button
+              onClick={saveInfo}
+              disabled={savingInfo || !isPremium}
+              style={{
+                width: '100%',
+                marginTop: 18,
+                padding: '13px',
+                borderRadius: 12,
+                border: 'none',
+                background: savedInfo ? 'linear-gradient(135deg,#059669,#10b981)' : 'linear-gradient(135deg,#c9a84c,#e8c96a)',
+                color: '#0a0a0a',
+                fontSize: 14,
+                fontWeight: 900,
+                cursor: isPremium ? 'pointer' : 'not-allowed',
+                opacity: isPremium ? 1 : 0.5,
+              }}
+            >
+              {savedInfo ? 'Landing salva!' : savingInfo ? 'Salvando...' : 'Salvar Landing Premium'}
+            </button>
+          </section>
+
+          <section style={cardStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: '0 0 8px' }}>
+              Banner principal
+            </h2>
+
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 18px' }}>
+              Imagem grande do topo da página pública. Recomendado: 1600x900 ou maior.
+            </p>
+
+            <div
+              style={{
+                height: 240,
+                borderRadius: 18,
+                overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(0,0,0,0.28)',
+                display: 'grid',
+                placeItems: 'center',
+                marginBottom: 16,
+              }}
+            >
+              {landingBannerUrl ? (
+                <img src={landingBannerUrl} alt="Banner da landing" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ textAlign: 'center', color: '#64748b' }}>
+                  <Camera size={34} />
+                  <p style={{ margin: '10px 0 0', fontSize: 13 }}>Nenhum banner cadastrado</p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <label
+                style={{
+                  padding: '11px 16px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(201,168,76,0.3)',
+                  background: 'rgba(201,168,76,0.1)',
+                  color: '#e8c96a',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: isPremium ? 'pointer' : 'not-allowed',
+                  opacity: isPremium ? 1 : 0.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                }}
+              >
+                <Upload size={14} />
+                {savingLandingBanner ? 'Enviando...' : 'Enviar banner'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={!isPremium || savingLandingBanner}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadLandingBanner(file)
+                    e.currentTarget.value = ''
+                  }}
+                  style={{ display: 'none' }}
+                />
+              </label>
+
+              {landingBannerUrl && (
+                <button
+                  onClick={removeLandingBanner}
+                  disabled={!isPremium}
+                  style={{
+                    padding: '11px 16px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(239,68,68,0.25)',
+                    background: 'rgba(239,68,68,0.08)',
+                    color: '#f87171',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    cursor: isPremium ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Remover banner
+                </button>
+              )}
+
+              <a
+                href={publicBookingUrl}
+                target="_blank"
+                style={{
+                  padding: '11px 16px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(59,130,246,0.25)',
+                  background: 'rgba(59,130,246,0.08)',
+                  color: '#60a5fa',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                }}
+              >
+                <ExternalLink size={14} />
+                Ver landing
+              </a>
             </div>
           </section>
         </div>

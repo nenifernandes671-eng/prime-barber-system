@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useTenantId } from '@/lib/useTenantId'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useUnit } from '@/lib/unit-context'
+import { useTenant } from '@/lib/tenant-context'
 
 interface Appointment {
   id: string
+  unit_id?: string | null
   client_name: string
   phone: string
   service: string
@@ -56,7 +59,7 @@ function formatDate(date: string, time?: string) {
 const emptyForm = () => ({
   barber: '', client_name: '', phone: '', service: '',
   price: '', appointment_date: '', appointment_time: '',
-  status: 'scheduled' as Appointment['status'], notes: '',
+  status: 'scheduled' as Appointment['status'], notes: '', unit_id: '',
 })
 
 export default function AdminAgendamentos() {
@@ -71,24 +74,60 @@ export default function AdminAgendamentos() {
   const [form, setForm] = useState(emptyForm())
   const [submitting, setSubmitting] = useState(false)
   const tenantId = useTenantId()
+  const { isPremium } = useTenant()
+  const { selectedUnitId } = useUnit()
+  const activeUnitId = isPremium ? selectedUnitId : 'all'
 
-  useEffect(() => { if (tenantId) fetchAll() }, [tenantId])
+  useEffect(() => {
+  if (tenantId) fetchAll()
+}, [tenantId, activeUnitId])
 
   const fetchAll = async () => {
-  if (!tenantId) return
-  setLoading(true)
-  const [{ data: appts }, { data: barbs }] = await Promise.all([
-    supabase.from('appointments').select('*')
+    if (!tenantId) return
+
+    setLoading(true)
+
+    let appointmentsQuery = supabase
+      .from('appointments')
+      .select('*')
       .eq('tenant_id', tenantId)
-      .order('appointment_date', { ascending: false }),
-    supabase.from('barbeiros').select('id, nome')
+
+    if (activeUnitId !== 'all') {
+      appointmentsQuery = appointmentsQuery.eq('unit_id', activeUnitId)
+    }
+
+    let barbersQuery = supabase
+      .from('barbeiros')
+      .select('id, nome')
       .eq('tenant_id', tenantId)
-      .eq('ativo', true),
-  ])
-  setAppointments(appts ?? [])
-  setBarbers(barbs ?? [])
-  setLoading(false)
-}
+      .eq('ativo', true)
+
+    if (activeUnitId !== 'all') {
+      barbersQuery = barbersQuery.eq('unit_id', activeUnitId)
+    }
+
+    const [{ data: appts, error: apptsError }, { data: barbs, error: barbsError }] =
+      await Promise.all([
+        appointmentsQuery.order('appointment_date', { ascending: false }),
+        barbersQuery.order('nome', { ascending: true }),
+      ])
+
+    if (apptsError) {
+      console.error('Erro ao buscar agendamentos:', apptsError)
+      setAppointments([])
+    } else {
+      setAppointments((appts ?? []) as Appointment[])
+    }
+
+    if (barbsError) {
+      console.error('Erro ao buscar barbeiros:', barbsError)
+      setBarbers([])
+    } else {
+      setBarbers((barbs ?? []) as Barber[])
+    }
+
+    setLoading(false)
+  }
 
   const filtered = appointments.filter(a => {
     const matchFilter = filter === 'todos' || a.status === filter
@@ -126,7 +165,7 @@ const todayCount = appointments.filter(a =>
       barber: a.barber || '', client_name: a.client_name, phone: a.phone || '',
       service: a.service, price: String(a.price),
       appointment_date: a.appointment_date, appointment_time: a.appointment_time,
-      status: a.status, notes: a.notes || '',
+      status: a.status, notes: a.notes || '', unit_id: a.unit_id || '',
     })
     setModal('edit')
   }
@@ -147,6 +186,7 @@ const todayCount = appointments.filter(a =>
   appointment_time: form.appointment_time,
   status: form.status,
   notes: form.notes.trim(),
+  unit_id: isPremium ? (activeUnitId !== 'all' ? activeUnitId : form.unit_id || null) : null,
 }
     if (modal === 'create') {
       const { error } = await supabase.from('appointments').insert(payload)
@@ -171,7 +211,9 @@ const todayCount = appointments.filter(a =>
       <div style={{ ...styles.pageHeader, ...(isMobile ? styles.mobilePageHeader : {}) }}>
         <div>
           <h1 style={{ ...styles.pageTitle, fontSize: isMobile ? 26 : styles.pageTitle.fontSize }}>Agendamentos</h1>
-          <p style={styles.pageSubtitle}>{appointments.length} total</p>
+          <p style={styles.pageSubtitle}>
+            {appointments.length} total{isPremium && activeUnitId !== 'all' ? ' na unidade selecionada' : ''}
+          </p>
         </div>
         <button onClick={openCreate} style={{ ...styles.createBtn, width: isMobile ? '100%' : undefined }}>+ Novo Agendamento</button>
       </div>

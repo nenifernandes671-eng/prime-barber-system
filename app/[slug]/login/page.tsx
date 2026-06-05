@@ -151,7 +151,7 @@ export default function SlugLoginPage({
     }
   }
 
-  // ✅ LOADING VALIDAÇÃO TENANT
+  // Loading validacao tenant
   if (checkingTenant) {
     return (
       <div style={styles.loadingRoot}>
@@ -160,7 +160,7 @@ export default function SlugLoginPage({
     )
   }
 
-  // ✅ TENANT NÃO EXISTE
+  // Tenant nao existe
   if (!tenantExists) {
     return (
       <div style={styles.notFoundRoot}>
@@ -187,7 +187,7 @@ export default function SlugLoginPage({
       <div style={styles.card}>
         <div style={styles.topSection}>
           <div style={styles.iconWrap}>
-            <img src="/icons/nexbarber-192.png" alt="NexBarber" style={styles.logoImg} />
+            <img src="/icons/kortebarber-192.png" alt="KorteBarber" style={styles.logoImg} />
           </div>
 
           <h1 style={styles.title}>Painel Admin</h1>

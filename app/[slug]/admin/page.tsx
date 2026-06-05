@@ -82,6 +82,7 @@ export default function AdminPage() {
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('este-ano')
   const [chartDropdown, setChartDropdown] = useState(false)
   const [tenantId, setTenantId] = useState<string | null>(null)
+const [tenantPlan, setTenantPlan] = useState<string | null>(null)
   const [notifOpen, setNotifOpen] = useState(false)
   const [recentAppointments, setRecentAppointments] = useState<any[]>([])
   const notifRef = useRef<HTMLDivElement>(null)
@@ -92,9 +93,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
+      const { data: tenant } = await supabase.from('tenants').select('id, plano').eq('slug', slug).maybeSingle()
       if (!tenant) return
-      setTenantId(tenant.id)
+
+setTenantId(tenant.id)
+setTenantPlan(tenant.plano || null)
+      
     }
     if (slug) init()
   }, [slug])

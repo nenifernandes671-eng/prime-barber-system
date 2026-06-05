@@ -1,18 +1,18 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 
 export default function SuportePage() {
   return (
     <main style={styles.page}>
       <section style={styles.card}>
         <Link href="/" style={styles.back}>Voltar para o inicio</Link>
-        <p style={styles.kicker}>NexBarber</p>
+        <p style={styles.kicker}>KorteBarber</p>
         <h1 style={styles.title}>Suporte</h1>
         <p style={styles.muted}>Precisa de ajuda com acesso, pagamento ou configuracao?</p>
 
         <div style={styles.grid}>
           <div style={styles.box}>
             <h2 style={styles.boxTitle}>Email</h2>
-            <p style={styles.text}>Envie uma mensagem para suporte@nexbarber.com.br.</p>
+            <p style={styles.text}>Envie uma mensagem para suporte@kortebarber.com.br.</p>
           </div>
           <div style={styles.box}>
             <h2 style={styles.boxTitle}>Assinatura</h2>

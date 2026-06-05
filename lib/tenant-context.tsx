@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
+import { getPlanFlags, type PlanKey } from '@/lib/permissions'
 
 interface Tenant {
   id: string
@@ -22,6 +23,11 @@ interface TenantContextType {
   trialDaysLeft: number
   hasAccess: boolean
   accessReason: string
+  currentPlan: PlanKey
+  isBasic: boolean
+  isPro: boolean
+  isPremium: boolean
+  isProOrPremium: boolean
 }
 
 const TenantContext = createContext<TenantContextType>({
@@ -31,6 +37,11 @@ const TenantContext = createContext<TenantContextType>({
   trialDaysLeft: 0,
   hasAccess: false,
   accessReason: 'loading',
+  currentPlan: 'basic',
+  isBasic: true,
+  isPro: false,
+  isPremium: false,
+  isProOrPremium: false,
 })
 
 export function TenantProvider({ slug, children }: { slug: string; children: ReactNode }) {
@@ -53,11 +64,12 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
   }, [slug])
 
   const access = getTenantAccess(tenant)
+  const plan = getPlanFlags(tenant?.plano)
   const isTrialing = tenant?.status === 'trial' && access.allowed
   const trialDaysLeft = access.daysLeft
 
   return (
-    <TenantContext.Provider value={{ tenant, loading, isTrialing, trialDaysLeft, hasAccess: access.allowed, accessReason: access.reason }}>
+    <TenantContext.Provider value={{ tenant, loading, isTrialing, trialDaysLeft, hasAccess: access.allowed, accessReason: access.reason, ...plan }}>
       {children}
     </TenantContext.Provider>
   )

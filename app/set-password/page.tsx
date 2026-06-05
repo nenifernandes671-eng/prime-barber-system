@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
@@ -95,7 +95,7 @@ export default function SetPasswordPage() {
   async function leaveSetup() {
     await supabase.auth.signOut()
     try {
-      localStorage.removeItem('nexbarber:last-access')
+      localStorage.removeItem('kortebarber:last-access')
     } catch {}
     router.replace('/app')
   }
@@ -151,7 +151,7 @@ export default function SetPasswordPage() {
         <p style={S.desc}>
           {slug
             ? 'Crie uma senha para acessar seu painel nas proximas vezes.'
-            : 'Saia desta tela e tente entrar novamente pelo app da NexBarber.'}
+            : 'Saia desta tela e tente entrar novamente pelo app da KorteBarber.'}
         </p>
 
         <div style={S.form}>

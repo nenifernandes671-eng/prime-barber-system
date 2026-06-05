@@ -1,11 +1,11 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 
 export default function PrivacidadePage() {
   return (
     <main style={styles.page}>
       <section style={styles.card}>
         <Link href="/" style={styles.back}>Voltar para o inicio</Link>
-        <p style={styles.kicker}>NexBarber</p>
+        <p style={styles.kicker}>KorteBarber</p>
         <h1 style={styles.title}>Politica de privacidade</h1>
         <p style={styles.muted}>Ultima atualizacao: maio de 2026</p>
 
@@ -19,7 +19,7 @@ export default function PrivacidadePage() {
             enviar comunicacoes importantes e manter o funcionamento da plataforma.
           </p>
           <p>
-            Pagamentos sao processados por provedores especializados, como Stripe. O NexBarber nao
+            Pagamentos sao processados por provedores especializados, como Stripe. O KorteBarber nao
             armazena dados completos de cartao de credito.
           </p>
           <p>

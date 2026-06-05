@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useTenantId } from '@/lib/useTenantId'
+import { useTenant } from '@/lib/tenant-context'
 
 interface Service {
   id: string
@@ -10,9 +11,16 @@ interface Service {
   price: number
   duration: number
   created_at: string
+  unit_id?: string | null
 }
 
-const emptyForm = () => ({ name: '', price: '', duration: '' })
+interface Unit {
+  id: string
+  name: string
+  active: boolean
+}
+
+const emptyForm = () => ({ name: '', price: '', duration: '', unit_id: '' })
 
 function formatCurrency(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -20,6 +28,7 @@ function formatCurrency(v: number) {
 
 export default function AdminServicos() {
   const [services, setServices] = useState<Service[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<'closed' | 'create' | 'edit'>('closed')
   const [selected, setSelected] = useState<Service | null>(null)
@@ -28,19 +37,53 @@ export default function AdminServicos() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [search, setSearch] = useState('')
   const tenantId = useTenantId()
+  const { isPremium } = useTenant()
 
-  useEffect(() => { if (tenantId) fetchServices() }, [tenantId])
+  useEffect(() => { if (tenantId) fetchServices() }, [tenantId, isPremium])
 
   const fetchServices = async () => {
-  if (!tenantId) return
-  setLoading(true)
-  const { data } = await supabase
-    .from('services').select('*')
-    .eq('tenant_id', tenantId)
-    .order('name')
-  setServices(data ?? [])
-  setLoading(false)
-}
+    if (!tenantId) return
+
+    setLoading(true)
+
+    const unitsRequest = isPremium
+      ? supabase
+          .from('units')
+          .select('id, name, active')
+          .eq('tenant_id', tenantId)
+          .eq('active', true)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null })
+
+    const [
+      { data: servicesData, error: servicesError },
+      { data: unitsData, error: unitsError },
+    ] = await Promise.all([
+      supabase
+        .from('services')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('name'),
+
+      unitsRequest,
+    ])
+
+    if (servicesError) {
+      console.error('Erro ao buscar serviços:', servicesError)
+      setServices([])
+    } else {
+      setServices((servicesData ?? []) as Service[])
+    }
+
+    if (unitsError) {
+      console.error('Erro ao buscar unidades:', unitsError)
+      setUnits([])
+    } else {
+      setUnits((unitsData ?? []) as Unit[])
+    }
+
+    setLoading(false)
+  }
 
   const filtered = services.filter(s =>
     search === '' || s.name.toLowerCase().includes(search.toLowerCase())
@@ -49,10 +92,15 @@ export default function AdminServicos() {
   const totalRevenue = services.reduce((s, v) => s + (v.price || 0), 0)
   const avgDuration = services.length ? Math.round(services.reduce((s, v) => s + (v.duration || 0), 0) / services.length) : 0
 
+  function getUnitName(unitId?: string | null) {
+    if (!unitId) return 'Todas as unidades'
+    return units.find((unit) => unit.id === unitId)?.name || 'Unidade removida'
+  }
+
   const openCreate = () => { setForm(emptyForm()); setSelected(null); setFeedback(null); setModal('create') }
   const openEdit = (s: Service) => {
     setSelected(s)
-    setForm({ name: s.name, price: String(s.price), duration: String(s.duration) })
+    setForm({ name: s.name, price: String(s.price), duration: String(s.duration), unit_id: s.unit_id || '' })
     setFeedback(null)
     setModal('edit')
   }
@@ -66,6 +114,7 @@ export default function AdminServicos() {
   name: form.name.trim(),
   price: parseFloat(form.price) || 0,
   duration: parseInt(form.duration) || 0,
+  unit_id: isPremium ? form.unit_id || null : null,
 }
 
     if (modal === 'create') {
@@ -104,6 +153,7 @@ export default function AdminServicos() {
         <StatCard icon="💰" label="Ticket médio" value={services.length ? formatCurrency(totalRevenue / services.length) : 'R$ 0,00'} color="#10b981" />
         <StatCard icon="⏱" label="Duração média" value={`${avgDuration} min`} color="#8b5cf6" />
         <StatCard icon="🏆" label="Mais caro" value={services.length ? formatCurrency(Math.max(...services.map(s => s.price))) : 'R$ 0,00'} color="#f59e0b" />
+        {isPremium && <StatCard icon="🏢" label="Unidades ativas" value={String(units.length)} color="#06b6d4" />}
       </div>
 
       {/* Busca */}
@@ -133,6 +183,7 @@ export default function AdminServicos() {
                 <div style={{ flex: 1 }}>
                   <p style={styles.serviceName}>{s.name}</p>
                   <p style={styles.serviceDuration}>⏱ {s.duration} minutos</p>
+                  {isPremium && <p style={styles.serviceUnit}>🏢 {getUnitName(s.unit_id)}</p>}
                 </div>
                 <p style={styles.servicePrice}>{formatCurrency(s.price)}</p>
               </div>
@@ -160,6 +211,19 @@ export default function AdminServicos() {
               <Field label="Duração (minutos)">
                 <input style={styles.input} type="number" placeholder="Ex: 30" value={form.duration} onChange={e => f('duration', e.target.value)} />
               </Field>
+
+              {isPremium && (
+                <Field label="Unidade">
+                  <select style={styles.input} value={form.unit_id} onChange={e => f('unit_id', e.target.value)}>
+                    <option value="">Todas as unidades</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               {feedback && (
                 <div style={{ ...styles.feedbackBar, ...(feedback.type === 'success' ? styles.fbSuccess : styles.fbError) }}>
                   {feedback.type === 'success' ? '✅' : '⚠️'} {feedback.msg}
@@ -205,7 +269,7 @@ const styles: Record<string, React.CSSProperties> = {
   pageTitle: { fontSize: 26, fontWeight: 700, color: '#f1f5f9', margin: '0 0 4px' },
   pageSubtitle: { fontSize: 14, color: '#64748b', margin: 0 },
   createBtn: { padding: '10px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 28 },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 28 },
   statCard: { backgroundColor: '#161b27', borderRadius: 14, padding: '20px 20px 16px', border: '1px solid #1e2535' },
   statValue: { fontSize: 20, fontWeight: 700, color: '#f1f5f9', margin: '8px 0 2px' },
   statLabel: { fontSize: 12, color: '#64748b', margin: 0 },
@@ -219,6 +283,7 @@ const styles: Record<string, React.CSSProperties> = {
   serviceIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1e2d45', border: '1px solid #2d3f5a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 },
   serviceName: { fontSize: 15, fontWeight: 600, color: '#f1f5f9', margin: '0 0 4px' },
   serviceDuration: { fontSize: 13, color: '#64748b', margin: 0 },
+  serviceUnit: { fontSize: 12, color: '#38bdf8', margin: '4px 0 0', fontWeight: 700 },
   servicePrice: { fontSize: 18, fontWeight: 700, color: '#10b981', flexShrink: 0 },
   editBtn: { padding: '8px', borderRadius: 8, border: '1px solid #2d3f5a', background: '#1e2d45', color: '#60a5fa', fontSize: 13, cursor: 'pointer' },
   overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24 },

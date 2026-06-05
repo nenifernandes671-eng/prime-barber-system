@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="KorteBarber">
+  <defs><linearGradient id="kb" x1="0" x2="1" y1="1" y2="0"><stop stop-color="#1E40AF"/><stop offset=".55" stop-color="#2563EB"/><stop offset="1" stop-color="#00B2FF"/></linearGradient></defs>
+  <rect width="512" height="512" rx="82" fill="#0A0F1C"/>
+  <path d="M108 96h88c13 0 24 11 24 24v296h-88c-13 0-24-11-24-24z" fill="url(#kb)"/>
+  <path d="M236 242 372 96h96L324 254l144 160h-96L236 268c-8-8-8-18 0-26z" fill="url(#kb)"/>
+</svg>

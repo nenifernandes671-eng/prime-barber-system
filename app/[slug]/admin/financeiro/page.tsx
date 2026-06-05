@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo, type ElementType } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { exportFinancePdf } from "@/lib/exportFinancePdf"
+import { useTenant } from '@/lib/tenant-context'
 import {
   Banknote,
   CalendarDays,
@@ -32,6 +34,7 @@ interface Appointment {
   payment_method: string
   payment_status: string
   status: string
+  unit_id?: string | null
 }
 
 interface BarberPhoto {
@@ -42,6 +45,7 @@ interface BarberPhoto {
 interface FinancialEntry {
   id: string
   tenant_id: string
+  unit_id?: string | null
   type: 'entrada' | 'despesa'
   description: string
   amount: number
@@ -53,6 +57,7 @@ interface FinancialEntry {
 interface CommissionPayment {
   id: string
   tenant_id: string
+  unit_id?: string | null
   barber_name: string
   amount: number
   payment_method: string
@@ -60,6 +65,8 @@ interface CommissionPayment {
   paid_at: string
   created_at?: string
 }
+
+interface Unit { id: string; tenant_id: string; name: string; active: boolean }
 
 type OperationModal = 'closed' | 'entrada' | 'despesa' | 'comissao'
 
@@ -199,6 +206,7 @@ export default function FinanceiroPage() {
   const router = useRouter()
   const slug = pathname.split('/').filter(Boolean)[0]
   const isMobile = useIsMobile()
+  const { isPremium, isProOrPremium } = useTenant()
 
   const [appts, setAppts] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
@@ -209,6 +217,8 @@ export default function FinanceiroPage() {
   const [barberPhotos, setBarberPhotos] = useState<Record<string, string>>({})
   const [entries, setEntries] = useState<FinancialEntry[]>([])
   const [commissionPayments, setCommissionPayments] = useState<CommissionPayment[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
+  const [selectedUnitId, setSelectedUnitId] = useState('all')
   const [operationModal, setOperationModal] = useState<OperationModal>('closed')
   const [operationLoading, setOperationLoading] = useState(false)
   const [operationMsg, setOperationMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -219,6 +229,9 @@ export default function FinanceiroPage() {
   const [commissionBarber, setCommissionBarber] = useState('')
   const [commissionAmount, setCommissionAmount] = useState('')
   const [commissionMethod, setCommissionMethod] = useState('pix')
+  const [entryUnitId, setEntryUnitId] = useState('')
+  const [commissionUnitId, setCommissionUnitId] = useState('')
+  const activeUnitId = isPremium ? selectedUnitId : 'all'
 
   useEffect(() => {
     async function init() {
@@ -246,6 +259,15 @@ export default function FinanceiroPage() {
           .eq('tenant_id', t.id)
           .order('paid_at', { ascending: false })
 
+        const { data: unitRows } = isPremium
+          ? await supabase
+              .from('units')
+              .select('id, tenant_id, name, active')
+              .eq('tenant_id', t.id)
+              .eq('active', true)
+              .order('created_at', { ascending: true })
+          : { data: [] }
+
         let barberRows: BarberPhoto[] = []
 
         const { data: sessionData } = await supabase.auth.getSession()
@@ -263,6 +285,7 @@ export default function FinanceiroPage() {
         setAppts(data ?? [])
         setEntries((entryRows ?? []) as FinancialEntry[])
         setCommissionPayments((commissionRows ?? []) as CommissionPayment[])
+        setUnits(isPremium ? (unitRows ?? []) as Unit[] : [])
         setBarberPhotos(
           Object.fromEntries(
             barberRows
@@ -276,7 +299,7 @@ export default function FinanceiroPage() {
     }
 
     if (slug) init()
-  }, [slug])
+  }, [slug, isPremium])
 
   async function markPaid(id: number, method = 'outros') {
     if (!tenantId) return
@@ -318,9 +341,11 @@ export default function FinanceiroPage() {
     setEntryAmount('')
     setEntryMethod('pix')
     setEntryDate(localDateKey())
+    setEntryUnitId(activeUnitId !== 'all' ? activeUnitId : '')
     setCommissionBarber(barberData[0]?.name ?? '')
     setCommissionAmount('')
     setCommissionMethod('pix')
+    setCommissionUnitId(activeUnitId !== 'all' ? activeUnitId : '')
     setOperationModal(type)
   }
 
@@ -344,6 +369,7 @@ export default function FinanceiroPage() {
 
     const payload = {
       tenant_id: tenantId,
+      unit_id: isPremium ? entryUnitId || null : null,
       type,
       description: entryDescription.trim(),
       amount,
@@ -389,6 +415,7 @@ export default function FinanceiroPage() {
 
     const payload = {
       tenant_id: tenantId,
+      unit_id: isPremium ? commissionUnitId || null : null,
       barber_name: commissionBarber,
       amount,
       payment_method: normalizePaymentMethod(commissionMethod),
@@ -425,21 +452,30 @@ export default function FinanceiroPage() {
             (f ?? '').toLowerCase().includes(s)
           )
 
-        return ok && match
+        const unitOk = activeUnitId === 'all' || !a.unit_id || a.unit_id === activeUnitId
+        return ok && match && unitOk
       }),
-    [appts, period, search]
+    [appts, period, search, activeUnitId]
   )
 
   const filteredEntries = useMemo(() => {
-    return entries.filter((entry) => inPeriod(entry.entry_date, period))
-  }, [entries, period])
+    if (!isProOrPremium) return []
+
+    return entries.filter((entry) => {
+      const unitOk = activeUnitId === 'all' || !entry.unit_id || entry.unit_id === activeUnitId
+      return inPeriod(entry.entry_date, period) && unitOk
+    })
+  }, [entries, period, activeUnitId, isProOrPremium])
 
   const filteredCommissionPayments = useMemo(() => {
+    if (!isProOrPremium) return []
+
     return commissionPayments.filter((payment) => {
       const date = payment.paid_at ? payment.paid_at.slice(0, 10) : localDateKey()
-      return inPeriod(date, period)
+      const unitOk = activeUnitId === 'all' || !payment.unit_id || payment.unit_id === activeUnitId
+      return inPeriod(date, period) && unitOk
     })
-  }, [commissionPayments, period])
+  }, [commissionPayments, period, activeUnitId, isProOrPremium])
 
   const rev = filtered.filter(isRevenue)
   const appointmentRevenue = rev.reduce((s, a) => s + (a.price || 0), 0)
@@ -560,6 +596,23 @@ export default function FinanceiroPage() {
   const chartMax = Math.max(...chartData.map((item) => item.value), 1)
   const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0)
 
+  function getUnitName(unitId?: string | null) {
+    if (!unitId) return 'Sem unidade'
+    return units.find((unit) => unit.id === unitId)?.name || 'Unidade removida'
+  }
+
+  const unitRanking = useMemo(() => {
+    return units.map((unit) => {
+      const unitAppointments = appts.filter((a) => a.unit_id === unit.id && inPeriod(a.appointment_date, period)).filter(isRevenue)
+      const appointmentRevenue = unitAppointments.reduce((sum, a) => sum + Number(a.price || 0), 0)
+      const unitEntries = entries.filter((entry) => entry.unit_id === unit.id && inPeriod(entry.entry_date, period))
+      const manualIncome = unitEntries.filter((entry) => entry.type === 'entrada').reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
+      const expenses = unitEntries.filter((entry) => entry.type === 'despesa').reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
+      const revenue = appointmentRevenue + manualIncome
+      return { id: unit.id, name: unit.name, appointments: unitAppointments.length, revenue, expenses, profit: revenue - expenses }
+    }).sort((a, b) => b.revenue - a.revenue)
+  }, [units, appts, entries, period])
+
   const periods: { key: Period; label: string }[] = [
     { key: 'hoje', label: 'Hoje' },
     { key: 'semana', label: 'Semana' },
@@ -599,8 +652,9 @@ export default function FinanceiroPage() {
   ]
 
   function exportCSV() {
-    const header = ['Cliente', 'Servico', 'Barbeiro', 'Valor', 'Data', 'Pagamento', 'Status']
+    const header = [...(isPremium ? ['Unidade'] : []), 'Cliente', 'Servico', 'Barbeiro', 'Valor', 'Data', 'Pagamento', 'Status']
     const rows = filtered.map((a) => [
+      ...(isPremium ? [getUnitName(a.unit_id)] : []),
       a.client_name,
       a.service,
       a.barber,
@@ -689,11 +743,30 @@ export default function FinanceiroPage() {
           font-size: 13px;
         }
 
+        .finance-filters {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+
         .periods {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
-          margin-bottom: 16px;
+        }
+
+        .unit-filter {
+          min-height: 42px;
+          border-radius: 12px;
+          border: 1px solid rgba(148,163,184,.14);
+          background: rgba(15,23,42,.82);
+          color: #f8fafc;
+          font-weight: 850;
+          padding: 0 13px;
+          outline: none;
         }
 
         .period-btn {
@@ -1036,7 +1109,7 @@ export default function FinanceiroPage() {
 
         .lower-grid {
           display: grid;
-          grid-template-columns: .95fr 1fr 1.25fr;
+          grid-template-columns: .95fr .95fr 1fr 1.25fr;
           gap: 16px;
           margin-bottom: 16px;
         }
@@ -1442,7 +1515,8 @@ export default function FinanceiroPage() {
         <p>Acompanhe todas as receitas, pagamentos e comissões da sua barbearia.</p>
       </div>
 
-      <div className="periods">
+      <div className="finance-filters">
+        <div className="periods">
         {periods.map((p) => (
           <button
             key={p.key}
@@ -1460,6 +1534,16 @@ export default function FinanceiroPage() {
             {p.label}
           </button>
         ))}
+        </div>
+
+        {isPremium && (
+          <select className="unit-filter" value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)}>
+            <option value="all">Todas as unidades</option>
+            {units.map((unit) => (
+              <option key={unit.id} value={unit.id}>{unit.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="grid-kpi">
@@ -1603,40 +1687,64 @@ export default function FinanceiroPage() {
               </span>
             </button>
 
-            <button className="quick-btn" onClick={() => openOperationModal('entrada')}>
-              <span className="quick-icon" style={{ background: 'rgba(16,185,129,.18)', color: '#10b981' }}>
-                <ArrowUpCircle size={18} />
-              </span>
-              <span>
-                <strong>Registrar entrada</strong>
-                <span>Venda avulsa, produto ou ajuste</span>
-              </span>
-            </button>
+            {isProOrPremium && (
+              <>
+                <button className="quick-btn" onClick={() => openOperationModal('entrada')}>
+                  <span className="quick-icon" style={{ background: 'rgba(16,185,129,.18)', color: '#10b981' }}>
+                    <ArrowUpCircle size={18} />
+                  </span>
+                  <span>
+                    <strong>Registrar entrada</strong>
+                    <span>Venda avulsa, produto ou ajuste</span>
+                  </span>
+                </button>
 
-            <button className="quick-btn" onClick={() => openOperationModal('despesa')}>
-              <span className="quick-icon" style={{ background: 'rgba(245,158,11,.18)', color: '#f59e0b' }}>
-                <ArrowDownCircle size={18} />
-              </span>
-              <span>
-                <strong>Registrar despesa</strong>
-                <span>Aluguel, produtos, água ou luz</span>
-              </span>
-            </button>
+                <button className="quick-btn" onClick={() => openOperationModal('despesa')}>
+                  <span className="quick-icon" style={{ background: 'rgba(245,158,11,.18)', color: '#f59e0b' }}>
+                    <ArrowDownCircle size={18} />
+                  </span>
+                  <span>
+                    <strong>Registrar despesa</strong>
+                    <span>Aluguel, produtos, água ou luz</span>
+                  </span>
+                </button>
 
-            <button className="quick-btn" onClick={() => openOperationModal('comissao')}>
-              <span className="quick-icon" style={{ background: 'rgba(139,92,246,.18)', color: '#8b5cf6' }}>
-                <Users size={18} />
-              </span>
-              <span>
-                <strong>Pagar comissão</strong>
-                <span>Registrar repasse ao barbeiro</span>
-              </span>
-            </button>
+                <button className="quick-btn" onClick={() => openOperationModal('comissao')}>
+                  <span className="quick-icon" style={{ background: 'rgba(139,92,246,.18)', color: '#8b5cf6' }}>
+                    <Users size={18} />
+                  </span>
+                  <span>
+                    <strong>Pagar comissão</strong>
+                    <span>Registrar repasse ao barbeiro</span>
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       <div className="lower-grid">
+        {isPremium && (
+          <div className="premium-card box-card">
+            <h3 className="section-title">Ranking de unidades</h3>
+            {unitRanking.length === 0 ? (
+              <p className="muted">Sem unidades cadastradas.</p>
+            ) : (
+              unitRanking.slice(0, 5).map((unit, index) => (
+                <div key={unit.id} className="barber-row">
+                  <div className="avatar-fallback">{index + 1}</div>
+                  <div className="grow">
+                    <strong className="truncate">{unit.name}</strong>
+                    <div className="muted">{unit.appointments} agendamentos · lucro {fmt(unit.profit)}</div>
+                  </div>
+                  <strong className="green">{fmt(unit.revenue)}</strong>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         <div className="premium-card box-card">
           <h3 className="section-title">Métodos de pagamento</h3>
 
@@ -1732,7 +1840,7 @@ export default function FinanceiroPage() {
                   <div className="grow">
                     <strong className="truncate">{a.service || 'Atendimento'}</strong>
                     <div className="muted">
-                      {a.client_name} · {fmtDate(a.appointment_date)}
+                      {isPremium ? `${getUnitName(a.unit_id)} · ` : ''}{a.client_name} · {fmtDate(a.appointment_date)}
                     </div>
                   </div>
 
@@ -1756,10 +1864,31 @@ export default function FinanceiroPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
 
-            <button className="export-btn" onClick={exportCSV}>
-              <Download size={15} />
-              Exportar CSV
-            </button>
+            <button className="export-btn"
+  onClick={() =>
+    exportFinancePdf({
+      businessName: "KorteBarber",
+      period: "01/06/2026 a 30/06/2026",
+      totalRevenue: 40,
+      received: 0,
+      pending: 40,
+      canceled: 0,
+      transactions: [
+        {
+          client: "Mateus",
+          service: "Corte Barba",
+          barber: "Thiago",
+          value: 40,
+          date: "01/06/2026",
+          paymentMethod: "PIX",
+          status: "Pendente",
+        },
+      ],
+    })
+  }
+>
+  Exportar PDF
+</button>
           </div>
         </div>
 
@@ -1777,7 +1906,7 @@ export default function FinanceiroPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                       <div>
                         <strong>{a.client_name}</strong>
-                        <div className="muted">{a.service} · {a.barber}</div>
+                        <div className="muted">{isPremium ? `${getUnitName(a.unit_id)} · ` : ''}{a.service} · {a.barber}</div>
                       </div>
 
                       <strong className="green">{fmt(a.price)}</strong>
@@ -1824,7 +1953,7 @@ export default function FinanceiroPage() {
             <table className="transactions-table">
               <thead>
                 <tr>
-                  {['Cliente', 'Serviço', 'Barbeiro', 'Valor', 'Data', 'Pagamento', 'Status', 'Ação'].map((h) => (
+                  {[...(isPremium ? ['Unidade'] : []), 'Cliente', 'Serviço', 'Barbeiro', 'Valor', 'Data', 'Pagamento', 'Status', 'Ação'].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -1833,7 +1962,7 @@ export default function FinanceiroPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: '#64748b', padding: 32 }}>
+                    <td colSpan={isPremium ? 9 : 8} style={{ textAlign: 'center', color: '#64748b', padding: 32 }}>
                       Nenhum resultado
                     </td>
                   </tr>
@@ -1844,6 +1973,7 @@ export default function FinanceiroPage() {
 
                     return (
                       <tr key={a.id}>
+                        {isPremium && <td className="muted">{getUnitName(a.unit_id)}</td>}
                         <td>
                           <strong>{a.client_name}</strong>
                         </td>
@@ -1969,6 +2099,18 @@ export default function FinanceiroPage() {
                   />
                 </label>
 
+                {isPremium && (
+                  <label>
+                    Unidade
+                    <select value={commissionUnitId} onChange={(event) => setCommissionUnitId(event.target.value)}>
+                      <option value="">Sem unidade definida</option>
+                      {units.map((unit) => (
+                        <option key={unit.id} value={unit.id}>{unit.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
                 <label>
                   Método de pagamento
                   <select value={commissionMethod} onChange={(event) => setCommissionMethod(event.target.value)}>
@@ -1999,6 +2141,18 @@ export default function FinanceiroPage() {
                     inputMode="decimal"
                   />
                 </label>
+
+                {isPremium && (
+                  <label>
+                    Unidade
+                    <select value={entryUnitId} onChange={(event) => setEntryUnitId(event.target.value)}>
+                      <option value="">Sem unidade definida</option>
+                      {units.map((unit) => (
+                        <option key={unit.id} value={unit.id}>{unit.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
                 <label>
                   Método de pagamento

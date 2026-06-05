@@ -20,8 +20,8 @@ import {
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
 
-const LAST_ACCESS_KEY = 'nexbarber:last-access'
-const LAST_CLIENT_SLUG_KEY = 'nexbarber:last-client-slug'
+const LAST_ACCESS_KEY = 'kortebarber:last-access'
+const LAST_CLIENT_SLUG_KEY = 'kortebarber:last-client-slug'
 
 function cleanSlug(value: string) {
   const trimmed = value.trim()
@@ -43,7 +43,7 @@ function cleanSlug(value: string) {
     if (firstPath) return sanitize(firstPath)
 
     const host = url.hostname.replace(/^www\./, '')
-    if (host === 'nexbarber.com.br') return ''
+    if (host === 'kortebarber.com.br') return ''
     return sanitize(host.split('.')[0] || '')
   } catch {
     const fallback = trimmed
@@ -626,10 +626,10 @@ export default function AppStartPage() {
         <header className="app-top">
           <a className="brand" href="/">
             <div className="brand-mark">
-              <img src="/icons/nexbarber-192.png" alt="" />
+              <img src="/icons/kortebarber-192.png" alt="" />
             </div>
             <div>
-              <p className="brand-name">NexBarber</p>
+              <p className="brand-name">KorteBarber</p>
               <p className="brand-sub">App da barbearia</p>
             </div>
           </a>
@@ -646,7 +646,7 @@ export default function AppStartPage() {
               Escolha seu acesso
             </div>
             <h1 className="title">
-              Entre no <span>NexBarber</span> certo.
+              Entre no <span>KorteBarber</span> certo para você e sua barbearia brilharem ainda mais.
             </h1>
             <p className="lead">
               Um app para clientes, barbeiros e donos. Cada pessoa entra no seu painel certo,

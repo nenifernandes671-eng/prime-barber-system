@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useTenantId } from '@/lib/useTenantId'
+import { useUnit } from '@/lib/unit-context'
+import { useTenant } from '@/lib/tenant-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Cliente {
   id: string
+  unit_id?: string | null
   nome: string
   telefone: string
   email: string
@@ -18,6 +21,7 @@ interface Cliente {
 
 interface Agendamento {
   id: string
+  unit_id?: string | null
   service: string
   price: number
   appointment_date: string
@@ -68,32 +72,63 @@ export default function AdminClientes() {
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const tenantId = useTenantId()
+  const { isPremium } = useTenant()
+  const { selectedUnitId } = useUnit()
+  const activeUnitId = isPremium ? selectedUnitId : 'all'
 
-  useEffect(() => { if (tenantId) fetchClientes() }, [tenantId])
+  useEffect(() => { if (tenantId) fetchClientes() }, [tenantId, activeUnitId])
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchClientes = async () => {
-  if (!tenantId) return
-  setLoading(true)
-  const { data } = await supabase
-    .from('clientes').select('*')
-    .eq('tenant_id', tenantId)
-    .order('nome')
-  setClientes(data ?? [])
-  setLoading(false)
-}
+    if (!tenantId) return
+
+    setLoading(true)
+
+    let query = supabase
+      .from('clientes')
+      .select('*')
+      .eq('tenant_id', tenantId)
+
+    if (activeUnitId !== 'all') {
+      query = query.eq('unit_id', activeUnitId)
+    }
+
+    const { data, error } = await query.order('nome')
+
+    if (error) {
+      console.error('Erro ao buscar clientes:', error)
+      setClientes([])
+    } else {
+      setClientes((data ?? []) as Cliente[])
+    }
+
+    setLoading(false)
+  }
 
   const fetchHistorico = async (clienteNome: string) => {
     if (!tenantId) return
-    const { data } = await supabase
+
+    let query = supabase
       .from('appointments')
-      .select('id, service, price, appointment_date, appointment_time, status')
+      .select('id, unit_id, service, price, appointment_date, appointment_time, status')
       .eq('tenant_id', tenantId)
       .ilike('client_name', clienteNome)
+
+    if (activeUnitId !== 'all') {
+      query = query.eq('unit_id', activeUnitId)
+    }
+
+    const { data, error } = await query
       .order('appointment_date', { ascending: false })
       .limit(10)
-    setHistorico(data ?? [])
+
+    if (error) {
+      console.error('Erro ao buscar histórico:', error)
+      setHistorico([])
+    } else {
+      setHistorico((data ?? []) as Agendamento[])
+    }
   }
 
   // ── Filtered ───────────────────────────────────────────────────────────────
@@ -144,6 +179,7 @@ export default function AdminClientes() {
     const payload = {
       nome: form.nome.trim(),
       tenant_id: tenantId,
+      unit_id: activeUnitId !== 'all' ? activeUnitId : null,
       telefone: form.telefone.trim() || null,
       email: form.email.trim() || null,
       nascimento: form.nascimento || null,
@@ -183,7 +219,10 @@ export default function AdminClientes() {
       <div style={styles.pageHeader}>
         <div>
           <h1 style={styles.pageTitle}>Clientes</h1>
-          <p style={styles.pageSubtitle}>{clientes.length} cadastrado{clientes.length !== 1 ? 's' : ''}</p>
+          <p style={styles.pageSubtitle}>
+            {clientes.length} cadastrado{clientes.length !== 1 ? 's' : ''}
+            {isPremium && activeUnitId !== 'all' ? ' na unidade selecionada' : ''}
+          </p>
         </div>
         <button onClick={openCreate} style={styles.createBtn}>+ Novo Cliente</button>
       </div>

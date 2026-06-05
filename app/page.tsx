@@ -2,10 +2,20 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import {
+  CalendarDays,
+  ChartColumn,
+  Crown,
+  DollarSign,
+  Scissors,
+  Trophy,
+  TrendingUp,
+  Users,
+} from 'lucide-react'
 
 const features = [
   {
-    icon: '📅',
+    icon: CalendarDays,
     number: '01',
     name: 'Agendamentos',
     description:
@@ -13,7 +23,7 @@ const features = [
     badge: 'Online & Presencial',
   },
   {
-    icon: '💰',
+    icon: DollarSign,
     number: '02',
     name: 'Financeiro',
     description:
@@ -21,7 +31,7 @@ const features = [
     badge: 'Relatórios Automáticos',
   },
   {
-    icon: '📊',
+    icon: ChartColumn,
     number: '03',
     name: 'Dashboard',
     description:
@@ -29,7 +39,7 @@ const features = [
     badge: 'Tempo Real',
   },
   {
-    icon: '✂️',
+    icon: Scissors,
     number: '04',
     name: 'Serviços',
     description:
@@ -37,7 +47,7 @@ const features = [
     badge: 'Ilimitado',
   },
   {
-    icon: '🏆',
+    icon: Trophy,
     number: '05',
     name: 'Comissões',
     description:
@@ -45,7 +55,7 @@ const features = [
     badge: 'Flexível',
   },
   {
-    icon: '👑',
+    icon: Crown,
     number: '06',
     name: 'Assinaturas',
     description:
@@ -93,7 +103,7 @@ const plans = [
   },
   {
     name: 'Premium',
-    price: '139',
+    price: '189',
     features: [
       ['Agendamentos online', true],
       ['Barbeiros ilimitados', true],
@@ -148,9 +158,9 @@ export default function Home() {
   }, [])
 
   return (
-    <main className="nex-page">
+    <main className="korte-page">
       <style>{`
-        .nex-page {
+        .korte-page {
           --black: #0a0a0a;
           --dark: #111111;
           --card: #161616;
@@ -168,13 +178,13 @@ export default function Home() {
           font-weight: 300;
         }
 
-        .nex-page *,
-        .nex-page *::before,
-        .nex-page *::after {
+        .korte-page *,
+        .korte-page *::before,
+        .korte-page *::after {
           box-sizing: border-box;
         }
 
-        .nex-page::before {
+        .korte-page::before {
           content: "";
           position: fixed;
           inset: 0;
@@ -184,7 +194,7 @@ export default function Home() {
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
         }
 
-        .nex-nav {
+        .korte-nav {
           position: fixed;
           top: 0;
           left: 0;
@@ -444,7 +454,7 @@ export default function Home() {
           animation: fadeUp 1s 0.8s ease both;
         }
 
-        .nex-section {
+        .korte-section {
           padding: 120px 60px;
         }
 
@@ -546,9 +556,25 @@ export default function Home() {
         }
 
         .feature-icon {
-          display: block;
+          width: 48px;
+          height: 48px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           margin-bottom: 24px;
-          font-size: 32px;
+          border-radius: 14px;
+          color: var(--gold-light);
+          background:
+            radial-gradient(circle at 30% 20%, rgba(255,255,255,0.16), transparent 32%),
+            linear-gradient(145deg, rgba(201,168,76,0.18), rgba(37,99,235,0.08));
+          border: 1px solid rgba(201,168,76,0.26);
+          box-shadow: 0 18px 38px rgba(0,0,0,0.32);
+        }
+
+        .feature-icon svg {
+          width: 24px;
+          height: 24px;
+          stroke-width: 2.3;
         }
 
         .feature-num {
@@ -737,16 +763,23 @@ export default function Home() {
         }
 
         .mock-dashboard-icon {
-          width: 28px;
-          height: 28px;
+          width: 34px;
+          height: 34px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 9px;
+          border-radius: 11px;
           background: rgba(201,168,76,0.14);
           color: var(--gold);
-          font-size: 14px;
+          font-size: 13px;
+          font-weight: 900;
           margin-bottom: 12px;
+        }
+
+        .mock-dashboard-icon svg {
+          width: 18px;
+          height: 18px;
+          stroke-width: 2.4;
         }
 
         .mock-dashboard-label {
@@ -1165,7 +1198,7 @@ export default function Home() {
           fill: white;
         }
 
-        .nex-footer {
+        .korte-footer {
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1184,7 +1217,7 @@ export default function Home() {
           color: rgba(255, 255, 255, 0.3);
         }
 
-        .nex-footer p {
+        .korte-footer p {
           color: var(--muted);
           font-size: 13px;
         }
@@ -1225,7 +1258,7 @@ export default function Home() {
         }
 
         @media (max-width: 900px) {
-          .nex-nav {
+          .korte-nav {
             padding: 16px 24px;
           }
 
@@ -1233,7 +1266,7 @@ export default function Home() {
             display: none;
           }
 
-          .nex-section {
+          .korte-section {
             padding: 80px 24px;
           }
 
@@ -1288,7 +1321,7 @@ export default function Home() {
             grid-template-columns: 1fr;
           }
 
-          .nex-footer {
+          .korte-footer {
             flex-direction: column;
             gap: 20px;
             padding: 40px 24px;
@@ -1311,9 +1344,9 @@ export default function Home() {
         }
       `}</style>
 
-      <nav className="nex-nav" aria-label="Navegação principal">
+      <nav className="korte-nav" aria-label="Navegação principal">
         <a className="nav-logo" href="#inicio">
-          Nex<span>Barber</span>
+          Korte<span>Barber</span>
         </a>
         <ul className="nav-links">
           <li><a href="#funcionalidades">Funcionalidades</a></li>
@@ -1359,7 +1392,7 @@ export default function Home() {
         <div className="scroll-line" />
       </section>
 
-      <section className="nex-section features" id="funcionalidades">
+      <section className="korte-section features" id="funcionalidades">
         <div className="features-header reveal">
           <div>
             <div className="section-label">Funcionalidades</div>
@@ -1372,7 +1405,9 @@ export default function Home() {
         <div className="features-grid">
           {features.map((feature) => (
             <article className="feature-card reveal" key={feature.number}>
-              <span className="feature-icon">{feature.icon}</span>
+              <span className="feature-icon">
+                <feature.icon aria-hidden="true" />
+              </span>
               <div className="feature-num">{feature.number}</div>
               <h3 className="feature-name">{feature.name}</h3>
               <p className="feature-desc">{feature.description}</p>
@@ -1382,7 +1417,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="nex-section how" id="como-funciona">
+      <section className="korte-section how" id="como-funciona">
         <div className="how-inner">
           <div className="reveal">
             <div className="section-label">Como funciona</div>
@@ -1417,22 +1452,22 @@ export default function Home() {
               </div>
               <div className="mock-dashboard-grid">
                 <div className="mock-dashboard-card">
-                  <div className="mock-dashboard-icon">💵</div>
+                  <div className="mock-dashboard-icon"><DollarSign aria-hidden="true" /></div>
                   <div className="mock-dashboard-label">Receita</div>
                   <div className="mock-dashboard-value">R$ 2.480</div>
                 </div>
                 <div className="mock-dashboard-card">
-                  <div className="mock-dashboard-icon">📈</div>
+                  <div className="mock-dashboard-icon"><TrendingUp aria-hidden="true" /></div>
                   <div className="mock-dashboard-label">Lucro</div>
                   <div className="mock-dashboard-value">R$ 1.920</div>
                 </div>
                 <div className="mock-dashboard-card">
-                  <div className="mock-dashboard-icon">✂</div>
+                  <div className="mock-dashboard-icon"><Scissors aria-hidden="true" /></div>
                   <div className="mock-dashboard-label">Hoje</div>
                   <div className="mock-dashboard-value">18</div>
                 </div>
                 <div className="mock-dashboard-card">
-                  <div className="mock-dashboard-icon">🎯</div>
+                  <div className="mock-dashboard-icon"><Users aria-hidden="true" /></div>
                   <div className="mock-dashboard-label">Ticket</div>
                   <div className="mock-dashboard-value">R$ 137</div>
                 </div>
@@ -1458,7 +1493,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="nex-section pricing" id="planos">
+      <section className="korte-section pricing" id="planos">
         <div className="pricing-header reveal">
           <div className="section-label">Planos</div>
           <h2 className="section-title">ESCOLHA O SEU PLANO</h2>
@@ -1481,13 +1516,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="nex-section testimonials" id="depoimentos">
+      <section className="korte-section testimonials" id="depoimentos">
         <div className="testimonials-header reveal">
           <div>
             <div className="section-label">Depoimentos</div>
             <h2 className="section-title">O QUE DIZEM OS DONOS</h2>
           </div>
-          <p className="section-desc">Mais de 3.000 barbearias já transformaram sua gestão com o NexBarber.</p>
+          <p className="section-desc">Mais de 3.000 barbearias já transformaram sua gestão com o KorteBarber.</p>
         </div>
         <div className="testimonials-grid">
           {testimonials.map((testimonial) => (
@@ -1530,9 +1565,9 @@ export default function Home() {
         </div>
       </a>
 
-      <footer className="nex-footer">
-        <div className="footer-logo">Nex<span>Barber</span></div>
-        <p>© 2026 NexBarber. Todos os direitos reservados.</p>
+      <footer className="korte-footer">
+        <div className="footer-logo">Korte<span>Barber</span></div>
+        <p>© 2026 KorteBarber. Todos os direitos reservados.</p>
         <div className="footer-links">
           <Link href="/termos">Termos</Link>
           <Link href="/privacidade">Privacidade</Link>

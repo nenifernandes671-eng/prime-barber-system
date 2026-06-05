@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const resendApiKey = process.env.RESEND_API_KEY
-const emailFrom = process.env.EMAIL_FROM || 'NexBarber <noreply@nexbarber.com.br>'
+const emailFrom = process.env.EMAIL_FROM || 'KorteBarber <noreply@kortebarber.com.br>'
 
 const admin =
   supabaseUrl && serviceRoleKey

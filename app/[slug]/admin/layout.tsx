@@ -5,6 +5,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TenantProvider, useTenant } from '@/lib/tenant-context'
+import { UnitProvider, useUnit } from '@/lib/unit-context'
+import { getBlockedPlanForPath, isAdminPathAllowed } from '@/lib/permissions'
+import { BarChart3 } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import {
   LayoutDashboard, CalendarDays, DollarSign, Scissors, Users, Settings,
   HandCoins, Wrench, Menu, X, Crown, LogOut, ChevronRight,
@@ -35,7 +39,8 @@ function progressPercent(start?: string | null, end?: string | null) {
 function AdminLayoutInner({ slug, children }: { slug: string; children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { tenant, loading, isTrialing, trialDaysLeft, hasAccess, accessReason } = useTenant()
+  const { tenant, loading, isTrialing, trialDaysLeft, hasAccess, accessReason, isPremium, isProOrPremium } = useTenant()
+  const { units, selectedUnitId, setSelectedUnitId, loadingUnits } = useUnit()
 
   const [checking, setChecking] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -69,14 +74,34 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     { name: 'Dashboard', path: `/${slug}/admin`, icon: LayoutDashboard },
     { name: 'Agendamentos', path: `/${slug}/admin/agendamentos`, icon: CalendarDays },
     { name: 'Financeiro', path: `/${slug}/admin/financeiro`, icon: DollarSign },
-    { name: 'Despesas', path: `/${slug}/admin/despesas`, icon: ReceiptText },
     { name: 'Barbeiros', path: `/${slug}/admin/barbeiros`, icon: Scissors },
     { name: 'Clientes', path: `/${slug}/admin/clientes`, icon: Users },
-    { name: 'Serviços', path: `/${slug}/admin/servicos`, icon: Wrench },
-    { name: 'Memberships', path: `/${slug}/admin/memberships`, icon: Crown },
-    { name: 'Comissões', path: `/${slug}/admin/comissoes`, icon: HandCoins },
-    { name: 'WhatsApp', path: `/${slug}/admin/whatsapp`, icon: MessageCircle },
-    { name: 'Configurações', path: `/${slug}/admin/configuracoes`, icon: Settings },
+    { name: 'Servicos', path: `/${slug}/admin/servicos`, icon: Wrench },
+
+    ...(isPremium
+      ? [
+          { name: 'Dashboard Executivo', path: `/${slug}/admin/dashboard-executivo`, icon: BarChart3 },
+          { name: 'Clientes Inativos', path: `/${slug}/admin/clientes-inativos`, icon: MessageCircle },
+        ]
+      : []),
+
+    ...(isProOrPremium
+      ? [
+          { name: 'Despesas', path: `/${slug}/admin/despesas`, icon: ReceiptText },
+          { name: 'Memberships', path: `/${slug}/admin/memberships`, icon: Crown },
+          { name: 'Comissoes', path: `/${slug}/admin/comissoes`, icon: HandCoins },
+          { name: 'WhatsApp', path: `/${slug}/admin/whatsapp`, icon: MessageCircle },
+          { name: 'Relatorios', path: `/${slug}/admin/relatorios`, icon: BarChart3 },
+        ]
+      : []),
+
+    ...(isPremium
+      ? [
+          { name: 'Unidades', path: `/${slug}/admin/unidades`, icon: Building2 },
+        ]
+      : []),
+
+    { name: 'Configuracoes', path: `/${slug}/admin/configuracoes`, icon: Settings },
   ]
 
   useEffect(() => {
@@ -177,14 +202,38 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     )
   }
 
+  const blockedPlan = getBlockedPlanForPath(pathname, slug)
+
+  if (!isAdminPathAllowed(pathname, slug, t?.plano)) {
+    const isPremiumBlock = blockedPlan === 'premium'
+
+    return (
+      <div style={{ minHeight: '100vh', background: '#050816', color: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Inter','DM Sans','Segoe UI',sans-serif" }}>
+        <div style={{ width: '100%', maxWidth: 520, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(8,13,28,.98))', border: '1px solid rgba(148,163,184,.12)', borderRadius: 24, padding: 30, textAlign: 'center', boxShadow: '0 30px 90px rgba(0,0,0,.5)' }}>
+          <div style={{ fontSize: 42, marginBottom: 12 }}>??</div>
+          <h1 style={{ fontSize: 28, margin: '0 0 10px', fontWeight: 950 }}>Recurso {isPremiumBlock ? 'Premium' : 'Pro'}</h1>
+          <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
+            Este recurso esta disponivel apenas no plano {isPremiumBlock ? 'Premium' : 'Pro ou Premium'}.
+          </p>
+          <Link href="/pricing" style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', textDecoration: 'none', fontWeight: 900 }}>
+            Fazer upgrade
+          </Link>
+          <Link href={`/${slug}/admin`} style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', marginTop: 12, padding: '12px 18px', borderRadius: 14, border: '1px solid rgba(148,163,184,.18)', color: '#cbd5e1', textDecoration: 'none', fontWeight: 800 }}>
+            Voltar ao dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   const SidebarContent = () => (
     <div className="sidebar-content">
       <div className="brand-area">
         <div className="brand-logo">
-          <img src="/icons/nexbarber-192.png" alt="NexBarber" />
+          <img src="/icons/kortebarber-192.png" alt="KorteBarber" />
         </div>
         <div className="brand-text">
-          <div><strong>NexBarber</strong><span>{planName}</span></div>
+          <div><strong>KorteBarber</strong><span>{planName}</span></div>
           <small>Painel Admin</small>
         </div>
       </div>
@@ -211,6 +260,34 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           </div>
           <Link href="/pricing">Assinar</Link>
         </div>
+      )}
+
+      {isPremium && (
+      <div className="unit-selector-card">
+        <div className="unit-selector-head">
+          <Building2 size={15} />
+          <span>Unidade ativa</span>
+        </div>
+
+        <select
+          value={selectedUnitId}
+          onChange={(event) => setSelectedUnitId(event.target.value)}
+          disabled={loadingUnits}
+        >
+          <option value="all">Todas as unidades</option>
+          {units.map((unit) => (
+            <option key={unit.id} value={unit.id}>
+              {unit.name}
+            </option>
+          ))}
+        </select>
+
+        <small>
+          {selectedUnitId === 'all'
+            ? 'Visão consolidada da rede'
+            : units.find((unit) => unit.id === selectedUnitId)?.name || 'Unidade selecionada'}
+        </small>
+      </div>
       )}
 
       <nav className="sidebar-nav">
@@ -243,7 +320,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           </div>
         </div>
 
-        {planName !== 'PREMIUM' && (
+        {!isPremium && (
   <Link href="/pricing" className="upgrade-plan-btn">
     Fazer upgrade
   </Link>
@@ -271,12 +348,30 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
 
       <header className="admin-mobile-header">
         <div className="mobile-brand">
-          <img src="/icons/nexbarber-192.png" alt="NexBarber" />
+          <img src="/icons/kortebarber-192.png" alt="KorteBarber" />
           <div><strong>{tenantName}</strong><span>Painel Admin</span></div>
         </div>
-        <button onClick={() => setMobileOpen((v) => !v)} className="mobile-menu-btn">
-          {mobileOpen ? <X size={23} /> : <Menu size={23} />}
-        </button>
+        <div className="mobile-actions">
+          {isPremium && (
+            <select
+              className="mobile-unit-select"
+              value={selectedUnitId}
+              onChange={(event) => setSelectedUnitId(event.target.value)}
+              disabled={loadingUnits}
+            >
+              <option value="all">Todas</option>
+              {units.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <button onClick={() => setMobileOpen((v) => !v)} className="mobile-menu-btn">
+            {mobileOpen ? <X size={23} /> : <Menu size={23} />}
+          </button>
+        </div>
       </header>
 
       {mobileOpen && (
@@ -316,6 +411,11 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .trial-card strong{display:block;color:#fbbf24;font-size:13px;font-weight:950}
         .trial-card span{display:block;margin-top:2px;color:#fcd34d;font-size:11px}
         .trial-card a{color:#fff;background:#f59e0b;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:950;text-decoration:none}
+        .unit-selector-card{padding:13px;border-radius:16px;background:rgba(15,23,42,.62);border:1px solid rgba(148,163,184,.10);display:grid;gap:9px}
+        .unit-selector-head{display:flex;align-items:center;gap:7px;color:#93c5fd;font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}
+        .unit-selector-card select{width:100%;min-height:39px;border-radius:12px;border:1px solid rgba(148,163,184,.14);background:rgba(2,6,23,.58);color:#f8fafc;padding:0 10px;font-size:12px;font-weight:900;outline:none}
+        .unit-selector-card option,.mobile-unit-select option{background:#020617;color:#f8fafc}
+        .unit-selector-card small{color:#64748b;font-size:11px;font-weight:800;line-height:1.35}
         .sidebar-nav{display:flex;flex-direction:column;gap:7px;flex:1;padding-top:6px}
         .sidebar-link{position:relative;display:flex;align-items:center;gap:13px;min-height:46px;padding:12px 14px;border-radius:15px;text-decoration:none;color:#a8b3c7;font-size:14px;font-weight:760;border:1px solid transparent;transition:.18s ease}
         .sidebar-link:hover{color:#fff;background:rgba(15,23,42,.78);border-color:rgba(148,163,184,.10);transform:translateX(2px)}
@@ -345,6 +445,8 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .mobile-brand img{width:34px;height:34px;border-radius:12px}
         .mobile-brand strong{display:block;font-size:14px;font-weight:950;color:#fff}
         .mobile-brand span{display:block;font-size:11px;color:#94a3b8}
+        .mobile-actions{display:flex;align-items:center;gap:8px}
+        .mobile-unit-select{max-width:116px;height:38px;border-radius:12px;border:1px solid rgba(148,163,184,.14);background:rgba(15,23,42,.82);color:#f8fafc;padding:0 9px;font-size:12px;font-weight:900;outline:none}
         .mobile-menu-btn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;border:1px solid rgba(148,163,184,.14);background:rgba(15,23,42,.82);color:#f8fafc;cursor:pointer}
         .mobile-drawer{position:fixed;inset:0;z-index:60}
         .mobile-overlay{position:absolute;inset:0;background:rgba(0,0,0,.58);backdrop-filter:blur(3px)}
@@ -383,7 +485,9 @@ export default function SlugAdminLayout({
 
   return (
     <TenantProvider slug={slug}>
-      <AdminLayoutInner slug={slug}>{children}</AdminLayoutInner>
+      <UnitProvider>
+        <AdminLayoutInner slug={slug}>{children}</AdminLayoutInner>
+      </UnitProvider>
     </TenantProvider>
   )
 }

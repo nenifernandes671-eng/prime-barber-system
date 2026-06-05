@@ -19,6 +19,11 @@ import {
   Power,
   RotateCcw,
   X,
+  DollarSign,
+  Target,
+  Percent,
+  TrendingUp,
+  Building2,
 } from 'lucide-react'
 
 interface Barber {
@@ -29,9 +34,61 @@ interface Barber {
   ativo: boolean
   created_at: string
   user_id: string
+  unit_id?: string | null
+  photo_url?: string | null
+  avatar_url?: string | null
+  image_url?: string | null
+  foto_url?: string | null
 }
 
-type ModalState = 'closed' | 'create' | 'confirm-deactivate' | 'edit-access'
+interface BarberAsset {
+  nome: string
+  avatar_url?: string | null
+}
+
+interface Appointment {
+  id: string
+  client_name?: string | null
+  barber?: string | null
+  appointment_date: string
+  status?: string | null
+  price?: number | null
+  tenant_id: string
+  unit_id?: string | null
+}
+
+interface Unit {
+  id: string
+  tenant_id: string
+  name: string
+  active: boolean
+}
+
+interface CommissionRow {
+  id?: string
+  tenant_id: string
+  name?: string | null
+  email?: string | null
+  commission_percent?: number | null
+  commission_percentage?: number | null
+  monthly_goal?: number | null
+  commission_type?: string | null
+}
+
+interface BarberPerformance {
+  commissionPercent: number
+  monthlyGoal: number
+  revenue: number
+  appointments: number
+  commissionValue: number
+  progress: number
+}
+
+function nameKey(name?: string | null) {
+  return (name || '').trim().toLowerCase()
+}
+
+type ModalState = 'closed' | 'create' | 'confirm-deactivate' | 'edit-access' | 'edit-performance' | 'edit-unit'
 
 export default function AdminBarbeiros() {
   const [barbers, setBarbers] = useState<Barber[]>([])
@@ -41,9 +98,13 @@ export default function AdminBarbeiros() {
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [search, setSearch] = useState('')
+  const [barberPhotos, setBarberPhotos] = useState<Record<string, string>>({})
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [commissionRows, setCommissionRows] = useState<CommissionRow[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
 
   const tenantId = useTenantId()
-  const { tenant } = useTenant()
+  const { tenant, isPremium } = useTenant()
   const maxBarbers = getMaxBarbers(tenant?.plano)
   const reachedLimit = barbers.length >= maxBarbers
 
@@ -52,10 +113,15 @@ export default function AdminBarbeiros() {
   const [telefone, setTelefone] = useState('')
   const [senha, setSenha] = useState('')
   const [showSenha, setShowSenha] = useState(false)
+  const [selectedUnitId, setSelectedUnitId] = useState('')
 
   const [accessEmail, setAccessEmail] = useState('')
   const [accessPassword, setAccessPassword] = useState('')
   const [showAccessPassword, setShowAccessPassword] = useState(false)
+
+  const [editCommissionPercent, setEditCommissionPercent] = useState(50)
+  const [editMonthlyGoal, setEditMonthlyGoal] = useState(3000)
+  const [editUnitId, setEditUnitId] = useState('')
 
   useEffect(() => {
     if (tenantId) fetchBarbers()
@@ -66,13 +132,108 @@ export default function AdminBarbeiros() {
 
     setLoading(true)
 
-    const { data, error } = await supabase
-      .from('barbeiros')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false })
+    const unitsRequest = isPremium
+      ? supabase
+          .from('units')
+          .select('id, tenant_id, name, active')
+          .eq('tenant_id', tenantId)
+          .eq('active', true)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [], error: null })
 
-    if (!error) setBarbers(data ?? [])
+    const [
+      { data, error },
+      { data: appointmentsData, error: appointmentsError },
+      { data: commissionData, error: commissionError },
+      { data: unitsData, error: unitsError },
+    ] = await Promise.all([
+      supabase
+        .from('barbeiros')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false }),
+
+      supabase
+        .from('appointments')
+        .select('id, client_name, barber, appointment_date, status, price, tenant_id, unit_id')
+        .eq('tenant_id', tenantId),
+
+      supabase
+        .from('barbers')
+        .select('*')
+        .eq('tenant_id', tenantId),
+
+      unitsRequest,
+    ])
+
+    if (error) {
+      console.error('Erro ao buscar barbeiros:', error)
+      setBarbers([])
+      setAppointments([])
+      setCommissionRows([])
+      setUnits([])
+      setBarberPhotos({})
+      setLoading(false)
+      return
+    }
+
+    if (appointmentsError) {
+      console.error('Erro ao buscar agendamentos dos barbeiros:', appointmentsError)
+      setAppointments([])
+    } else {
+      setAppointments((appointmentsData || []) as Appointment[])
+    }
+
+    if (commissionError) {
+      console.error('Erro ao buscar metas/comissões dos barbeiros:', commissionError)
+      setCommissionRows([])
+    } else {
+      setCommissionRows((commissionData || []) as CommissionRow[])
+    }
+
+    if (unitsError) {
+      console.error('Erro ao buscar unidades:', unitsError)
+      setUnits([])
+    } else {
+      setUnits((unitsData || []) as Unit[])
+    }
+
+    setBarbers(data ?? [])
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) {
+        setBarberPhotos({})
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch(
+        `/api/admin/settings-assets?tenant_id=${encodeURIComponent(tenantId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      const assets = await response.json().catch(() => ({}))
+      const barberRows: BarberAsset[] = response.ok ? assets.barbers ?? [] : []
+
+      setBarberPhotos(
+        Object.fromEntries(
+          barberRows
+            .filter((barber) => barber.nome && barber.avatar_url)
+            .map((barber) => [nameKey(barber.nome), barber.avatar_url as string])
+        )
+      )
+    } catch (error) {
+      console.error('Erro ao buscar fotos dos barbeiros:', error)
+      setBarberPhotos({})
+    }
+
     setLoading(false)
   }
 
@@ -117,6 +278,7 @@ export default function AdminBarbeiros() {
           senha,
           telefone: telefone.trim(),
           tenant_id: tenantId,
+          unit_id: isPremium ? selectedUnitId || null : null,
         }),
       })
 
@@ -126,6 +288,14 @@ export default function AdminBarbeiros() {
         setFeedback({ type: 'error', msg: json.error ?? 'Erro ao criar barbeiro.' })
         setSubmitting(false)
         return
+      }
+
+      if (isPremium && selectedUnitId) {
+        await supabase
+          .from('barbeiros')
+          .update({ unit_id: selectedUnitId })
+          .eq('tenant_id', tenantId)
+          .eq('email', email.trim())
       }
 
       setFeedback({ type: 'success', msg: `Barbeiro "${nome}" criado com sucesso.` })
@@ -243,12 +413,201 @@ export default function AdminBarbeiros() {
     setSubmitting(false)
   }
 
+
+  function isFinished(status?: string | null) {
+    return ['finished', 'completed', 'concluido', 'concluído', 'finalizado', 'done'].includes(
+      (status || '').toLowerCase()
+    )
+  }
+
+  function money(value: number) {
+    return Number(value || 0).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+  }
+
+  function getCurrentMonthRange() {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    start.setHours(0, 0, 0, 0)
+    end.setHours(23, 59, 59, 999)
+
+    return { start, end }
+  }
+
+  function getCommissionSettings(barber: Barber) {
+    const row = commissionRows.find((item) => {
+      const sameEmail =
+        item.email &&
+        barber.email &&
+        item.email.toLowerCase() === barber.email.toLowerCase()
+
+      const sameName =
+        item.name &&
+        barber.nome &&
+        item.name.toLowerCase() === barber.nome.toLowerCase()
+
+      return item.tenant_id === tenantId && (sameEmail || sameName)
+    })
+
+    const commissionPercent = Number(
+      row?.commission_percent ?? row?.commission_percentage ?? 50
+    )
+
+    const monthlyGoal = Number(row?.monthly_goal ?? 3000)
+
+    return {
+      row,
+      commissionPercent,
+      monthlyGoal,
+    }
+  }
+
+  function getBarberPerformance(barber: Barber): BarberPerformance {
+    const { start, end } = getCurrentMonthRange()
+    const settings = getCommissionSettings(barber)
+
+    const barberAppointments = appointments.filter((appointment) => {
+      if (!appointment.appointment_date) return false
+
+      const sameBarber =
+        nameKey(appointment.barber) === nameKey(barber.nome)
+
+      const date = new Date(`${appointment.appointment_date}T00:00:00`)
+
+      return sameBarber && isFinished(appointment.status) && date >= start && date <= end
+    })
+
+    const revenue = barberAppointments.reduce(
+      (sum, appointment) => sum + Number(appointment.price || 0),
+      0
+    )
+
+    const commissionValue = revenue * (settings.commissionPercent / 100)
+    const progress = settings.monthlyGoal > 0
+      ? Math.min(Math.round((revenue / settings.monthlyGoal) * 100), 100)
+      : 0
+
+    return {
+      commissionPercent: settings.commissionPercent,
+      monthlyGoal: settings.monthlyGoal,
+      revenue,
+      appointments: barberAppointments.length,
+      commissionValue,
+      progress,
+    }
+  }
+
+  function openEditPerformance(barber: Barber) {
+    const settings = getCommissionSettings(barber)
+
+    setFeedback(null)
+    setSelectedBarber(barber)
+    setEditCommissionPercent(settings.commissionPercent)
+    setEditMonthlyGoal(settings.monthlyGoal)
+    setModal('edit-performance')
+  }
+
+  function getUnitName(unitId?: string | null) {
+    if (!unitId) return 'Sem unidade'
+    return units.find((unit) => unit.id === unitId)?.name || 'Unidade removida'
+  }
+
+  function openEditUnit(barber: Barber) {
+    setFeedback(null)
+    setSelectedBarber(barber)
+    setEditUnitId(barber.unit_id || '')
+    setModal('edit-unit')
+  }
+
+  async function handleSaveUnit() {
+    if (!selectedBarber || !tenantId) return
+
+    setSubmitting(true)
+    setFeedback(null)
+
+    const { error } = await supabase
+      .from('barbeiros')
+      .update({ unit_id: editUnitId || null })
+      .eq('id', selectedBarber.id)
+      .eq('tenant_id', tenantId)
+
+    setSubmitting(false)
+
+    if (error) {
+      setFeedback({ type: 'error', msg: `Erro ao salvar unidade: ${error.message}` })
+      return
+    }
+
+    setFeedback({ type: 'success', msg: `Unidade de ${selectedBarber.nome} atualizada.` })
+    setModal('closed')
+    setSelectedBarber(null)
+    await fetchBarbers()
+  }
+
+  async function handleSavePerformance() {
+    if (!selectedBarber || !tenantId) return
+
+    const commission = Number(editCommissionPercent)
+    const goal = Number(editMonthlyGoal)
+
+    if (commission < 0 || commission > 100) {
+      setFeedback({ type: 'error', msg: 'A comissão precisa estar entre 0% e 100%.' })
+      return
+    }
+
+    if (goal < 0) {
+      setFeedback({ type: 'error', msg: 'A meta mensal não pode ser negativa.' })
+      return
+    }
+
+    setSubmitting(true)
+    setFeedback(null)
+
+    const existing = getCommissionSettings(selectedBarber).row
+
+    const payload = {
+      tenant_id: tenantId,
+      name: selectedBarber.nome,
+      email: selectedBarber.email,
+      commission_percent: commission,
+      commission_percentage: commission,
+      commission_type: 'percentage',
+      monthly_goal: goal,
+    }
+
+    const result = existing?.id
+      ? await supabase
+          .from('barbers')
+          .update(payload)
+          .eq('id', existing.id)
+          .eq('tenant_id', tenantId)
+      : await supabase
+          .from('barbers')
+          .insert(payload)
+
+    setSubmitting(false)
+
+    if (result.error) {
+      setFeedback({ type: 'error', msg: `Erro ao salvar comissão/meta: ${result.error.message}` })
+      return
+    }
+
+    setFeedback({ type: 'success', msg: `Comissão e meta de ${selectedBarber.nome} atualizadas.` })
+    setModal('closed')
+    setSelectedBarber(null)
+    await fetchBarbers()
+  }
+
   const resetForm = () => {
     setNome('')
     setEmail('')
     setSenha('')
     setTelefone('')
     setShowSenha(false)
+    setSelectedUnitId('')
     setFeedback(null)
   }
 
@@ -271,6 +630,23 @@ export default function AdminBarbeiros() {
         .some((field) => String(field).toLowerCase().includes(s))
     )
   }, [barbers, search])
+
+  const totalTeamRevenue = barbers.reduce(
+    (sum, barber) => sum + getBarberPerformance(barber).revenue,
+    0
+  )
+
+  const totalTeamCommission = barbers.reduce(
+    (sum, barber) => sum + getBarberPerformance(barber).commissionValue,
+    0
+  )
+
+  const averageTeamGoalProgress = barbers.length > 0
+    ? Math.round(
+        barbers.reduce((sum, barber) => sum + getBarberPerformance(barber).progress, 0) /
+          barbers.length
+      )
+    : 0
 
   return (
     <div className="barbers-page">
@@ -329,8 +705,10 @@ export default function AdminBarbeiros() {
       <div className="stats-grid">
         <StatCard icon={<Users size={22} />} label="Total" value={barbers.length} color="#3b82f6" />
         <StatCard icon={<UserCheck size={22} />} label="Ativos" value={active.length} color="#10b981" />
-        <StatCard icon={<UserX size={22} />} label="Inativos" value={inactive.length} color="#f59e0b" />
-        <StatCard icon={<CrownIcon />} label="Limite do plano" value={`${barbers.length}/${maxBarbers}`} color="#8b5cf6" />
+        <StatCard icon={<DollarSign size={22} />} label="Receita da equipe" value={money(totalTeamRevenue)} color="#22c55e" />
+        <StatCard icon={<Target size={22} />} label="Média das metas" value={`${averageTeamGoalProgress}%`} color="#f59e0b" />
+        <StatCard icon={<Percent size={22} />} label="Comissões" value={money(totalTeamCommission)} color="#8b5cf6" />
+        <StatCard icon={<CrownIcon />} label="Limite do plano" value={`${barbers.length}/${maxBarbers}`} color="#06b6d4" />
       </div>
 
       {loading ? (
@@ -355,8 +733,14 @@ export default function AdminBarbeiros() {
             <BarberCard
               key={barber.id}
               barber={barber}
+              avatarUrl={barberPhotos[nameKey(barber.nome)] || null}
+              performance={getBarberPerformance(barber)}
+              unitName={getUnitName(barber.unit_id)}
+              showUnitControls={isPremium}
               onToggle={handleToggleActive}
               onEditAccess={openEditAccess}
+              onEditPerformance={openEditPerformance}
+              onEditUnit={openEditUnit}
             />
           ))}
         </div>
@@ -387,6 +771,19 @@ export default function AdminBarbeiros() {
               <Field label="Telefone (opcional)" icon="📱">
                 <input placeholder="(47) 99999-9999" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
               </Field>
+
+              {isPremium && (
+                <Field label="Unidade" icon="🏢">
+                  <select value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)}>
+                    <option value="">Sem unidade definida</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
               <Field label="Senha de acesso" icon="🔒">
                 <div className="password-wrap">
@@ -502,18 +899,128 @@ export default function AdminBarbeiros() {
           </div>
         </Overlay>
       )}
+      {modal === 'edit-performance' && selectedBarber && (
+        <Overlay onClose={() => setModal('closed')}>
+          <div className="modal">
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Performance</p>
+                <h2>Comissão e meta</h2>
+              </div>
+              <button onClick={() => setModal('closed')} className="icon-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p className="confirm-text">
+                Configure a comissão individual e a meta mensal de <strong>{selectedBarber.nome}</strong>.
+              </p>
+
+              <Field label="Comissão sobre receita (%)" icon="💰">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={editCommissionPercent}
+                  onChange={(e) => setEditCommissionPercent(Number(e.target.value))}
+                />
+              </Field>
+
+              <Field label="Meta mensal de receita (R$)" icon="🎯">
+                <input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={editMonthlyGoal}
+                  onChange={(e) => setEditMonthlyGoal(Number(e.target.value))}
+                />
+              </Field>
+
+              <div className="modal-hint">
+                A comissão é calculada sobre os atendimentos finalizados do mês atual.
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={() => setModal('closed')} className="cancel-btn">Cancelar</button>
+              <button onClick={handleSavePerformance} disabled={submitting} className="confirm-btn">
+                {submitting ? 'Salvando...' : 'Salvar comissão e meta'}
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {isPremium && modal === 'edit-unit' && selectedBarber && (
+        <Overlay onClose={() => setModal('closed')}>
+          <div className="modal small">
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Multiunidade</p>
+                <h2>Unidade do barbeiro</h2>
+              </div>
+              <button onClick={() => setModal('closed')} className="icon-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p className="confirm-text">
+                Defina em qual unidade <strong>{selectedBarber.nome}</strong> trabalha.
+              </p>
+
+              <Field label="Unidade" icon="🏢">
+                <select value={editUnitId} onChange={(e) => setEditUnitId(e.target.value)}>
+                  <option value="">Sem unidade definida</option>
+                  {units.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <div className="modal-hint">
+                Isso será usado para separar agendamentos, faturamento e relatórios por filial.
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={() => setModal('closed')} className="cancel-btn">Cancelar</button>
+              <button onClick={handleSaveUnit} disabled={submitting} className="confirm-btn">
+                {submitting ? 'Salvando...' : 'Salvar unidade'}
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
     </div>
   )
 }
 
 function BarberCard({
   barber,
+  avatarUrl,
+  performance,
+  unitName,
+  showUnitControls,
   onToggle,
   onEditAccess,
+  onEditPerformance,
+  onEditUnit,
 }: {
   barber: Barber
+  avatarUrl: string | null
+  performance: BarberPerformance
+  unitName: string
+  showUnitControls: boolean
   onToggle: (b: Barber) => void
   onEditAccess: (b: Barber) => void
+  onEditPerformance: (b: Barber) => void
+  onEditUnit: (b: Barber) => void
 }) {
   const initials = barber.nome
     .split(' ')
@@ -522,16 +1029,37 @@ function BarberCard({
     .join('')
     .toUpperCase()
 
+  const barberPhoto =
+    avatarUrl ||
+    barber.photo_url ||
+    barber.avatar_url ||
+    barber.image_url ||
+    barber.foto_url ||
+    null
+
   const since = new Date(barber.created_at).toLocaleDateString('pt-BR', {
     month: 'short',
     year: 'numeric',
   })
 
+  const formatMoney = (value: number) =>
+    Number(value || 0).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    })
+
   return (
     <article className={`barber-card ${!barber.ativo ? 'inactive' : ''}`}>
       <div className="card-top">
-        <div className="barber-avatar">{initials || 'BR'}</div>
-
+        {barberPhoto ? (
+          <img
+            src={barberPhoto}
+            alt={barber.nome}
+            className="barber-avatar-img"
+          />
+        ) : (
+          <div className="barber-avatar">{initials || 'BR'}</div>
+        )}
         <span className={`status ${barber.ativo ? 'active' : 'inactive'}`}>
           {barber.ativo ? 'Ativo' : 'Inativo'}
         </span>
@@ -556,9 +1084,61 @@ function BarberCard({
           <ShieldCheck size={14} />
           Desde {since}
         </p>
+
+        {showUnitControls && (
+          <p>
+            <Building2 size={14} />
+            {unitName}
+          </p>
+        )}
+      </div>
+
+      <div className="performance-box">
+        <div className="performance-head">
+          <span>Meta mensal</span>
+          <strong>{performance.progress}%</strong>
+        </div>
+
+        <div className="progress-track">
+          <span style={{ width: `${performance.progress}%` }} />
+        </div>
+
+        <div className="performance-grid">
+          <div>
+            <small>Receita</small>
+            <b>{formatMoney(performance.revenue)}</b>
+          </div>
+
+          <div>
+            <small>Meta</small>
+            <b>{formatMoney(performance.monthlyGoal)}</b>
+          </div>
+
+          <div>
+            <small>Comissão</small>
+            <b>{performance.commissionPercent}%</b>
+          </div>
+
+          <div>
+            <small>Ganhos</small>
+            <b>{formatMoney(performance.commissionValue)}</b>
+          </div>
+        </div>
       </div>
 
       <div className="card-actions">
+        {showUnitControls && (
+          <button onClick={() => onEditUnit(barber)} className="unit-btn">
+            <Building2 size={15} />
+            Unidade
+          </button>
+        )}
+
+        <button onClick={() => onEditPerformance(barber)} className="performance-btn">
+          <TrendingUp size={15} />
+          Comissão
+        </button>
+
         <button onClick={() => onEditAccess(barber)} className="access-btn">
           <KeyRound size={15} />
           Acesso
@@ -654,6 +1234,11 @@ const css = `
   outline: 0;
   color: #f8fafc;
   font-size: 14px;
+}
+
+.field select option {
+  background: #020617;
+  color: #f8fafc;
 }
 
 .create-btn {
@@ -776,7 +1361,7 @@ const css = `
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -825,7 +1410,7 @@ const css = `
 }
 
 .barber-card {
-  min-height: 250px;
+  min-height: 420px;
   border-radius: 24px;
   padding: 22px;
   background:
@@ -862,6 +1447,16 @@ const css = `
   font-size: 18px;
   font-weight: 950;
   box-shadow: 0 18px 38px rgba(37,99,235,.28);
+}
+
+.barber-avatar-img {
+  width: 62px;
+  height: 62px;
+  border-radius: 22px;
+  object-fit: cover;
+  border: 1px solid rgba(59,130,246,.35);
+  box-shadow: 0 18px 38px rgba(37,99,235,.22);
+  background: rgba(15,23,42,.8);
 }
 
 .status {
@@ -912,14 +1507,84 @@ const css = `
   flex-shrink: 0;
 }
 
-.card-actions {
+.performance-box {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(2,6,23,.34);
+  border: 1px solid rgba(148,163,184,.10);
+}
+
+.performance-head {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.performance-head span {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.performance-head strong {
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148,163,184,.12);
+  overflow: hidden;
+  margin-bottom: 13px;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg,#2563eb,#22c55e);
+}
+
+.performance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 22px;
+}
+
+.performance-grid div {
+  min-width: 0;
+}
+
+.performance-grid small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  margin-bottom: 3px;
+}
+
+.performance-grid b {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .card-actions button {
-  flex: 1;
   min-height: 42px;
   border-radius: 13px;
   border: 1px solid rgba(148,163,184,.14);
@@ -932,6 +1597,16 @@ const css = `
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+.card-actions .unit-btn {
+  color: #38bdf8;
+  border-color: rgba(56,189,248,.24);
+}
+
+.card-actions .performance-btn {
+  color: #22c55e;
+  border-color: rgba(34,197,94,.24);
 }
 
 .card-actions .access-btn {
@@ -1065,6 +1740,7 @@ const css = `
 }
 
 .field input,
+.field select,
 .password-wrap input {
   width: 100%;
   min-height: 46px;

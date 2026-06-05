@@ -4,9 +4,10 @@ import { useEffect, useState, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
 
-interface Service { id: string; name: string; price: number; duration: number; description?: string; photo_url?: string }
-interface Barber  { id: string; nome: string; avatar_url?: string }
-interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string; opening_time?: string; closing_time?: string; slot_interval?: number }
+interface Service { id: string; name: string; price: number; duration: number; description?: string; photo_url?: string; unit_id?: string | null }
+interface Barber  { id: string; nome: string; avatar_url?: string; unit_id?: string | null }
+interface Unit { id: string; tenant_id: string; name: string; address?: string | null; phone?: string | null; active: boolean }
+interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string; opening_time?: string; closing_time?: string; slot_interval?: number; endereco?: string; landing_headline?: string; landing_description?: string; landing_whatsapp?: string; landing_instagram?: string; landing_address?: string; landing_primary_color?: string; landing_banner_url?: string }
 
 function timeToMinutes(time?: string) {
   const [hours, minutes] = String(time || '08:00').split(':').map(Number)
@@ -48,12 +49,12 @@ function getAvatarColor(name: string) {
 }
 
 const SERVICE_ICONS: Record<string, string> = {
-  corte: '✂', barba: '🪒', sobrancelha: '✨', platinado: '💈', hidratação: '💧', combo: '💈',
+  corte: 'C', barba: 'B', sobrancelha: 'S', platinado: 'P', hidratacao: 'H', combo: '+',
 }
 function getServiceIcon(name: string) {
   const l = name.toLowerCase()
   for (const [k, v] of Object.entries(SERVICE_ICONS)) if (l.includes(k)) return v
-  return '✂'
+  return 'C'
 }
 
 export default function BookingPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -62,11 +63,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [tenant, setTenant]     = useState<Tenant | null>(null)
   const [services, setServices] = useState<Service[]>([])
   const [barbers, setBarbers]   = useState<Barber[]>([])
+  const [units, setUnits]       = useState<Unit[]>([])
   const [bookedTimes, setBookedTimes] = useState<string[]>([])
   const [mobileNav, setMobileNav] = useState(false)
   const [showAppReturn, setShowAppReturn] = useState(false)
   const [tenantChecked, setTenantChecked] = useState(false)
 
+  const [selectedUnit, setSelectedUnit]       = useState<Unit | null>(null)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [selectedBarber, setSelectedBarber]   = useState<Barber | null>(null)
   const [selectedDate, setSelectedDate]       = useState('')
@@ -78,9 +81,25 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [error, setError]                     = useState('')
 
   const isPro = tenant?.plano === 'pro' || tenant?.plano === 'premium'
+  const isPremium = tenant?.plano === 'premium'
   const allTimes = generateTimes(tenant?.opening_time, tenant?.closing_time, tenant?.slot_interval)
   const availableTimes = allTimes.filter(t => !bookedTimes.includes(t))
-  const heroImage = tenant?.hero_url || DEFAULT_HERO
+  const hasMultipleUnits = isPremium && units.length > 1
+  const filteredBarbers = isPremium && selectedUnit
+    ? barbers.filter((barber) => !barber.unit_id || barber.unit_id === selectedUnit.id)
+    : barbers
+  const filteredServices = isPremium && selectedUnit
+    ? services.filter((service) => !service.unit_id || service.unit_id === selectedUnit.id)
+    : services
+  const primaryColor = tenant?.landing_primary_color || GOLD
+  const heroImage = tenant?.landing_banner_url || tenant?.hero_url || DEFAULT_HERO
+  const landingHeadline = tenant?.landing_headline || 'Seu estilo,\nnosso cuidado.'
+  const landingDescription =
+    tenant?.landing_description ||
+    `Agende seu horário e viva a experiência ${tenant?.nome ?? slug.toUpperCase()}. Profissionais especializados, ambiente premium.`
+  const landingWhatsapp = tenant?.landing_whatsapp || tenant?.telefone || ''
+  const landingInstagram = tenant?.landing_instagram || ''
+  const landingAddress = tenant?.landing_address || tenant?.endereco || ''
 
   useEffect(() => {
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
@@ -96,10 +115,24 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         setTenant(null)
         setServices([])
         setBarbers([])
+        setUnits([])
         setTenantChecked(true)
         return
       }
       setTenant(t)
+      const { data: unitRows } = t.plano === 'premium'
+        ? await supabase
+            .from('units')
+            .select('id, tenant_id, name, address, phone, active')
+            .eq('tenant_id', t.id)
+            .eq('active', true)
+            .order('created_at', { ascending: true })
+        : { data: [] }
+
+      const activeUnits = (unitRows ?? []) as Unit[]
+      setUnits(activeUnits)
+      setSelectedUnit(t.plano === 'premium' && activeUnits.length === 1 ? activeUnits[0] : null)
+
       const response = await fetch(`/api/public/tenant-assets?tenant_id=${encodeURIComponent(t.id)}`)
       const assets = await response.json().catch(() => ({}))
       if (response.ok) {
@@ -122,10 +155,22 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       tenant_id: tenant.id,
       barber_id: barber.id,
       date,
+      ...(isPremium && selectedUnit?.id ? { unit_id: selectedUnit.id } : {}),
     })
     const response = await fetch(`/api/public/appointments?${params.toString()}`)
     const payload = await response.json().catch(() => ({}))
     setBookedTimes(response.ok ? (payload.bookedTimes ?? []) : [])
+  }
+
+  function handleUnitChange(unitId: string) {
+    const unit = units.find((item) => item.id === unitId) || null
+
+    setSelectedUnit(unit)
+    setSelectedService(null)
+    setSelectedBarber(null)
+    setSelectedDate('')
+    setSelectedTime('')
+    setBookedTimes([])
   }
 
   function handleDateChange(date: string) {
@@ -134,12 +179,17 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   }
 
   function handleBarberChange(barber: Barber) {
+    if (isPremium && !selectedUnit && barber.unit_id) {
+      const barberUnit = units.find((unit) => unit.id === barber.unit_id)
+      if (barberUnit) setSelectedUnit(barberUnit)
+    }
+
     setSelectedBarber(barber); setSelectedTime(''); setBookedTimes([])
     if (selectedDate) fetchTimes(selectedDate, barber)
   }
 
   async function handleSubmit() {
-    if (!clientName || !clientPhone || !selectedService || !selectedBarber || !selectedDate || !selectedTime) {
+    if (!clientName || !clientPhone || !selectedService || !selectedBarber || !selectedDate || !selectedTime || (hasMultipleUnits && !selectedUnit)) {
       setError('Por favor, preencha todos os campos.'); return
     }
     setSubmitting(true); setError('')
@@ -148,6 +198,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tenant_id: tenant!.id,
+        unit_id: isPremium ? selectedUnit?.id || selectedBarber.unit_id || selectedService.unit_id || null : null,
         service_id: selectedService.id,
         barber_id: selectedBarber.id,
         client_name: clientName,
@@ -192,7 +243,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             O link acessado nao existe ou ainda nao foi configurado.
           </p>
           <a href="/app" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, textDecoration: 'none', fontWeight: 800, fontSize: 13 }}>
-            Voltar para NexBarber
+            Voltar para KorteBarber
           </a>
         </div>
       </div>
@@ -220,7 +271,14 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         <div style={{ fontSize:50, marginBottom:12 }}>✂</div>
         <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:24, fontWeight:900, color:'#f1f5f9', margin:'0 0 20px' }}>Agendamento confirmado!</h2>
         <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, overflow:'hidden', marginBottom:20 }}>
-          {[['Cliente',clientName],['Serviço',selectedService?.name],['Barbeiro',selectedBarber?.nome],['Data',new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})],['Horário',selectedTime]].map(([l,v])=>(
+          {[
+            ['Cliente',clientName],
+            ...(isPremium ? [['Unidade',selectedUnit?.name || 'Unidade principal']] : []),
+            ['Serviço',selectedService?.name],
+            ['Barbeiro',selectedBarber?.nome],
+            ['Data',new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})],
+            ['Horário',selectedTime],
+          ].map(([l,v])=>(
             <div key={l} style={{ display:'flex', justifyContent:'space-between', padding:'11px 16px', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
               <span style={{ color:'#64748b', fontSize:13 }}>{l}</span>
               <span style={{ color:'#f1f5f9', fontSize:13, fontWeight:600 }}>{v}</span>
@@ -228,12 +286,12 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           ))}
           <div style={{ display:'flex', justifyContent:'space-between', padding:'11px 16px' }}>
             <span style={{ color:'#64748b', fontSize:13 }}>Valor</span>
-            <span style={{ color:GOLD, fontSize:16, fontWeight:800 }}>R$ {selectedService?.price?.toFixed(2)}</span>
+            <span style={{ color:primaryColor, fontSize:16, fontWeight:800 }}>R$ {selectedService?.price?.toFixed(2)}</span>
           </div>
         </div>
         <p style={{ color:'#94a3b8', fontSize:13, margin:'0 0 20px' }}>Até breve! 👋</p>
-        <button onClick={()=>{setSuccess(false);setClientName('');setClientPhone('');setSelectedService(null);setSelectedBarber(null);setSelectedDate('');setSelectedTime('')}}
-          style={{ padding:'12px 28px', borderRadius:10, border:'none', background:`linear-gradient(135deg,${GOLD},${GOLD2})`, color:DARK, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+        <button onClick={()=>{setSuccess(false);setClientName('');setClientPhone('');setSelectedService(null);setSelectedBarber(null);setSelectedDate('');setSelectedTime('');setSelectedUnit(isPremium && units.length === 1 ? units[0] : null)}}
+          style={{ padding:'12px 28px', borderRadius:10, border:'none', background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, color:DARK, fontWeight:700, fontSize:14, cursor:'pointer' }}>
           Fazer outro agendamento
         </button>
       </div>
@@ -307,10 +365,10 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 32px', height:68, display:'flex', alignItems:'center', justifyContent:'space-between', gap:20 }}>
           {/* Logo */}
           <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
-            <div style={{ width:38, height:38, borderRadius:10, background:`linear-gradient(135deg,${GOLD},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:DARK, fontWeight:900, boxShadow:`0 4px 16px rgba(201,168,76,0.3)` }}>✂</div>
+            <div style={{ width:38, height:38, borderRadius:10, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:DARK, fontWeight:900, boxShadow:`0 4px 16px rgba(201,168,76,0.3)` }}>✂</div>
             <div>
               <p style={{ margin:0, fontSize:16, fontWeight:800, color:'#f1f5f9', letterSpacing:1.5, fontFamily:"'Playfair Display',serif", textTransform:'uppercase' }}>{tenantName}</p>
-              <p style={{ margin:0, fontSize:9, color:GOLD, letterSpacing:3, textTransform:'uppercase' }}>Barbearia</p>
+              <p style={{ margin:0, fontSize:9, color:primaryColor, letterSpacing:3, textTransform:'uppercase' }}>Barbearia</p>
             </div>
           </div>
 
@@ -326,7 +384,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           </div>
 
           {/* CTA */}
-          <a href="#agendar" className="gold-btn" style={{ padding:'11px 24px', borderRadius:8, background:`linear-gradient(135deg,${GOLD},${GOLD2})`, color:'#fff', fontWeight:700, fontSize:14, textDecoration:'none', flexShrink:0, boxShadow:`0 4px 20px rgba(201,168,76,0.3)`, letterSpacing:0.5 }}>
+          <a href="#agendar" className="gold-btn" style={{ padding:'11px 24px', borderRadius:8, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, color:'#fff', fontWeight:700, fontSize:14, textDecoration:'none', flexShrink:0, boxShadow:`0 4px 20px rgba(201,168,76,0.3)`, letterSpacing:0.5 }}>
             Agendar Horário
           </a>
 
@@ -357,21 +415,20 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           {/* Hero text */}
           <div className="hero-text anim" style={{ maxWidth:560, padding:'60px 0' }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(201,168,76,0.15)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:999, padding:'6px 14px', marginBottom:24 }}>
-              <span style={{ color:GOLD, fontSize:12 }}>★★★★★</span>
+              <span style={{ color:primaryColor, fontSize:12 }}>★★★★★</span>
               <span style={{ color:'#d4c9b0', fontSize:12 }}>Referência em qualidade</span>
             </div>
 
-            <h1 className="hero-title-txt" style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(44px,5.5vw,72px)', fontWeight:900, lineHeight:1.05, color:'#fff', margin:'0 0 20px' }}>
-              Seu estilo,<br />
-              <span style={{ color:GOLD, fontStyle:'italic' }}>nosso cuidado.</span>
+            <h1 className="hero-title-txt" style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(44px,5.5vw,72px)', fontWeight:900, lineHeight:1.05, color:'#fff', margin:'0 0 20px', whiteSpace:'pre-line' }}>
+              {landingHeadline.includes('\\n') ? landingHeadline.replace(/\\n/g, '\n') : landingHeadline}
             </h1>
 
             <p style={{ fontSize:17, color:'#c8bfad', lineHeight:1.7, fontWeight:300, margin:'0 0 36px', maxWidth:460 }}>
-              Agende seu horário e viva a experiência {tenantName}. Profissionais especializados, ambiente premium.
+              {landingDescription}
             </p>
 
             <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:44 }}>
-              <a href="#agendar" className="gold-btn" style={{ padding:'14px 30px', borderRadius:9, background:`linear-gradient(135deg,${GOLD},${GOLD2})`, color:'#fff', fontWeight:700, fontSize:15, textDecoration:'none', boxShadow:`0 6px 24px rgba(201,168,76,0.35)`, display:'flex', alignItems:'center', gap:8 }}>
+              <a href="#agendar" className="gold-btn" style={{ padding:'14px 30px', borderRadius:9, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, color:'#fff', fontWeight:700, fontSize:15, textDecoration:'none', boxShadow:`0 6px 24px rgba(201,168,76,0.35)`, display:'flex', alignItems:'center', gap:8 }}>
                 📅 Agendar Horário
               </a>
               <a href="#servicos" style={{ padding:'14px 30px', borderRadius:9, border:'1px solid rgba(255,255,255,0.25)', color:'#fff', fontSize:15, textDecoration:'none', background:'rgba(255,255,255,0.05)', fontWeight:500, backdropFilter:'blur(8px)' }}>
@@ -385,7 +442,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                 <div key={t1} style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <span style={{ fontSize:20 }}>{icon}</span>
                   <div>
-                    <p style={{ margin:0, fontSize:13, fontWeight:700, color:GOLD, letterSpacing:0.3 }}>{t1}</p>
+                    <p style={{ margin:0, fontSize:13, fontWeight:700, color:primaryColor, letterSpacing:0.3 }}>{t1}</p>
                     <p style={{ margin:0, fontSize:11, color:'#8a7d68' }}>{t2}</p>
                   </div>
                 </div>
@@ -402,32 +459,54 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             </div>
 
             <div style={{ padding:'20px 26px', display:'flex', flexDirection:'column', gap:13 }}>
+              {hasMultipleUnits && (
+                <div>
+                  <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
+                    <span style={{ color:primaryColor }}>🏢</span> Selecione a unidade
+                  </label>
+                  <select className="book-select" value={selectedUnit?.id ?? ''} onChange={e=>handleUnitChange(e.target.value)}>
+                    <option value="">Escolha uma unidade</option>
+                    {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+                  </select>
+                </div>
+              )}
+
               {/* Serviço */}
               <div>
                 <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
-                  <span style={{ color:GOLD }}>✂</span> Selecione o serviço
+                  <span style={{ color:primaryColor }}>✂</span> Selecione o serviço
                 </label>
-                <select className="book-select" value={selectedService?.id??''} onChange={e=>setSelectedService(services.find(s=>s.id===e.target.value)??null)}>
-                  <option value="">Escolha um serviço</option>
-                  {services.map(s=><option key={s.id} value={s.id}>{s.name} — R$ {s.price?.toFixed(2)}</option>)}
+                <select
+                  className="book-select"
+                  value={selectedService?.id??''}
+                  disabled={hasMultipleUnits && !selectedUnit}
+                  onChange={e=>setSelectedService(filteredServices.find(s=>s.id===e.target.value)??null)}
+                >
+                  <option value="">{hasMultipleUnits && !selectedUnit ? 'Escolha a unidade primeiro' : 'Escolha um serviço'}</option>
+                  {filteredServices.map(s=><option key={s.id} value={s.id}>{s.name} — R$ {s.price?.toFixed(2)}</option>)}
                 </select>
               </div>
 
               {/* Barbeiro */}
               <div>
                 <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
-                  <span style={{ color:GOLD }}>👤</span> Selecione o barbeiro
+                  <span style={{ color:primaryColor }}>👤</span> Selecione o barbeiro
                 </label>
-                <select className="book-select" value={selectedBarber?.id??''} onChange={e=>{const b=barbers.find(x=>x.id===e.target.value);if(b)handleBarberChange(b)}}>
-                  <option value="">Escolha um barbeiro</option>
-                  {barbers.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+                <select
+                  className="book-select"
+                  value={selectedBarber?.id??''}
+                  disabled={hasMultipleUnits && !selectedUnit}
+                  onChange={e=>{const b=filteredBarbers.find(x=>x.id===e.target.value);if(b)handleBarberChange(b)}}
+                >
+                  <option value="">{hasMultipleUnits && !selectedUnit ? 'Escolha a unidade primeiro' : 'Escolha um barbeiro'}</option>
+                  {filteredBarbers.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
                 </select>
               </div>
 
               {/* Data */}
               <div>
                 <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
-                  <span style={{ color:GOLD }}>📅</span> Selecione a data
+                  <span style={{ color:primaryColor }}>📅</span> Selecione a data
                 </label>
                 <input type="date" className="book-input" value={selectedDate} min={todayStr} onChange={e=>handleDateChange(e.target.value)} style={{ color: selectedDate?'#374151':'#9ca3af' }} />
               </div>
@@ -435,7 +514,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
               {/* Horário */}
               <div>
                 <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
-                  <span style={{ color:GOLD }}>🕐</span> Selecione o horário
+                  <span style={{ color:primaryColor }}>🕐</span> Selecione o horário
                 </label>
                 {selectedDate && selectedBarber ? (
                   availableTimes.length === 0 ? (
@@ -470,8 +549,8 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
               {error && <p style={{ color:'#ef4444', fontSize:13, margin:0 }}>{error}</p>}
 
-              <button className="gold-btn" onClick={handleSubmit} disabled={submitting||!selectedService||!selectedBarber||!selectedDate||!selectedTime||!clientName||!clientPhone}
-                style={{ padding:'14px', borderRadius:10, border:'none', background:`linear-gradient(135deg,${GOLD},${GOLD2})`, color:'#fff', fontSize:15, fontWeight:700, width:'100%', boxShadow:`0 4px 20px rgba(201,168,76,0.3)`, marginTop:2, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <button className="gold-btn" onClick={handleSubmit} disabled={submitting||!selectedService||!selectedBarber||!selectedDate||!selectedTime||!clientName||!clientPhone||(hasMultipleUnits&&!selectedUnit)}
+                style={{ padding:'14px', borderRadius:10, border:'none', background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, color:'#fff', fontSize:15, fontWeight:700, width:'100%', boxShadow:`0 4px 20px rgba(201,168,76,0.3)`, marginTop:2, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
                 {submitting ? (
                   <><div style={{ width:16, height:16, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', animation:'spin 0.8s linear infinite' }} /> Agendando...</>
                 ) : 'Ver horários disponíveis →'}
@@ -487,7 +566,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       </section>
 
       {/* ── TRUST BAR ── */}
-      <div className="trust-bar" style={{ background:'#1a1a1a', padding:'20px 32px', display:'flex', justifyContent:'center', gap:40, flexWrap:'wrap', borderBottom:`3px solid ${GOLD}` }}>
+      <div className="trust-bar" style={{ background:'#1a1a1a', padding:'20px 32px', display:'flex', justifyContent:'center', gap:40, flexWrap:'wrap', borderBottom:`3px solid ${primaryColor}` }}>
         {[['✂','Profissionais Especializados'],['⭐','Produtos Premium'],['🛡','Ambiente Exclusivo'],['⚡','Atendimento Rápido']].map(([icon,text])=>(
           <div key={text} style={{ display:'flex', alignItems:'center', gap:10 }}>
             <span style={{ fontSize:18 }}>{icon}</span>
@@ -500,16 +579,16 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       <section id="servicos" style={{ padding:'80px 32px', background:'#f8f4ee' }}>
         <div className="services-layout" style={{ maxWidth:1100, margin:'0 auto', display:'grid', gridTemplateColumns:'260px 1fr', gap:60, alignItems:'start' }}>
           <div className="services-copy">
-            <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:GOLD, textTransform:'uppercase', margin:'0 0 12px' }}>NOSSOS SERVIÇOS</p>
+            <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 12px' }}>NOSSOS SERVIÇOS</p>
             <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#1a1a1a', lineHeight:1.2, margin:'0 0 20px' }}>Escolha o serviço ideal para você</h2>
             <a href="#agendar" className="gold-btn" style={{ display:'inline-block', padding:'12px 24px', borderRadius:8, background:'transparent', border:`1.5px solid #1a1a1a`, color:'#1a1a1a', fontSize:13, fontWeight:600, textDecoration:'none', letterSpacing:0.3 }}>
               Ver todos os serviços →
             </a>
           </div>
           <div className="sv-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:18 }}>
-            {services.length === 0 ? (
+            {filteredServices.length === 0 ? (
               <p style={{ color:'#9ca3af', gridColumn:'span 4' }}>Nenhum serviço cadastrado.</p>
-            ) : services.map(sv=>(
+            ) : filteredServices.map(sv=>(
               <div key={sv.id} className={`sv-card${selectedService?.id===sv.id?' sel':''}`} onClick={()=>setSelectedService(sv)} style={{ background:'#fff', borderRadius:14, overflow:'hidden' }}>
                 {isPro && sv.photo_url ? (
                   <img src={sv.photo_url} alt={sv.name} style={{ width:'100%', height:130, objectFit:'cover', display:'block' }} />
@@ -524,7 +603,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                   <h4 className="service-card-title" style={{ fontSize:15, fontWeight:700, color:'#1a1a1a', margin:'0 0 4px' }}>{sv.name}</h4>
                   <p className="service-card-desc" style={{ fontSize:12, color:'#6b7280', margin:'0 0 8px', lineHeight:1.5 }}>{sv.description || 'Atendimento premium e acabamento perfeito.'}</p>
                   {sv.duration && <p style={{ fontSize:11, color:'#9ca3af', margin:'0 0 6px' }}>⏱ {sv.duration} min</p>}
-                  <p style={{ fontSize:20, fontWeight:800, color:GOLD, margin:0, fontFamily:"'Playfair Display',serif" }}>R$ {sv.price?.toFixed(2)}</p>
+                  <p style={{ fontSize:20, fontWeight:800, color:primaryColor, margin:0, fontFamily:"'Playfair Display',serif" }}>R$ {sv.price?.toFixed(2)}</p>
                 </div>
               </div>
             ))}
@@ -533,13 +612,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       </section>
 
       {/* ── BARBEIROS ── */}
-      {barbers.length > 0 && (
+      {filteredBarbers.length > 0 && (
         <section id="barbeiros" style={{ padding:'80px 32px', background:'#fff' }}>
           <div style={{ maxWidth:1100, margin:'0 auto' }}>
-            <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:GOLD, textTransform:'uppercase', margin:'0 0 10px' }}>NOSSA EQUIPE</p>
+            <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 10px' }}>NOSSA EQUIPE</p>
             <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#1a1a1a', margin:'0 0 36px' }}>Barbeiros Profissionais</h2>
             <div className="br-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:20 }}>
-              {barbers.map(b=>{
+              {filteredBarbers.map(b=>{
                 const color = getAvatarColor(b.nome)
                 return (
                   <div key={b.id} className={`br-card${selectedBarber?.id===b.id?' sel':''}`} onClick={()=>handleBarberChange(b)} style={{ background:'#f8f4ee', borderRadius:14, overflow:'hidden', textAlign:'center' }}>
@@ -555,7 +634,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                     <div style={{ padding:'16px' }}>
                       <h4 style={{ fontSize:16, fontWeight:700, color:'#1a1a1a', margin:'0 0 4px' }}>{b.nome}</h4>
                       <p style={{ fontSize:12, color:'#6b7280', margin:'0 0 8px' }}>Barbeiro Profissional</p>
-                      <p style={{ fontSize:14, color:GOLD, margin:0, letterSpacing:3 }}>★★★★★</p>
+                      <p style={{ fontSize:14, color:primaryColor, margin:0, letterSpacing:3 }}>★★★★★</p>
                     </div>
                   </div>
                 )
@@ -585,39 +664,45 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       </section>
 
       {/* ── FOOTER ── */}
-      <footer id="contato" style={{ background:'#111', borderTop:`3px solid ${GOLD}`, padding:'36px 32px 20px' }}>
+      <footer id="contato" style={{ background:'#111', borderTop:`3px solid ${primaryColor}`, padding:'36px 32px 20px' }}>
         <div style={{ maxWidth:1100, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:20, marginBottom:20 }}>
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ width:36, height:36, borderRadius:9, background:`linear-gradient(135deg,${GOLD},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:DARK, fontWeight:900 }}>✂</div>
+            <div style={{ width:36, height:36, borderRadius:9, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:DARK, fontWeight:900 }}>✂</div>
             <div>
               <p style={{ margin:0, fontSize:15, fontWeight:800, color:'#f1f5f9', fontFamily:"'Playfair Display',serif", letterSpacing:1, textTransform:'uppercase' }}>{tenantName}</p>
-              <p style={{ margin:0, fontSize:9, color:GOLD, letterSpacing:2.5, textTransform:'uppercase' }}>Barbearia</p>
+              <p style={{ margin:0, fontSize:9, color:primaryColor, letterSpacing:2.5, textTransform:'uppercase' }}>Barbearia</p>
             </div>
           </div>
-          <div style={{ display:'flex', gap:24 }}>
+          <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
             {[['#inicio','Início'],['#servicos','Serviços'],['#barbeiros','Barbeiros'],['#agendar','Agendar']].map(([href,label])=>(
               <a key={href} href={href} style={{ color:'#64748b', textDecoration:'none', fontSize:13, transition:'color 0.2s' }}>{label}</a>
             ))}
+            {landingInstagram && (
+              <a href={landingInstagram.startsWith('http') ? landingInstagram : `https://instagram.com/${landingInstagram.replace('@','')}`} target="_blank" style={{ color:'#64748b', textDecoration:'none', fontSize:13 }}>Instagram</a>
+            )}
           </div>
-          {tenant?.telefone && (
-            <a href={`https://wa.me/55${tenant.telefone.replace(/\D/g,'')}`} target="_blank" style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', borderRadius:8, background:'rgba(37,211,102,0.1)', border:'1px solid rgba(37,211,102,0.2)', color:'#25d366', fontSize:13, fontWeight:600, textDecoration:'none' }}>
-              💬 {tenant.telefone}
+          {landingWhatsapp && (
+            <a href={`https://wa.me/55${landingWhatsapp.replace(/\D/g,'')}`} target="_blank" style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', borderRadius:8, background:'rgba(37,211,102,0.1)', border:'1px solid rgba(37,211,102,0.2)', color:'#25d366', fontSize:13, fontWeight:600, textDecoration:'none' }}>
+              💬 {landingWhatsapp}
             </a>
           )}
         </div>
         <div style={{ maxWidth:1100, margin:'0 auto', paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.04)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
-          <p style={{ color:'#334155', fontSize:12, margin:0 }}>© {new Date().getFullYear()} {tenantName} · Todos os direitos reservados</p>
+          <div>
+            <p style={{ color:'#334155', fontSize:12, margin:0 }}>© {new Date().getFullYear()} {tenantName} · Todos os direitos reservados</p>
+            {landingAddress && <p style={{ color:'#475569', fontSize:12, margin:'5px 0 0' }}>📍 {landingAddress}</p>}
+          </div>
           <div style={{ display:'flex', gap:16 }}>
-            {tenant?.telefone && (
-              <a href={`https://wa.me/55${tenant.telefone.replace(/\D/g,'')}`} target="_blank" style={{ color:'#334155', textDecoration:'none', fontSize:20 }}>💬</a>
+            {landingWhatsapp && (
+              <a href={`https://wa.me/55${landingWhatsapp.replace(/\D/g,'')}`} target="_blank" style={{ color:'#334155', textDecoration:'none', fontSize:20 }}>💬</a>
             )}
           </div>
         </div>
       </footer>
 
       {/* WhatsApp FAB */}
-      {tenant?.telefone && (
-        <a href={`https://wa.me/55${tenant.telefone.replace(/\D/g,'')}`} target="_blank" className="gold-btn" style={{ position:'fixed', bottom:24, right:24, width:54, height:54, borderRadius:'50%', background:'#25d366', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, textDecoration:'none', boxShadow:'0 4px 24px rgba(37,211,102,0.45)', zIndex:50 }}>
+      {landingWhatsapp && (
+        <a href={`https://wa.me/55${landingWhatsapp.replace(/\D/g,'')}`} target="_blank" className="gold-btn" style={{ position:'fixed', bottom:24, right:24, width:54, height:54, borderRadius:'50%', background:'#25d366', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, textDecoration:'none', boxShadow:'0 4px 24px rgba(37,211,102,0.45)', zIndex:50 }}>
           💬
         </a>
       )}
