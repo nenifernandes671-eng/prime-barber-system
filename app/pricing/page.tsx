@@ -77,6 +77,8 @@ export default function PricingPage() {
     numero: '',
     bairro: '',
     slug: '',
+    password: '',
+    confirmPassword: '',
     plano: '',
   })
   const [formError, setFormError] = useState('')
@@ -98,7 +100,9 @@ export default function PricingPage() {
       !form.endereco ||
       !form.numero ||
       !form.bairro ||
-      !form.slug
+      !form.slug ||
+      !form.password ||
+      !form.confirmPassword
     ) {
       setFormError('Preencha todos os campos.')
       return
@@ -120,6 +124,16 @@ export default function PricingPage() {
 
     if (cepDigits.length !== 8) {
       setFormError('Informe um CEP valido.')
+      return
+    }
+
+    if (form.password.length < 8) {
+      setFormError('A senha precisa ter pelo menos 8 caracteres.')
+      return
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setFormError('As senhas nao conferem.')
       return
     }
 
@@ -252,6 +266,28 @@ export default function PricingPage() {
                 placeholder="000.000.000-00"
               />
             </label>
+
+            <div className="address-grid">
+              <label>
+                Senha
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Minimo 8 caracteres"
+                />
+              </label>
+
+              <label>
+                Confirmar senha
+                <input
+                  type="password"
+                  value={form.confirmPassword}
+                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                  placeholder="Repita a senha"
+                />
+              </label>
+            </div>
 
             <label>
               Telefone

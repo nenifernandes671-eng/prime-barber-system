@@ -109,27 +109,98 @@ async function asaasRequest(path: string, init: RequestInit) {
   return payload
 }
 
+async function findAuthUserByEmail(email: string) {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  for (let page = 1; page <= 10; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage: 100,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    const user = data.users.find((item) => item.email?.toLowerCase() === normalizedEmail)
+    if (user) return user
+    if (data.users.length < 100) return null
+  }
+
+  return null
+}
+
+async function ensureOwnerUser(input: {
+  email: string
+  password: string
+  nome: string
+  slug: string
+}) {
+  const existingUser = await findAuthUserByEmail(input.email)
+
+  if (existingUser) {
+    return existingUser.id
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+    user_metadata: {
+      nome: input.nome,
+      slug: input.slug,
+      role: 'admin',
+      password_set: true,
+    },
+  })
+
+  if (error || !data.user) {
+    throw new Error(error?.message || 'Nao foi possivel criar o usuario administrador.')
+  }
+
+  return data.user.id
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { plano, nome, email, cpfCnpj, telefone, cep, endereco, numero, bairro, slug } = await req.json()
+    const {
+      plano,
+      nome,
+      email,
+      cpfCnpj,
+      telefone,
+      cep,
+      endereco,
+      numero,
+      bairro,
+      slug,
+      password,
+      confirmPassword,
+    } = await req.json()
     const normalizedSlug = normalizeSlug(String(slug ?? ''))
     const document = onlyDigits(String(cpfCnpj ?? ''))
     const phone = onlyDigits(String(telefone ?? ''))
     const postalCode = onlyDigits(String(cep ?? ''))
     const planKey = String(plano ?? '').toLowerCase()
     const planValue = planPrices()[planKey as keyof ReturnType<typeof planPrices>]
+    const emailClean = String(email ?? '').trim().toLowerCase()
+    const nameClean = String(nome ?? '').trim()
+    const passwordValue = String(password ?? '')
+    const confirmPasswordValue = String(confirmPassword ?? '')
 
     if (
       !planKey ||
-      !nome ||
-      !email ||
+      !nameClean ||
+      !emailClean ||
       !document ||
       !phone ||
       !postalCode ||
       !endereco ||
       !numero ||
       !bairro ||
-      !normalizedSlug
+      !normalizedSlug ||
+      !passwordValue ||
+      !confirmPasswordValue
     ) {
       return NextResponse.json({ error: 'Campos obrigatorios faltando.' }, { status: 400 })
     }
@@ -150,17 +221,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'O link da barbearia precisa ter pelo menos 3 caracteres.' }, { status: 400 })
     }
 
+    if (passwordValue.length < 8) {
+      return NextResponse.json({ error: 'A senha precisa ter pelo menos 8 caracteres.' }, { status: 400 })
+    }
+
+    if (passwordValue !== confirmPasswordValue) {
+      return NextResponse.json({ error: 'As senhas nao conferem.' }, { status: 400 })
+    }
+
     if (!planValue) {
       return NextResponse.json({ error: 'Plano invalido ou preco nao configurado.' }, { status: 400 })
     }
 
     const { data: existingTenant } = await supabaseAdmin
       .from('tenants')
-      .select('email, asaas_customer_id')
+      .select('id, email, asaas_customer_id')
       .eq('slug', normalizedSlug)
       .maybeSingle()
 
-    if (existingTenant && existingTenant.email?.toLowerCase() !== String(email).toLowerCase()) {
+    if (existingTenant && existingTenant.email?.toLowerCase() !== emailClean) {
       return NextResponse.json({ error: 'Este link de barbearia ja esta em uso.' }, { status: 409 })
     }
 
@@ -172,8 +251,8 @@ export async function POST(req: NextRequest) {
       const customer = await asaasRequest('/customers', {
         method: 'POST',
         body: JSON.stringify({
-          name: String(nome).trim(),
-          email: String(email).trim(),
+          name: nameClean,
+          email: emailClean,
           cpfCnpj: document,
           mobilePhone: phone,
           address: String(endereco).trim(),
@@ -229,21 +308,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Asaas nao retornou a URL do checkout.' }, { status: 502 })
     }
 
-    await supabaseAdmin
+    const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .upsert(
         {
-          nome: String(nome).trim(),
-          email: String(email).trim(),
+          nome: nameClean,
+          email: emailClean,
           slug: normalizedSlug,
           plano: planKey,
-          status: 'trial',
+          status: 'suspended',
           trial_ends_at: trialStart.toISOString(),
           asaas_customer_id: asaasCustomerId,
           asaas_subscription_id: asaasSubscriptionId,
         },
         { onConflict: 'slug' },
       )
+      .select('id')
+      .single()
+
+    if (tenantError || !tenant?.id) {
+      return NextResponse.json(
+        { error: tenantError?.message || 'Nao foi possivel criar a barbearia.' },
+        { status: 500 },
+      )
+    }
+
+    const ownerUserId = await ensureOwnerUser({
+      email: emailClean,
+      password: passwordValue,
+      nome: nameClean,
+      slug: normalizedSlug,
+    })
+
+    const { data: existingMembership } = await supabaseAdmin
+      .from('tenant_users')
+      .select('tenant_id')
+      .eq('tenant_id', tenant.id)
+      .eq('user_id', ownerUserId)
+      .maybeSingle()
+
+    if (!existingMembership) {
+      const { error: membershipError } = await supabaseAdmin
+        .from('tenant_users')
+        .insert({
+          tenant_id: tenant.id,
+          user_id: ownerUserId,
+          role: 'admin',
+        })
+
+      if (membershipError) {
+        return NextResponse.json(
+          { error: membershipError.message || 'Nao foi possivel vincular o administrador.' },
+          { status: 500 },
+        )
+      }
+    }
 
     return NextResponse.json({
       url: checkoutUrl,
