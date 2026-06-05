@@ -1,21 +1,26 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowRight,
-  CalendarCheck,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
   Crown,
-  ExternalLink,
+  DollarSign,
   Eye,
   EyeOff,
+  HelpCircle,
   Lock,
   Mail,
+  Moon,
   Scissors,
   ShieldCheck,
-  Sparkles,
-  Store,
+  Sun,
   UserRound,
+  Users,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
@@ -31,15 +36,46 @@ type OwnerTenant = {
   created_at?: string | null
 }
 
+const FEATURE_ITEMS = [
+  {
+    icon: CalendarDays,
+    title: 'Agenda Inteligente',
+    text: 'Gerencie agendamentos de forma pratica e evite conflitos de horario.',
+  },
+  {
+    icon: Users,
+    title: 'Clientes na Mao',
+    text: 'Historico completo dos clientes para um atendimento unico.',
+  },
+  {
+    icon: DollarSign,
+    title: 'Comissoes Justas',
+    text: 'Controle comissoes e desempenho da equipe com facilidade.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Relatorios Reais',
+    text: 'Acompanhe numeros e tome decisoes com base em dados.',
+  },
+]
+
+const CHECK_ITEMS = [
+  'Interface simples e moderna',
+  'Suporte rapido e humanizado',
+  'Acesso de onde estiver',
+  'Atualizacoes constantes',
+]
+
 function cleanSlug(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return ''
 
-  const sanitize = (input: string) => input
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9-]/g, '')
+  const sanitize = (input: string) =>
+    input
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]/g, '')
 
   if (!trimmed.includes('.') && !trimmed.includes('/')) {
     return sanitize(trimmed)
@@ -102,25 +138,18 @@ export default function AppStartPage() {
       if (lastClientSlug) setBarbershop(lastClientSlug)
 
       const { data: { user } } = await supabase.auth.getUser()
-      if (!active) return
-
-      if (!user) {
-        return
-      }
+      if (!active || !user) return
 
       const { data: memberships } = await supabase
         .from('tenant_users')
         .select('tenant_id, role')
         .eq('user_id', user.id)
         .in('role', ['admin', 'owner'])
-        .limit(1)
 
       if (!active) return
 
       if (memberships?.length) {
-        if (!user.user_metadata?.password_set) {
-          return
-        }
+        if (!user.user_metadata?.password_set) return
 
         const tenantIds = memberships.map((item) => item.tenant_id)
         const { data: tenants } = await supabase
@@ -214,7 +243,6 @@ export default function AppStartPage() {
       .select('tenant_id, role')
       .eq('user_id', data.user.id)
       .in('role', ['admin', 'owner'])
-      .limit(1)
 
     if (membershipError || !memberships?.length) {
       await supabase.auth.signOut()
@@ -331,486 +359,645 @@ export default function AppStartPage() {
   }
 
   return (
-    <main className="app-shell">
-      <style>{`
-        .app-shell {
+    <main className="app-page">
+      <header className="topbar">
+        <a className="brand" href="/">
+          <span className="brand-icon"><Scissors size={28} /></span>
+          <strong>Korte<span>Barber</span></strong>
+        </a>
+        <div className="top-actions">
+          <span className="theme-icons"><Sun size={17} /><Moon size={14} /></span>
+          <a className="help-btn" href="/suporte"><HelpCircle size={16} /> Ajuda</a>
+        </div>
+      </header>
+
+      <section className="app-grid">
+        <div className="left-panel">
+          <div className="welcome-pill"><Scissors size={13} /> Bem-vindo ao KorteBarber</div>
+          <h1>Tudo que sua barbearia precisa, <span>em um so lugar.</span></h1>
+          <p className="lead">
+            Agendamentos, clientes, barbeiros, comissoes e relatorios. Organize sua
+            barbearia e ofereca a melhor experiencia.
+          </p>
+
+          <div className="feature-row">
+            {FEATURE_ITEMS.map((item) => {
+              const Icon = item.icon
+              return (
+                <article className="feature" key={item.title}>
+                  <div><Icon size={25} /></div>
+                  <strong>{item.title}</strong>
+                  <span>{item.text}</span>
+                </article>
+              )
+            })}
+          </div>
+
+          <div className="trust-card">
+            <div className="trust-icon"><ShieldCheck size={28} /></div>
+            <div>
+              <strong>Seguro e confiavel</strong>
+              <span>Seus dados e informacoes estao protegidos com criptografia e backups automaticos.</span>
+            </div>
+            <a href="/suporte">Saiba mais</a>
+          </div>
+
+          <div className="check-card">
+            <h2>Feito para barbearias que querem crescer</h2>
+            <div className="check-grid">
+              {CHECK_ITEMS.map((item) => (
+                <span key={item}><CheckCircle2 size={18} /> {item}</span>
+              ))}
+            </div>
+          </div>
+
+          <footer className="app-footer">
+            <span>KorteBarber © 2026 - Todos os direitos reservados.</span>
+            <nav>
+              <a href="/termos">Termos de uso</a>
+              <a href="/privacidade">Politica de privacidade</a>
+            </nav>
+          </footer>
+        </div>
+
+        <div className="access-stack">
+          <article className="access-card featured">
+            <div className="access-head">
+              <div className="access-icon"><UserRound size={28} /></div>
+              <div>
+                <h2>Sou cliente</h2>
+                <p>Acesse a pagina publica da barbearia e agende seu horario.</p>
+              </div>
+            </div>
+            <div className="client-row">
+              <input
+                value={barbershop}
+                onChange={(event) => setBarbershop(event.target.value)}
+                onBlur={() => setBarbershop((value) => cleanSlug(value))}
+                onKeyDown={(event) => { if (event.key === 'Enter') goToShop() }}
+                placeholder="Digite o link da barbearia"
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+              <button onClick={goToShop}>Abrir agenda <ArrowRight size={16} /></button>
+            </div>
+            <small>Nao precisa colocar o dominio. Use apenas o nome do link da barbearia.</small>
+          </article>
+
+          <article className="access-card">
+            <div className="access-head">
+              <div className="access-icon"><Scissors size={28} /></div>
+              <div>
+                <h2>Sou barbeiro</h2>
+                <p>Entre no seu painel para ver seus horarios, clientes e comissoes.</p>
+              </div>
+            </div>
+            <form className="login-form" onSubmit={signInBarber}>
+              <Field icon={<Mail size={16} />} placeholder="E-mail do barbeiro" type="email" value={barberEmail} onChange={setBarberEmail} />
+              <PasswordField value={barberPassword} onChange={setBarberPassword} show={showBarberPassword} onToggle={() => setShowBarberPassword((value) => !value)} />
+              {barberError && <div className="error-box">{barberError}</div>}
+              <button type="submit" disabled={barberLoading}>{barberLoading ? 'Entrando...' : 'Entrar como barbeiro'} <ArrowRight size={16} /></button>
+            </form>
+          </article>
+
+          <article className="access-card">
+            <div className="access-head">
+              <div className="access-icon"><Crown size={29} /></div>
+              <div>
+                <h2>Sou dono</h2>
+                <p>Acesse o painel administrativo e gerencie toda a sua barbearia.</p>
+              </div>
+            </div>
+            <form className="login-form" onSubmit={signInOwner}>
+              <Field icon={<Mail size={16} />} placeholder="E-mail do dono" type="email" value={ownerEmail} onChange={setOwnerEmail} />
+              <PasswordField value={ownerPassword} onChange={setOwnerPassword} show={showOwnerPassword} onToggle={() => setShowOwnerPassword((value) => !value)} />
+              {ownerError && <div className="error-box">{ownerError}</div>}
+              <button type="submit" disabled={ownerLoading}>{ownerLoading ? 'Entrando...' : 'Entrar como dono'} <ArrowRight size={16} /></button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <style jsx global>{`
+        .app-page {
           min-height: 100vh;
-          color: #f8f3e8;
+          color: #f8fafc;
           background:
-            radial-gradient(circle at 70% 18%, rgba(214,178,74,0.16), transparent 28%),
-            radial-gradient(circle at 18% 78%, rgba(59,130,246,0.12), transparent 26%),
-            linear-gradient(135deg, #05070d 0%, #0a0f1b 48%, #05070d 100%);
+            linear-gradient(90deg, rgba(4,8,16,.96), rgba(6,13,24,.82) 48%, rgba(4,8,16,.98)),
+            radial-gradient(circle at 28% 32%, rgba(224,182,65,.15), transparent 34%),
+            radial-gradient(circle at 78% 76%, rgba(37,99,235,.14), transparent 38%),
+            #050913;
           font-family: var(--font-geist-sans), Arial, sans-serif;
           overflow-x: hidden;
         }
-        .app-shell::before {
+        .app-page::before {
           content: '';
           position: fixed;
-          inset: 0;
+          inset: 80px 0 0;
           pointer-events: none;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
-          background-size: 72px 72px;
-          mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent 82%);
+          background:
+            linear-gradient(rgba(5,9,19,.38), rgba(5,9,19,.92)),
+            url('/kortebarber-logo.jpg') center left / 820px auto no-repeat;
+          opacity: .18;
+          filter: saturate(.85);
         }
-        .app-wrap {
+        .topbar {
           position: relative;
-          z-index: 1;
-          width: min(1120px, calc(100% - 32px));
-          margin: 0 auto;
-          padding: 34px 0 42px;
-        }
-        .app-top {
+          z-index: 2;
+          min-height: 80px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 18px;
-          margin-bottom: 58px;
-        }
-        .brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          text-decoration: none;
-          color: inherit;
-        }
-        .brand-mark {
-          width: 48px;
-          height: 48px;
-          border-radius: 15px;
-          display: grid;
-          place-items: center;
-          background: #070a12;
-          border: 1px solid rgba(214,178,74,0.24);
-          box-shadow: 0 18px 45px rgba(59,130,246,0.18);
-          overflow: hidden;
-        }
-        .brand-mark img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-        .brand-name {
-          margin: 0;
-          font-size: 18px;
-          font-weight: 950;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-        }
-        .brand-sub {
-          margin: 1px 0 0;
-          font-size: 11px;
-          color: #8b95aa;
-          letter-spacing: 2.4px;
-          text-transform: uppercase;
-        }
-        .top-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          min-height: 42px;
-          padding: 0 16px;
-          border-radius: 12px;
-          border: 1px solid rgba(214,178,74,0.28);
-          color: #d6b24a;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: 800;
-          background: rgba(214,178,74,0.08);
-        }
-        .hero {
-          display: grid;
-          grid-template-columns: 0.92fr 1.08fr;
-          gap: 42px;
-          align-items: center;
-        }
-        .kicker {
-          display: inline-flex;
-          align-items: center;
-          gap: 9px;
-          min-height: 34px;
-          padding: 0 13px;
-          border: 1px solid rgba(214,178,74,0.36);
-          color: #d6b24a;
-          font-size: 11px;
-          letter-spacing: 2.8px;
-          text-transform: uppercase;
-          font-weight: 900;
-          background: rgba(214,178,74,0.06);
-        }
-        .title {
-          margin: 24px 0 18px;
-          font-size: clamp(48px, 8vw, 92px);
-          line-height: 0.88;
-          letter-spacing: -2px;
-          font-weight: 950;
-        }
-        .title span {
-          color: #d6b24a;
-        }
-        .lead {
-          margin: 0;
-          max-width: 560px;
-          color: #9aa4b8;
-          font-size: 17px;
-          line-height: 1.75;
-        }
-        .quick {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          margin-top: 28px;
-        }
-        .quick-item {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          min-height: 36px;
-          padding: 0 12px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.045);
-          border: 1px solid rgba(255,255,255,0.08);
-          color: #c8d0df;
-          font-size: 12px;
-          font-weight: 800;
-        }
-        .cards {
-          display: grid;
-          gap: 14px;
-        }
-        .choice-card {
-          position: relative;
-          overflow: hidden;
-          padding: 22px;
-          border-radius: 20px;
-          background: rgba(13,19,32,0.82);
-          border: 1px solid rgba(255,255,255,0.08);
-          box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+          padding: 0 clamp(24px, 5vw, 72px);
+          border-bottom: 1px solid rgba(148,163,184,.13);
+          background: rgba(4,8,16,.72);
           backdrop-filter: blur(18px);
         }
-        .choice-card::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(135deg, rgba(214,178,74,0.12), transparent 45%);
-          opacity: 0.72;
-        }
-        .choice-inner {
-          position: relative;
-          z-index: 1;
-          display: grid;
-          grid-template-columns: 54px 1fr;
-          gap: 16px;
-        }
-        .choice-icon {
-          width: 54px;
-          height: 54px;
-          border-radius: 16px;
-          display: grid;
-          place-items: center;
-          background: rgba(214,178,74,0.12);
-          border: 1px solid rgba(214,178,74,0.28);
-          color: #d6b24a;
-        }
-        .choice-title {
-          margin: 0;
+        .brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          color: #fff;
+          text-decoration: none;
           font-size: 22px;
           font-weight: 950;
         }
-        .choice-copy {
-          margin: 6px 0 16px;
-          color: #8b95aa;
-          font-size: 14px;
-          line-height: 1.55;
+        .brand span,
+        .brand-icon {
+          color: #f2c94c;
         }
-        .input-hint {
-          margin: 8px 0 0;
-          color: #6f7a8f;
-          font-size: 12px;
-          font-weight: 700;
-        }
-        .input-hint strong {
-          color: #d6b24a;
-        }
-        .form-row {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 10px;
-        }
-        .login-stack {
-          display: grid;
-          gap: 10px;
-        }
-        .input-wrap {
-          position: relative;
-        }
-        .field-icon {
-          position: absolute;
-          left: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #768196;
-          pointer-events: none;
-        }
-        .input {
-          width: 100%;
-          min-width: 0;
-          height: 48px;
-          border-radius: 13px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(0,0,0,0.22);
-          color: #f8f3e8;
-          padding: 0 14px;
-          font-size: 14px;
-          font-weight: 700;
-          outline: none;
-        }
-        .input.has-icon {
-          padding-left: 42px;
-        }
-        .input.has-action {
-          padding-right: 46px;
-        }
-        .input:focus {
-          border-color: rgba(214,178,74,0.65);
-          box-shadow: 0 0 0 4px rgba(214,178,74,0.1);
-        }
-        .password-toggle {
-          position: absolute;
-          right: 11px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 30px;
-          height: 30px;
-          border: 0;
-          border-radius: 9px;
+        .brand-icon {
+          width: 34px;
+          height: 34px;
           display: grid;
           place-items: center;
-          background: rgba(255,255,255,0.04);
-          color: #aab3c4;
-          cursor: pointer;
         }
-        .auth-error {
-          border: 1px solid rgba(239,68,68,0.28);
-          background: rgba(239,68,68,0.1);
-          color: #fca5a5;
-          border-radius: 12px;
-          padding: 10px 12px;
-          font-size: 12px;
-          font-weight: 800;
-          line-height: 1.35;
+        .top-actions {
+          display: flex;
+          align-items: center;
+          gap: 18px;
         }
-        .btn {
-          height: 48px;
-          border: 0;
-          border-radius: 13px;
+        .theme-icons {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #f2c94c;
+        }
+        .theme-icons svg:last-child {
+          color: #64748b;
+        }
+        .help-btn {
+          height: 42px;
           padding: 0 18px;
+          border-radius: 12px;
+          border: 1px solid rgba(148,163,184,.18);
+          color: #f8fafc;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          font-weight: 800;
+          background: rgba(15,23,42,.55);
+        }
+        .help-btn svg {
+          color: #f2c94c;
+        }
+        .app-grid {
+          position: relative;
+          z-index: 1;
+          min-height: calc(100vh - 80px);
+          width: min(1440px, calc(100% - 64px));
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: minmax(0, 1.04fr) minmax(420px, .72fr);
+          gap: 72px;
+          align-items: center;
+          padding: 52px 0 34px;
+        }
+        .left-panel {
+          min-width: 0;
+        }
+        .welcome-pill {
+          width: fit-content;
+          height: 36px;
+          padding: 0 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(242,201,76,.28);
+          color: #f2c94c;
+          background: rgba(15,23,42,.56);
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-transform: uppercase;
+          letter-spacing: .16em;
+          font-size: 11px;
+          font-weight: 950;
+        }
+        h1 {
+          max-width: 690px;
+          margin: 24px 0 18px;
+          font-size: clamp(48px, 5.2vw, 78px);
+          line-height: .98;
+          letter-spacing: -1.8px;
+          font-weight: 950;
+        }
+        h1 span {
+          color: #f2c94c;
+        }
+        .lead {
+          max-width: 620px;
+          margin: 0;
+          color: #a8b1c3;
+          font-size: 18px;
+          line-height: 1.65;
+        }
+        .feature-row {
+          margin-top: 62px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 28px;
+        }
+        .feature div,
+        .trust-icon {
+          width: 58px;
+          height: 58px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          color: #f2c94c;
+          background: rgba(242,201,76,.12);
+          border: 1px solid rgba(242,201,76,.1);
+          margin-bottom: 18px;
+        }
+        .feature strong {
+          display: block;
+          color: #fff;
+          font-size: 15px;
+          margin-bottom: 8px;
+        }
+        .feature span {
+          display: block;
+          color: #9aa4b8;
+          font-size: 14px;
+          line-height: 1.45;
+        }
+        .trust-card,
+        .check-card {
+          margin-top: 34px;
+          border-radius: 16px;
+          border: 1px solid rgba(148,163,184,.13);
+          background: linear-gradient(135deg, rgba(15,23,42,.76), rgba(15,23,42,.38));
+          box-shadow: 0 20px 70px rgba(0,0,0,.22);
+        }
+        .trust-card {
+          min-height: 110px;
+          display: grid;
+          grid-template-columns: 68px 1fr auto;
+          align-items: center;
+          gap: 16px;
+          padding: 18px 24px;
+          max-width: 710px;
+        }
+        .trust-icon {
+          margin: 0;
+        }
+        .trust-card strong,
+        .check-card h2 {
+          display: block;
+          color: #fff;
+          font-size: 15px;
+          margin: 0 0 6px;
+        }
+        .trust-card span {
+          color: #9aa4b8;
+          font-size: 14px;
+          line-height: 1.45;
+        }
+        .trust-card a {
+          min-height: 42px;
+          padding: 0 18px;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          color: #fff;
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 900;
+          background: rgba(148,163,184,.12);
+        }
+        .check-card {
+          max-width: 710px;
+          padding: 24px;
+        }
+        .check-card h2 {
+          color: #f2c94c;
+          font-size: 16px;
+          padding-bottom: 18px;
+          border-bottom: 1px solid rgba(148,163,184,.2);
+        }
+        .check-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 18px;
+          margin-top: 20px;
+        }
+        .check-grid span {
+          color: #a8b1c3;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 13px;
+          line-height: 1.25;
+        }
+        .check-grid svg {
+          color: #f2c94c;
+          flex-shrink: 0;
+        }
+        .app-footer {
+          max-width: 710px;
+          margin-top: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          color: #8a94a8;
+          font-size: 13px;
+        }
+        .app-footer nav {
+          display: flex;
+          gap: 22px;
+        }
+        .app-footer a {
+          color: #8a94a8;
+          text-decoration: none;
+        }
+        .access-stack {
+          display: grid;
+          gap: 14px;
+        }
+        .access-card {
+          border-radius: 18px;
+          border: 1px solid rgba(148,163,184,.15);
+          background:
+            linear-gradient(135deg, rgba(20,27,39,.92), rgba(9,15,27,.84));
+          box-shadow: 0 30px 90px rgba(0,0,0,.28);
+          padding: 30px;
+          backdrop-filter: blur(22px);
+        }
+        .access-card.featured {
+          border-color: rgba(242,201,76,.34);
+          background:
+            radial-gradient(circle at top left, rgba(242,201,76,.14), transparent 36%),
+            linear-gradient(135deg, rgba(20,27,39,.96), rgba(9,15,27,.84));
+        }
+        .access-head {
+          display: grid;
+          grid-template-columns: 62px 1fr;
+          gap: 18px;
+          align-items: center;
+          margin-bottom: 24px;
+        }
+        .access-icon {
+          width: 62px;
+          height: 62px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          color: #f2c94c;
+          background: rgba(242,201,76,.13);
+        }
+        .access-card h2 {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 950;
+        }
+        .access-card p {
+          margin: 7px 0 0;
+          color: #a8b1c3;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .client-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+        }
+        input {
+          width: 100%;
+          min-height: 46px;
+          border: 1px solid rgba(148,163,184,.18);
+          border-radius: 10px;
+          background: rgba(2,6,23,.38);
+          color: #f8fafc;
+          outline: none;
+          padding: 0 15px;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        input:focus {
+          border-color: rgba(242,201,76,.72);
+          box-shadow: 0 0 0 4px rgba(242,201,76,.1);
+        }
+        .access-card small {
+          display: block;
+          margin-top: 12px;
+          color: #8a94a8;
+          font-size: 12px;
+        }
+        button {
+          min-height: 46px;
+          border: 0;
+          border-radius: 10px;
+          padding: 0 20px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          background: linear-gradient(135deg, #f2d26c, #c4932c);
-          color: #070a12;
+          background: linear-gradient(135deg, #f8d86d, #d7a52e);
+          color: #090d14;
+          font-size: 14px;
           font-weight: 950;
           cursor: pointer;
-          text-decoration: none;
           white-space: nowrap;
-          box-shadow: 0 18px 42px rgba(214,178,74,0.2);
         }
-        .btn:disabled {
+        button:disabled {
+          opacity: .7;
           cursor: wait;
-          opacity: 0.68;
         }
-        .btn.secondary {
-          background: rgba(255,255,255,0.06);
-          color: #f8f3e8;
-          border: 1px solid rgba(255,255,255,0.1);
+        .login-form {
+          display: grid;
+          gap: 11px;
+        }
+        .field-wrap {
+          position: relative;
+        }
+        .field-wrap svg:first-child {
+          position: absolute;
+          left: 15px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #8792a6;
+        }
+        .field-wrap input {
+          padding-left: 44px;
+        }
+        .field-wrap.password input {
+          padding-right: 48px;
+        }
+        .toggle-password {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          min-height: 34px;
+          width: 34px;
+          padding: 0;
+          border-radius: 9px;
+          background: transparent;
+          color: #a8b1c3;
           box-shadow: none;
         }
-        .split-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
+        .error-box {
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid rgba(248,113,113,.28);
+          background: rgba(239,68,68,.1);
+          color: #fca5a5;
+          font-size: 12px;
+          font-weight: 800;
         }
-        @media (max-width: 860px) {
-          .app-wrap { padding-top: 22px; }
-          .app-top { margin-bottom: 36px; }
-          .top-link { display: none; }
-          .hero { grid-template-columns: 1fr; gap: 28px; }
-          .title { font-size: clamp(44px, 15vw, 68px); }
-          .choice-card { padding: 18px; border-radius: 18px; }
-          .choice-inner { grid-template-columns: 46px 1fr; gap: 12px; }
-          .choice-icon { width: 46px; height: 46px; border-radius: 14px; }
-          .choice-title { font-size: 19px; }
-          .form-row { grid-template-columns: 1fr; }
-          .btn { width: 100%; }
+        @media (max-width: 1100px) {
+          .app-grid {
+            grid-template-columns: 1fr;
+            gap: 34px;
+            align-items: start;
+          }
+          .feature-row,
+          .check-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .access-stack {
+            max-width: 680px;
+          }
+        }
+        @media (max-width: 680px) {
+          .topbar {
+            min-height: 72px;
+            padding: 0 18px;
+          }
+          .brand {
+            font-size: 19px;
+          }
+          .theme-icons {
+            display: none;
+          }
+          .help-btn {
+            height: 38px;
+            padding: 0 12px;
+            font-size: 13px;
+          }
+          .app-grid {
+            width: min(100% - 28px, 1440px);
+            padding: 30px 0 24px;
+          }
+          h1 {
+            font-size: clamp(40px, 12vw, 56px);
+            letter-spacing: -1px;
+          }
+          .lead {
+            font-size: 15px;
+          }
+          .feature-row,
+          .check-grid,
+          .client-row,
+          .trust-card {
+            grid-template-columns: 1fr;
+          }
+          .feature-row {
+            gap: 18px;
+            margin-top: 34px;
+          }
+          .trust-card a,
+          .client-row button,
+          .login-form button {
+            width: 100%;
+          }
+          .app-footer {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+          .app-footer nav {
+            flex-wrap: wrap;
+          }
+          .access-card {
+            padding: 22px;
+          }
+          .access-head {
+            grid-template-columns: 52px 1fr;
+            gap: 14px;
+          }
+          .access-icon {
+            width: 52px;
+            height: 52px;
+          }
         }
       `}</style>
-
-      <div className="app-wrap">
-        <header className="app-top">
-          <a className="brand" href="/">
-            <div className="brand-mark">
-              <img src="/icons/kortebarber-192.png" alt="" />
-            </div>
-            <div>
-              <p className="brand-name">KorteBarber</p>
-              <p className="brand-sub">App da barbearia</p>
-            </div>
-          </a>
-          <a className="top-link" href="/pricing">
-            Criar minha barbearia
-            <ExternalLink size={15} />
-          </a>
-        </header>
-
-        <section className="hero">
-          <div>
-            <div className="kicker">
-              <Sparkles size={14} />
-              Escolha seu acesso
-            </div>
-            <h1 className="title">
-              Entre no <span>KorteBarber</span> certo para você e sua barbearia brilharem ainda mais.
-            </h1>
-            <p className="lead">
-              Um app para clientes, barbeiros e donos. Cada pessoa entra no seu painel certo,
-              com agenda, atendimentos e gestão separados por barbearia.
-            </p>
-            <div className="quick">
-              <span className="quick-item"><ShieldCheck size={15} /> Acesso seguro</span>
-              <span className="quick-item"><CalendarCheck size={15} /> Agenda online</span>
-              <span className="quick-item"><Store size={15} /> Multi-barbearia</span>
-            </div>
-          </div>
-
-          <div className="cards" aria-label="Escolha o tipo de acesso">
-            <article className="choice-card">
-              <div className="choice-inner">
-                <div className="choice-icon"><UserRound size={25} /></div>
-                <div>
-                  <h2 className="choice-title">Sou cliente</h2>
-                  <p className="choice-copy">Acesse a página pública da barbearia e agende seu horário.</p>
-                  <div className="form-row">
-                    <input
-                      className="input"
-                      value={barbershop}
-                      onChange={(event) => setBarbershop(event.target.value)}
-                      onBlur={() => setBarbershop((value) => cleanSlug(value))}
-                      onKeyDown={(event) => { if (event.key === 'Enter') goToShop() }}
-                      placeholder="Digite o link da barbearia"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                    />
-                    <button className="btn" onClick={goToShop}>
-                      Abrir agenda <ArrowRight size={16} />
-                    </button>
-                  </div>
-                  <p className="input-hint">Nao precisa colocar o dominio. Use apenas o nome do link da barbearia.</p>
-                </div>
-              </div>
-            </article>
-
-            <article className="choice-card">
-              <div className="choice-inner">
-                <div className="choice-icon"><Scissors size={25} /></div>
-                <div>
-                  <h2 className="choice-title">Sou barbeiro</h2>
-                  <p className="choice-copy">Entre no seu painel para ver seus horários, clientes e comissões.</p>
-                  <form className="login-stack" onSubmit={signInBarber}>
-                    <div className="input-wrap">
-                      <Mail className="field-icon" size={16} />
-                      <input
-                        className="input has-icon"
-                        type="email"
-                        value={barberEmail}
-                        onChange={(event) => setBarberEmail(event.target.value)}
-                        placeholder="E-mail do barbeiro"
-                        autoComplete="email"
-                      />
-                    </div>
-                    <div className="input-wrap">
-                      <Lock className="field-icon" size={16} />
-                      <input
-                        className="input has-icon has-action"
-                        type={showBarberPassword ? 'text' : 'password'}
-                        value={barberPassword}
-                        onChange={(event) => setBarberPassword(event.target.value)}
-                        placeholder="Senha"
-                        autoComplete="current-password"
-                      />
-                      <button
-                        type="button"
-                        className="password-toggle"
-                        onClick={() => setShowBarberPassword((value) => !value)}
-                        aria-label={showBarberPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                      >
-                        {showBarberPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                    {barberError && <div className="auth-error">{barberError}</div>}
-                    <button className="btn" type="submit" disabled={barberLoading}>
-                      {barberLoading ? 'Entrando...' : 'Entrar como barbeiro'} <ArrowRight size={16} />
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </article>
-
-            <article className="choice-card">
-              <div className="choice-inner">
-                <div className="choice-icon"><Crown size={25} /></div>
-                <div>
-                  <h2 className="choice-title">Sou dono</h2>
-                  <p className="choice-copy">Acesse o painel administrativo sem precisar lembrar o link da barbearia.</p>
-                  <form className="login-stack" onSubmit={signInOwner}>
-                    <div className="input-wrap">
-                      <Mail className="field-icon" size={16} />
-                      <input
-                        className="input has-icon"
-                        type="email"
-                        value={ownerEmail}
-                        onChange={(event) => setOwnerEmail(event.target.value)}
-                        placeholder="E-mail do dono"
-                        autoComplete="email"
-                      />
-                    </div>
-                    <div className="input-wrap">
-                      <Lock className="field-icon" size={16} />
-                      <input
-                        className="input has-icon has-action"
-                        type={showOwnerPassword ? 'text' : 'password'}
-                        value={ownerPassword}
-                        onChange={(event) => setOwnerPassword(event.target.value)}
-                        placeholder="Senha"
-                        autoComplete="current-password"
-                      />
-                      <button
-                        type="button"
-                        className="password-toggle"
-                        onClick={() => setShowOwnerPassword((value) => !value)}
-                        aria-label={showOwnerPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                      >
-                        {showOwnerPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                    {ownerError && <div className="auth-error">{ownerError}</div>}
-                    <button className="btn" type="submit" disabled={ownerLoading}>
-                      {ownerLoading ? 'Entrando...' : 'Entrar como dono'} <ArrowRight size={16} />
-                    </button>
-                  </form>
-                  <div className="split-actions" style={{ marginTop: 10 }}>
-                    <a className="btn secondary" href="/pricing">Criar barbearia</a>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-      </div>
     </main>
+  )
+}
+
+function Field({
+  icon,
+  placeholder,
+  type,
+  value,
+  onChange,
+}: {
+  icon: ReactNode
+  placeholder: string
+  type: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="field-wrap">
+      {icon}
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        autoComplete={type === 'email' ? 'email' : 'current-password'}
+      />
+    </div>
+  )
+}
+
+function PasswordField({
+  value,
+  onChange,
+  show,
+  onToggle,
+}: {
+  value: string
+  onChange: (value: string) => void
+  show: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="field-wrap password">
+      <Lock size={16} />
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Senha"
+        autoComplete="current-password"
+      />
+      <button type="button" className="toggle-password" onClick={onToggle} aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}>
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
   )
 }
