@@ -48,6 +48,10 @@ function addDays(date: Date, days: number) {
   return next
 }
 
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
 function asaasBaseUrl() {
   return (process.env.ASAAS_BASE_URL || DEFAULT_ASAAS_BASE_URL).replace(/\/$/, '')
 }
@@ -272,8 +276,8 @@ export async function POST(req: NextRequest) {
     }
 
     const checkoutPayload: Record<string, any> = {
-      billingTypes: mode === 'manual' ? ['PIX', 'BOLETO'] : ['CREDIT_CARD'],
-      chargeTypes: mode === 'manual' ? ['DETACHED'] : ['RECURRENT'],
+      billingTypes: ['CREDIT_CARD'],
+      chargeTypes: ['RECURRENT'],
       minutesToExpire: 60,
       externalReference: normalizedSlug,
       callback: {
@@ -295,27 +299,45 @@ export async function POST(req: NextRequest) {
       customer: asaasCustomerId,
     }
 
-    if (mode === 'card') {
-      checkoutPayload.subscription = {
-        cycle: 'MONTHLY',
-        nextDueDate: trialStart.toISOString().slice(0, 10),
-      }
+    checkoutPayload.subscription = {
+      cycle: 'MONTHLY',
+      nextDueDate: formatDate(trialStart),
     }
 
-    const checkout = await asaasRequest('/checkouts', {
-      method: 'POST',
-      body: JSON.stringify(checkoutPayload),
-    })
+    const manualPaymentPayload = {
+      customer: asaasCustomerId,
+      billingType: 'UNDEFINED',
+      value: planValue,
+      dueDate: formatDate(new Date()),
+      description: `Mensalidade manual do plano ${planKey} - KorteBarber`,
+      externalReference: normalizedSlug,
+    }
 
-    const checkoutId = checkout?.id
-    const checkoutUrl = checkout?.url || checkout?.link || null
+    const paymentSession =
+      mode === 'manual'
+        ? await asaasRequest('/payments', {
+            method: 'POST',
+            body: JSON.stringify(manualPaymentPayload),
+          })
+        : await asaasRequest('/checkouts', {
+            method: 'POST',
+            body: JSON.stringify(checkoutPayload),
+          })
+
+    const checkoutId = paymentSession?.id
+    const checkoutUrl =
+      paymentSession?.url ||
+      paymentSession?.link ||
+      paymentSession?.invoiceUrl ||
+      paymentSession?.bankSlipUrl ||
+      null
     const asaasSubscriptionId =
-      typeof checkout?.subscription === 'string'
-        ? checkout.subscription
-        : checkout?.subscription?.id || null
+      typeof paymentSession?.subscription === 'string'
+        ? paymentSession.subscription
+        : paymentSession?.subscription?.id || null
 
     if (!checkoutUrl) {
-      return NextResponse.json({ error: 'Asaas nao retornou a URL do checkout.' }, { status: 502 })
+      return NextResponse.json({ error: 'Asaas nao retornou a URL de pagamento.' }, { status: 502 })
     }
 
     const tenantPayload: Record<string, any> = {
