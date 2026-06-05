@@ -17,16 +17,6 @@ function planPrices() {
   }
 }
 
-function asaasBillingTypes() {
-  const allowed = new Set(['CREDIT_CARD', 'PIX', 'BOLETO'])
-  const configured = (process.env.ASAAS_BILLING_TYPES || 'CREDIT_CARD,PIX')
-    .split(',')
-    .map((item) => item.trim().toUpperCase())
-    .filter((item) => allowed.has(item))
-
-  return configured.length ? configured : ['CREDIT_CARD', 'PIX']
-}
-
 class AsaasApiError extends Error {
   constructor(
     message: string,
@@ -282,7 +272,7 @@ export async function POST(req: NextRequest) {
     const checkout = await asaasRequest('/checkouts', {
       method: 'POST',
       body: JSON.stringify({
-        billingTypes: asaasBillingTypes(),
+        billingTypes: ['CREDIT_CARD'],
         chargeTypes: ['RECURRENT'],
         minutesToExpire: 60,
         externalReference: normalizedSlug,
