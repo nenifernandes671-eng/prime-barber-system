@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, use } from 'react'
+import { useEffect, useMemo, useRef, useState, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TenantProvider, useTenant } from '@/lib/tenant-context'
 import { UnitProvider, useUnit } from '@/lib/unit-context'
@@ -46,6 +46,9 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const [mobileOpen, setMobileOpen] = useState(false)
   const [adminEmail, setAdminEmail] = useState('')
   const [copied, setCopied] = useState(false)
+  const [syncingAccess, setSyncingAccess] = useState(false)
+  const [syncMessage, setSyncMessage] = useState('')
+  const syncAttemptedRef = useRef(false)
 
   const t = tenant as any
   const planName = t?.plano ? String(t.plano).toUpperCase() : 'PRO'
@@ -157,6 +160,59 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     setMobileOpen(false)
   }, [pathname])
 
+  useEffect(() => {
+    if (loading || checking || hasAccess || !tenant?.slug || syncingAccess || syncAttemptedRef.current) return
+
+    let active = true
+
+    async function syncAsaasAccess() {
+      syncAttemptedRef.current = true
+      setSyncingAccess(true)
+      setSyncMessage('Verificando pagamento no Asaas...')
+
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+
+        if (!token) {
+          if (active) setSyncMessage('')
+          return
+        }
+
+        const response = await fetch('/api/asaas/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ slug }),
+        })
+
+        const result = await response.json().catch(() => ({}))
+
+        if (!active) return
+
+        if (result.active) {
+          setSyncMessage('Pagamento confirmado. Liberando acesso...')
+          window.location.reload()
+          return
+        }
+
+        setSyncMessage(result.message || 'Pagamento ainda nao confirmado no Asaas.')
+      } catch {
+        if (active) setSyncMessage('Nao foi possivel verificar o pagamento agora.')
+      } finally {
+        if (active) setSyncingAccess(false)
+      }
+    }
+
+    syncAsaasAccess()
+
+    return () => {
+      active = false
+    }
+  }, [loading, checking, hasAccess, tenant?.slug, syncingAccess, slug])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push(`/${slug}/login`)
@@ -215,6 +271,11 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             Este recurso esta disponivel apenas no plano {isPremiumBlock ? 'Premium' : 'Pro ou Premium'}.
           </p>
+          {syncMessage && (
+            <p style={{ color: '#93c5fd', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
+              {syncMessage}
+            </p>
+          )}
           <Link href="/pricing" style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', textDecoration: 'none', fontWeight: 900 }}>
             Fazer upgrade
           </Link>
