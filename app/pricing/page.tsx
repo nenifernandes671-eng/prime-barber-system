@@ -79,6 +79,7 @@ export default function PricingPage() {
     slug: '',
     password: '',
     confirmPassword: '',
+    paymentMode: 'card',
     plano: '',
   })
   const [formError, setFormError] = useState('')
@@ -238,6 +239,25 @@ export default function PricingPage() {
             <p className="modal-kicker">Comece seu teste</p>
             <h2>Criar sua barbearia</h2>
             <p className="modal-copy">Informe os dados para abrir o checkout seguro.</p>
+
+            <div className="payment-mode">
+              <button
+                type="button"
+                className={form.paymentMode === 'card' ? 'active' : ''}
+                onClick={() => setForm({ ...form, paymentMode: 'card' })}
+              >
+                <strong>Cartao recorrente</strong>
+                <span>Cobranca automatica mensal.</span>
+              </button>
+              <button
+                type="button"
+                className={form.paymentMode === 'manual' ? 'active' : ''}
+                onClick={() => setForm({ ...form, paymentMode: 'manual' })}
+              >
+                <strong>Pix ou boleto</strong>
+                <span>Pagamento manual por 30 dias.</span>
+              </button>
+            </div>
 
             <label>
               Nome da barbearia
@@ -708,6 +728,44 @@ export default function PricingPage() {
           font-size: 14px;
         }
 
+        .payment-mode {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+
+        .payment-mode button {
+          min-height: 74px;
+          padding: 12px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(0,0,0,0.28);
+          color: #b8b8b8;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .payment-mode button.active {
+          border-color: #c9a84c;
+          background: rgba(201,168,76,0.12);
+          color: #f5f0e8;
+        }
+
+        .payment-mode strong {
+          display: block;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+        }
+
+        .payment-mode span {
+          display: block;
+          margin-top: 5px;
+          color: #888;
+          font-size: 12px;
+          line-height: 1.35;
+        }
+
         .modal-box label {
           display: block;
           margin-bottom: 16px;
@@ -807,6 +865,10 @@ export default function PricingPage() {
             gap: 18px;
             flex-wrap: wrap;
             justify-content: center;
+          }
+
+          .payment-mode {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

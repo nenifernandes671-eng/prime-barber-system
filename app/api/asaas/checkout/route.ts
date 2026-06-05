@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
       slug,
       password,
       confirmPassword,
+      paymentMode,
     } = await req.json()
     const normalizedSlug = normalizeSlug(String(slug ?? ''))
     const document = onlyDigits(String(cpfCnpj ?? ''))
@@ -187,6 +188,7 @@ export async function POST(req: NextRequest) {
     const nameClean = String(nome ?? '').trim()
     const passwordValue = String(password ?? '')
     const confirmPasswordValue = String(confirmPassword ?? '')
+    const mode = String(paymentMode ?? 'card').toLowerCase() === 'manual' ? 'manual' : 'card'
 
     if (
       !planKey ||
@@ -269,32 +271,40 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const checkoutPayload: Record<string, any> = {
+      billingTypes: mode === 'manual' ? ['PIX', 'BOLETO'] : ['CREDIT_CARD'],
+      chargeTypes: mode === 'manual' ? ['DETACHED'] : ['RECURRENT'],
+      minutesToExpire: 60,
+      externalReference: normalizedSlug,
+      callback: {
+        cancelUrl: `${appUrl}/pricing`,
+        expiredUrl: `${appUrl}/pricing`,
+        successUrl: `${appUrl}/register/success?slug=${encodeURIComponent(normalizedSlug)}`,
+      },
+      items: [
+        {
+          name: `KorteBarber ${planKey.toUpperCase()}`,
+          description:
+            mode === 'manual'
+              ? `Mensalidade manual do plano ${planKey} por Pix ou boleto`
+              : `Assinatura mensal do plano ${planKey}`,
+          quantity: 1,
+          value: planValue,
+        },
+      ],
+      customer: asaasCustomerId,
+    }
+
+    if (mode === 'card') {
+      checkoutPayload.subscription = {
+        cycle: 'MONTHLY',
+        nextDueDate: trialStart.toISOString().slice(0, 10),
+      }
+    }
+
     const checkout = await asaasRequest('/checkouts', {
       method: 'POST',
-      body: JSON.stringify({
-        billingTypes: ['CREDIT_CARD'],
-        chargeTypes: ['RECURRENT'],
-        minutesToExpire: 60,
-        externalReference: normalizedSlug,
-        callback: {
-          cancelUrl: `${appUrl}/pricing`,
-          expiredUrl: `${appUrl}/pricing`,
-          successUrl: `${appUrl}/register/success?slug=${encodeURIComponent(normalizedSlug)}`,
-        },
-        items: [
-          {
-            name: `KorteBarber ${planKey.toUpperCase()}`,
-            description: `Assinatura mensal do plano ${planKey}`,
-            quantity: 1,
-            value: planValue,
-          },
-        ],
-        customer: asaasCustomerId,
-        subscription: {
-          cycle: 'MONTHLY',
-          nextDueDate: trialStart.toISOString().slice(0, 10),
-        },
-      }),
+      body: JSON.stringify(checkoutPayload),
     })
 
     const checkoutId = checkout?.id
@@ -308,21 +318,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Asaas nao retornou a URL do checkout.' }, { status: 502 })
     }
 
+    const tenantPayload: Record<string, any> = {
+      nome: nameClean,
+      email: emailClean,
+      slug: normalizedSlug,
+      plano: planKey,
+      status: 'suspended',
+      trial_ends_at: trialStart.toISOString(),
+      asaas_customer_id: asaasCustomerId,
+    }
+
+    if (asaasSubscriptionId) {
+      tenantPayload.asaas_subscription_id = asaasSubscriptionId
+    }
+
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .upsert(
-        {
-          nome: nameClean,
-          email: emailClean,
-          slug: normalizedSlug,
-          plano: planKey,
-          status: 'suspended',
-          trial_ends_at: trialStart.toISOString(),
-          asaas_customer_id: asaasCustomerId,
-          asaas_subscription_id: asaasSubscriptionId,
-        },
-        { onConflict: 'slug' },
-      )
+      .upsert(tenantPayload, { onConflict: 'slug' })
       .select('id')
       .single()
 
@@ -367,6 +379,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       url: checkoutUrl,
       checkoutId,
+      paymentMode: mode,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro ao iniciar checkout Asaas.'
