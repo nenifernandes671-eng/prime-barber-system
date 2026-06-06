@@ -421,6 +421,594 @@ export default function Home() {
           max-width: 720px;
         }
 
+        .hero-showcase {
+          position: absolute;
+          right: clamp(120px, 9vw, 190px);
+          bottom: 78px;
+          z-index: 2;
+          width: min(48vw, 760px);
+          min-width: 520px;
+          pointer-events: none;
+          animation: fadeUp 0.9s 0.28s ease both;
+        }
+
+        .showcase-glow {
+          position: absolute;
+          inset: 8% -8% -4% 0;
+          background:
+            radial-gradient(circle at 45% 44%, rgba(201, 168, 76, 0.20), transparent 34%),
+            radial-gradient(circle at 84% 36%, rgba(255, 255, 255, 0.10), transparent 28%);
+          filter: blur(24px);
+          opacity: 0.78;
+        }
+
+        .showcase-props {
+          position: absolute;
+          right: -42px;
+          top: 16px;
+          width: 220px;
+          height: 330px;
+          border-radius: 38px;
+          opacity: 0.44;
+          background:
+            radial-gradient(circle at 38% 18%, rgba(245,240,232,0.42), transparent 11%),
+            radial-gradient(circle at 62% 18%, rgba(245,240,232,0.36), transparent 10%),
+            linear-gradient(90deg, transparent 0 34%, rgba(201,168,76,.18) 35% 39%, transparent 40% 58%, rgba(245,240,232,.2) 59% 64%, transparent 65%),
+            linear-gradient(135deg, rgba(201,168,76,.16), rgba(0,0,0,.15));
+          border: 1px solid rgba(255,255,255,.08);
+          box-shadow: inset 0 0 80px rgba(0,0,0,.55);
+        }
+
+        .showcase-desk {
+          position: absolute;
+          left: 7%;
+          right: -3%;
+          bottom: -22px;
+          height: 74px;
+          border-radius: 50%;
+          background: radial-gradient(ellipse, rgba(255,255,255,.16) 0%, rgba(201,168,76,.08) 34%, transparent 72%);
+          filter: blur(9px);
+        }
+
+        .macbook {
+          position: relative;
+          width: 640px;
+          max-width: 84%;
+          margin: 0 auto;
+        }
+
+        .mac-screen {
+          position: relative;
+          aspect-ratio: 16 / 10;
+          padding: 12px;
+          border: 2px solid rgba(235, 238, 245, 0.85);
+          border-radius: 18px 18px 10px 10px;
+          background: linear-gradient(145deg, #0d1118, #05070b 58%, #161a21);
+          box-shadow:
+            0 26px 80px rgba(0, 0, 0, 0.56),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+
+        .mac-camera {
+          position: absolute;
+          top: 7px;
+          left: 50%;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: #111827;
+          transform: translateX(-50%);
+        }
+
+        .mac-ui {
+          overflow: hidden;
+          height: 100%;
+          border-radius: 9px;
+          background: #f8fafc;
+          color: #0f172a;
+          font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        }
+
+        .mac-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          height: 18px;
+          padding: 0 9px;
+          background: #111827;
+        }
+
+        .mac-toolbar span {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+        }
+
+        .mac-toolbar span:nth-child(1) { background: #ff5f57; }
+        .mac-toolbar span:nth-child(2) { background: #febc2e; }
+        .mac-toolbar span:nth-child(3) { background: #28c840; }
+
+        .mac-app {
+          display: grid;
+          height: calc(100% - 18px);
+          grid-template-columns: 80px 1fr;
+        }
+
+        .mac-sidebar {
+          padding: 10px 8px;
+          border-right: 1px solid #e2e8f0;
+          background: #ffffff;
+        }
+
+        .mac-brand {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 10px;
+          color: #0f172a;
+          font-size: 8px;
+          font-weight: 900;
+        }
+
+        .mac-mark,
+        .phone-mark {
+          display: grid;
+          width: 15px;
+          height: 15px;
+          place-items: center;
+          border-radius: 5px;
+          background: linear-gradient(135deg, #2563eb, #0f172a);
+          color: #fff;
+          font-size: 8px;
+          font-weight: 900;
+        }
+
+        .mac-tenant {
+          margin-bottom: 9px;
+          padding: 7px;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          background: #f8fafc;
+        }
+
+        .mac-avatar {
+          display: grid;
+          width: 18px;
+          height: 18px;
+          margin-bottom: 5px;
+          place-items: center;
+          border-radius: 7px;
+          background: #3b82f6;
+          color: #fff;
+          font-size: 8px;
+          font-weight: 900;
+        }
+
+        .mac-line {
+          width: 100%;
+          height: 5px;
+          margin-top: 4px;
+          border-radius: 999px;
+          background: #dbeafe;
+        }
+
+        .mac-line.short {
+          width: 62%;
+        }
+
+        .mac-menu-line {
+          height: 7px;
+          margin: 8px 0;
+          border-radius: 999px;
+          background: #eef2ff;
+        }
+
+        .mac-menu-line.active {
+          background: #dbeafe;
+          box-shadow: inset 2px 0 0 #2563eb;
+        }
+
+        .mac-content {
+          padding: 10px 12px 12px;
+          background: #f8fafc;
+        }
+
+        .mac-header {
+          margin-bottom: 8px;
+          padding: 10px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 9px;
+          background: #fff;
+          box-shadow: 0 8px 18px rgba(15,23,42,.05);
+        }
+
+        .mac-title {
+          color: #0f172a;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .mac-subtitle {
+          margin-top: 3px;
+          color: #64748b;
+          font-size: 6px;
+        }
+
+        .mac-tabs {
+          display: flex;
+          gap: 5px;
+          margin-bottom: 8px;
+        }
+
+        .mac-tab {
+          padding: 4px 8px;
+          border-radius: 6px;
+          background: #fff;
+          color: #64748b;
+          font-size: 6px;
+          font-weight: 800;
+        }
+
+        .mac-tab.active {
+          background: #2563eb;
+          color: #fff;
+        }
+
+        .mac-kpis {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 7px;
+          margin-bottom: 8px;
+        }
+
+        .mac-kpi,
+        .phone-kpi {
+          padding: 8px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          background: #fff;
+          box-shadow: 0 8px 18px rgba(15,23,42,.04);
+        }
+
+        .mac-kpi-icon,
+        .phone-kpi-icon {
+          width: 14px;
+          height: 14px;
+          margin-bottom: 6px;
+          border-radius: 6px;
+          background: #e0ecff;
+        }
+
+        .mac-kpi-label,
+        .phone-kpi-label {
+          color: #64748b;
+          font-size: 5px;
+          font-weight: 800;
+        }
+
+        .mac-kpi-value,
+        .phone-kpi-value {
+          margin-top: 4px;
+          color: #0f172a;
+          font-size: 10px;
+          font-weight: 950;
+        }
+
+        .mac-spark,
+        .phone-spark {
+          display: flex;
+          gap: 3px;
+          align-items: end;
+          height: 10px;
+          margin-top: 6px;
+        }
+
+        .mac-spark i,
+        .phone-spark i {
+          flex: 1;
+          border-radius: 999px 999px 0 0;
+          background: #bfdbfe;
+        }
+
+        .mac-dashboard {
+          display: grid;
+          grid-template-columns: 1.45fr .85fr .75fr;
+          gap: 8px;
+        }
+
+        .mac-panel {
+          min-height: 112px;
+          padding: 9px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          background: #fff;
+        }
+
+        .mac-panel-title {
+          color: #0f172a;
+          font-size: 8px;
+          font-weight: 900;
+        }
+
+        .mac-panel-value {
+          margin: 4px 0 8px;
+          color: #0f172a;
+          font-size: 15px;
+          font-weight: 950;
+        }
+
+        .mac-chart {
+          display: flex;
+          align-items: end;
+          gap: 5px;
+          height: 58px;
+          border-bottom: 1px solid #e2e8f0;
+          background-image: linear-gradient(to top, #eef2f7 1px, transparent 1px);
+          background-size: 100% 18px;
+        }
+
+        .mac-chart i {
+          width: 9px;
+          border-radius: 999px 999px 0 0;
+          background: linear-gradient(180deg, #93c5fd, #2563eb);
+          box-shadow: 0 5px 14px rgba(37,99,235,.22);
+        }
+
+        .mac-donut {
+          display: grid;
+          width: 74px;
+          height: 74px;
+          margin: 14px auto 6px;
+          place-items: center;
+          border-radius: 50%;
+          background: conic-gradient(#10b981 0 42%, #f59e0b 42% 76%, #ef4444 76% 100%);
+        }
+
+        .mac-donut span {
+          display: grid;
+          width: 42px;
+          height: 42px;
+          place-items: center;
+          border-radius: 50%;
+          background: #fff;
+          color: #0f172a;
+          font-size: 8px;
+          font-weight: 950;
+        }
+
+        .mac-actions {
+          display: grid;
+          gap: 7px;
+          margin-top: 14px;
+        }
+
+        .mac-action {
+          height: 20px;
+          border-radius: 7px;
+          background: #f1f5f9;
+          box-shadow: inset 20px 0 0 #dbeafe;
+        }
+
+        .mac-base {
+          position: relative;
+          width: 720px;
+          max-width: 96%;
+          height: 22px;
+          margin: 0 auto;
+          border-radius: 0 0 34px 34px;
+          background: linear-gradient(180deg, #c7c7c7, #383d43 48%, #0c0e12);
+          box-shadow: 0 20px 50px rgba(0,0,0,.62);
+        }
+
+        .mac-base::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 43%;
+          width: 14%;
+          height: 5px;
+          border-radius: 0 0 10px 10px;
+          background: rgba(255,255,255,.24);
+        }
+
+        .phone {
+          position: absolute;
+          right: 18px;
+          bottom: 42px;
+          width: 128px;
+          padding: 8px;
+          border: 2px solid #e5e7eb;
+          border-radius: 24px;
+          background: linear-gradient(145deg, #0b0f17, #05070b);
+          box-shadow: 0 22px 55px rgba(0,0,0,.58);
+        }
+
+        .phone::before {
+          content: "";
+          position: absolute;
+          top: 6px;
+          left: 50%;
+          width: 34px;
+          height: 4px;
+          border-radius: 999px;
+          background: #111827;
+          transform: translateX(-50%);
+        }
+
+        .phone-ui {
+          overflow: hidden;
+          min-height: 226px;
+          padding: 16px 7px 8px;
+          border-radius: 17px;
+          background: #f8fafc;
+        }
+
+        .phone-top {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 8px;
+          color: #0f172a;
+          font-size: 6px;
+          font-weight: 900;
+        }
+
+        .phone-kpis {
+          display: grid;
+          gap: 6px;
+        }
+
+        .phone-kpi {
+          padding: 7px;
+        }
+
+        .phone-kpi-value {
+          font-size: 9px;
+        }
+
+        .phone-panel {
+          margin-top: 7px;
+          padding: 8px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          background: #fff;
+        }
+
+        .phone-panel-title {
+          margin-bottom: 7px;
+          color: #0f172a;
+          font-size: 7px;
+          font-weight: 900;
+        }
+
+        .phone-mini-donut {
+          width: 42px;
+          height: 42px;
+          margin: 0 auto;
+          border-radius: 50%;
+          background: conic-gradient(#10b981 0 48%, #f59e0b 48% 100%);
+          box-shadow: inset 0 0 0 13px #fff;
+        }
+
+        .showcase-caption {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin: 20px 0 14px 47%;
+          color: var(--white);
+          font-size: 13px;
+          letter-spacing: .4px;
+        }
+
+        .showcase-caption::before {
+          content: "›";
+          color: var(--gold);
+          font-size: 18px;
+        }
+
+        .hero-pills {
+          display: grid;
+          width: min(560px, 78%);
+          margin-left: auto;
+          margin-right: 70px;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+
+        .hero-pill {
+          display: grid;
+          grid-template-columns: 36px 1fr;
+          gap: 10px;
+          align-items: center;
+          min-height: 68px;
+          padding: 10px 12px;
+          border: 1px solid rgba(255,255,255,.10);
+          border-radius: 8px;
+          background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
+          box-shadow: 0 18px 42px rgba(0,0,0,.28);
+          backdrop-filter: blur(14px);
+        }
+
+        .hero-pill-icon {
+          display: grid;
+          width: 34px;
+          height: 34px;
+          place-items: center;
+          border-radius: 8px;
+          background: rgba(201,168,76,.16);
+          color: var(--gold);
+        }
+
+        .hero-pill-icon svg {
+          width: 17px;
+          height: 17px;
+        }
+
+        .hero-pill strong {
+          display: block;
+          color: var(--white);
+          font-size: 12px;
+          line-height: 1.1;
+        }
+
+        .hero-pill span {
+          display: block;
+          margin-top: 4px;
+          color: var(--muted);
+          font-size: 10px;
+          line-height: 1.35;
+        }
+
+        [data-theme='light'] .korte-page .hero-showcase,
+        [data-theme='light'] .korte-page .macbook,
+        [data-theme='light'] .korte-page .phone,
+        [data-theme='light'] .korte-page .hero-pills {
+          color: initial !important;
+        }
+
+        [data-theme='light'] .korte-page .mac-ui,
+        [data-theme='light'] .korte-page .mac-content,
+        [data-theme='light'] .korte-page .mac-sidebar,
+        [data-theme='light'] .korte-page .mac-header,
+        [data-theme='light'] .korte-page .mac-kpi,
+        [data-theme='light'] .korte-page .mac-panel,
+        [data-theme='light'] .korte-page .phone-ui,
+        [data-theme='light'] .korte-page .phone-kpi,
+        [data-theme='light'] .korte-page .phone-panel {
+          color: #0f172a !important;
+        }
+
+        [data-theme='light'] .korte-page .mac-title,
+        [data-theme='light'] .korte-page .mac-panel-title,
+        [data-theme='light'] .korte-page .mac-panel-value,
+        [data-theme='light'] .korte-page .mac-kpi-value,
+        [data-theme='light'] .korte-page .mac-donut span,
+        [data-theme='light'] .korte-page .phone-top,
+        [data-theme='light'] .korte-page .phone-panel-title,
+        [data-theme='light'] .korte-page .phone-kpi-value {
+          color: #0f172a !important;
+        }
+
+        [data-theme='light'] .korte-page .mac-subtitle,
+        [data-theme='light'] .korte-page .mac-kpi-label,
+        [data-theme='light'] .korte-page .phone-kpi-label {
+          color: #64748b !important;
+        }
+
+        [data-theme='light'] .korte-page .hero-pill {
+          background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.035)) !important;
+          border-color: rgba(255,255,255,.10) !important;
+          box-shadow: 0 18px 42px rgba(0,0,0,.28) !important;
+        }
+
+        [data-theme='light'] .korte-page .hero-pill strong {
+          color: var(--white) !important;
+        }
+
+        [data-theme='light'] .korte-page .hero-pill span {
+          color: var(--muted) !important;
+        }
+
 
         .hero-tag {
           display: inline-flex;
@@ -1400,6 +1988,7 @@ export default function Home() {
           }
 
           .hero-stats,
+          .hero-showcase,
           .scroll-line {
             display: none;
           }
@@ -1481,6 +2070,118 @@ export default function Home() {
           <div className="hero-actions">
             <Link href="/pricing" className="btn-primary">Testar 7 dias grátis</Link>
             <a href="#como-funciona" className="btn-ghost">Ver como funciona</a>
+          </div>
+        </div>
+        <div className="hero-showcase" aria-hidden="true">
+          <div className="showcase-glow" />
+          <div className="showcase-props" />
+          <div className="showcase-desk" />
+          <div className="macbook">
+            <div className="mac-screen">
+              <div className="mac-camera" />
+              <div className="mac-ui">
+                <div className="mac-toolbar"><span /><span /><span /></div>
+                <div className="mac-app">
+                  <aside className="mac-sidebar">
+                    <div className="mac-brand"><div className="mac-mark">K</div>KorteBarber</div>
+                    <div className="mac-tenant">
+                      <div className="mac-avatar">NE</div>
+                      <div className="mac-line" />
+                      <div className="mac-line short" />
+                    </div>
+                    {['', 'active', '', '', '', '', '', ''].map((state, index) => (
+                      <div className={`mac-menu-line ${state}`} key={index} />
+                    ))}
+                  </aside>
+                  <div className="mac-content">
+                    <div className="mac-header">
+                      <div className="mac-title">Financeiro</div>
+                      <div className="mac-subtitle">Acompanhe receitas, pagamentos e comissões da sua barbearia.</div>
+                    </div>
+                    <div className="mac-tabs">
+                      <span className="mac-tab">Hoje</span>
+                      <span className="mac-tab">Semana</span>
+                      <span className="mac-tab active">Este mês</span>
+                      <span className="mac-tab">Tudo</span>
+                    </div>
+                    <div className="mac-kpis">
+                      {[
+                        ['Receita Total', 'R$ 619,00'],
+                        ['Recebido', 'R$ 619,00'],
+                        ['Pendente', 'R$ 0,00'],
+                        ['Lucro Líquido', '-R$ 1.130,00'],
+                      ].map(([label, value]) => (
+                        <div className="mac-kpi" key={label}>
+                          <div className="mac-kpi-icon" />
+                          <div className="mac-kpi-label">{label}</div>
+                          <div className="mac-kpi-value">{value}</div>
+                          <div className="mac-spark"><i style={{ height: 5 }} /><i style={{ height: 8 }} /><i style={{ height: 7 }} /><i style={{ height: 10 }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mac-dashboard">
+                      <div className="mac-panel">
+                        <div className="mac-panel-title">Receita no período</div>
+                        <div className="mac-panel-value">R$ 619,00</div>
+                        <div className="mac-chart">
+                          {[22, 42, 70, 24, 44, 10, 9, 9, 10, 9, 8, 9].map((height, index) => (
+                            <i key={index} style={{ height }} />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mac-panel">
+                        <div className="mac-panel-title">Resumo financeiro</div>
+                        <div className="mac-donut"><span>R$ 619</span></div>
+                      </div>
+                      <div className="mac-panel">
+                        <div className="mac-panel-title">Central</div>
+                        <div className="mac-actions"><div className="mac-action" /><div className="mac-action" /><div className="mac-action" /></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mac-base" />
+          </div>
+
+          <div className="phone">
+            <div className="phone-ui">
+              <div className="phone-top"><div className="phone-mark">K</div>KorteBarber</div>
+              <div className="phone-kpis">
+                <div className="phone-kpi">
+                  <div className="phone-kpi-icon" />
+                  <div className="phone-kpi-label">Receita total</div>
+                  <div className="phone-kpi-value">R$ 619,00</div>
+                  <div className="phone-spark"><i style={{ height: 6 }} /><i style={{ height: 8 }} /><i style={{ height: 7 }} /><i style={{ height: 10 }} /></div>
+                </div>
+                <div className="phone-kpi">
+                  <div className="phone-kpi-icon" />
+                  <div className="phone-kpi-label">Pendente</div>
+                  <div className="phone-kpi-value">R$ 0,00</div>
+                </div>
+              </div>
+              <div className="phone-panel">
+                <div className="phone-panel-title">Resumo financeiro</div>
+                <div className="phone-mini-donut" />
+              </div>
+            </div>
+          </div>
+
+          <div className="showcase-caption">Conheça o Sistema completo</div>
+          <div className="hero-pills">
+            <div className="hero-pill">
+              <span className="hero-pill-icon"><ChartColumn aria-hidden="true" /></span>
+              <div><strong>Dashboard Financeiro</strong><span>Indicadores e agendamentos.</span></div>
+            </div>
+            <div className="hero-pill">
+              <span className="hero-pill-icon"><CalendarDays aria-hidden="true" /></span>
+              <div><strong>Agendamentos Rápidos</strong><span>Acompanhe tudo em tempo real.</span></div>
+            </div>
+            <div className="hero-pill">
+              <span className="hero-pill-icon"><Users aria-hidden="true" /></span>
+              <div><strong>Controle de Equipe</strong><span>Gerencie barbeiros e comissões.</span></div>
+            </div>
           </div>
         </div>
         <div className="hero-stats">
