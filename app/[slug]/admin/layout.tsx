@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { TenantProvider, useTenant } from '@/lib/tenant-context'
 import { UnitProvider, useUnit } from '@/lib/unit-context'
 import { getBlockedPlanForPath, isAdminPathAllowed } from '@/lib/permissions'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { BarChart3 } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import {
@@ -299,6 +300,10 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         </div>
       </div>
 
+      <div className="sidebar-theme-row">
+        <ThemeToggle />
+      </div>
+
       <div className="tenant-card">
         <div className="tenant-avatar">{initial}</div>
         <div className="tenant-info">
@@ -432,6 +437,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           <button onClick={() => setMobileOpen((v) => !v)} className="mobile-menu-btn">
             {mobileOpen ? <X size={23} /> : <Menu size={23} />}
           </button>
+          <ThemeToggle compact />
         </div>
       </header>
 

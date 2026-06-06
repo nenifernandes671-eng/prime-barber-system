@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUnit } from '@/lib/unit-context'
 import { useTenant } from '@/lib/tenant-context'
+import { useTheme } from '@/components/theme-provider'
 import {
   BarChart3,
   CalendarDays,
@@ -53,6 +54,8 @@ export default function RelatoriosPage() {
   const params = useParams()
   const slug = String(params.slug || '')
   const { isPremium } = useTenant()
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
   const { selectedUnitId, selectedUnit } = useUnit()
   const activeUnitId = isPremium ? selectedUnitId : 'all'
 
@@ -281,9 +284,9 @@ export default function RelatoriosPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#020617] text-white p-6">
+      <main className={`kb-light-root kb-reports-page min-h-screen p-6 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#020617] text-white'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6">
+          <div className={isLight ? 'bg-white border border-slate-200 rounded-3xl p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)]' : 'bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6'}>
             <p className="text-zinc-400">Carregando relatórios...</p>
           </div>
         </div>
@@ -292,7 +295,7 @@ export default function RelatoriosPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#020617] text-white p-6">
+    <main className={`kb-light-root kb-reports-page min-h-screen p-6 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#020617] text-white'}`}>
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5">
           <div>
@@ -315,7 +318,7 @@ export default function RelatoriosPage() {
             </p>
           </div>
 
-          <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-2 flex flex-wrap gap-2">
+          <div className={isLight ? 'bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap gap-2 shadow-[0_10px_24px_rgba(15,23,42,0.06)]' : 'bg-zinc-900/80 border border-zinc-800 rounded-2xl p-2 flex flex-wrap gap-2'}>
             <div className="hidden sm:flex items-center px-2 text-zinc-400">
               <Filter size={18} />
             </div>
@@ -397,7 +400,7 @@ export default function RelatoriosPage() {
           </Panel>
         </section>
 
-        <section className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6 shadow-2xl shadow-black/20">
+        <section className={isLight ? 'bg-white border border-slate-200 rounded-3xl p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)]' : 'bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6 shadow-2xl shadow-black/20'}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5">
             <div>
               <h2 className="text-xl font-semibold">Últimos agendamentos</h2>
@@ -475,12 +478,16 @@ function FilterButton({
   onClick: () => void
   children: React.ReactNode
 }) {
+  const { isLight } = useTheme()
+
   return (
     <button
       onClick={onClick}
       className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
         active
           ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+          : isLight
+          ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
       }`}
     >
@@ -498,17 +505,19 @@ function MetricCard({
   value: string | number
   icon: React.ElementType
 }) {
+  const { isLight } = useTheme()
+
   return (
-    <div className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-5 shadow-2xl shadow-black/20 hover:border-blue-500/30 transition">
+    <div className={isLight ? 'bg-white border border-slate-200 rounded-3xl p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] hover:border-blue-300 transition' : 'bg-zinc-900/80 border border-zinc-800 rounded-3xl p-5 shadow-2xl shadow-black/20 hover:border-blue-500/30 transition'}>
       <div className="flex items-center justify-between">
-        <p className="text-zinc-400 text-sm">{title}</p>
+        <p className={isLight ? 'text-slate-500 text-sm' : 'text-zinc-400 text-sm'}>{title}</p>
 
         <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-          <Icon size={20} className="text-blue-400" />
+          <Icon size={20} className={isLight ? 'text-blue-600' : 'text-blue-400'} />
         </div>
       </div>
 
-      <h2 className="text-2xl font-bold mt-4">{value}</h2>
+      <h2 className={isLight ? 'text-2xl font-bold mt-4 text-slate-900' : 'text-2xl font-bold mt-4'}>{value}</h2>
     </div>
   )
 }
@@ -522,11 +531,13 @@ function Panel({
   icon: React.ElementType
   children: React.ReactNode
 }) {
+  const { isLight } = useTheme()
+
   return (
-    <div className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6 shadow-2xl shadow-black/20">
+    <div className={isLight ? 'bg-white border border-slate-200 rounded-3xl p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)]' : 'bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6 shadow-2xl shadow-black/20'}>
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-xl font-semibold">{title}</h2>
-        <Icon size={20} className="text-blue-400" />
+        <h2 className={isLight ? 'text-xl font-semibold text-slate-900' : 'text-xl font-semibold'}>{title}</h2>
+        <Icon size={20} className={isLight ? 'text-blue-600' : 'text-blue-400'} />
       </div>
 
       {children}
@@ -535,5 +546,7 @@ function Panel({
 }
 
 function EmptyText({ children }: { children: React.ReactNode }) {
-  return <p className="text-zinc-500">{children}</p>
+  const { isLight } = useTheme()
+
+  return <p className={isLight ? 'text-slate-500' : 'text-zinc-500'}>{children}</p>
 }

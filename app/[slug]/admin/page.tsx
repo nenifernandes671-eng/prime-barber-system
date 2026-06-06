@@ -328,7 +328,7 @@ setTenantPlan(tenant.plano || null)
   )
 
   return (
-    <div style={S.root}>
+    <div className="kb-light-root kb-dashboard-page" style={S.root}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 768px) {

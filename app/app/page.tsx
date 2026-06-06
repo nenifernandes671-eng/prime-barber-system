@@ -15,15 +15,14 @@ import {
   HelpCircle,
   Lock,
   Mail,
-  Moon,
   Scissors,
   ShieldCheck,
-  Sun,
   UserRound,
   Users,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const LAST_ACCESS_KEY = 'kortebarber:last-access'
 const LAST_CLIENT_SLUG_KEY = 'kortebarber:last-client-slug'
@@ -366,7 +365,7 @@ export default function AppStartPage() {
           <strong>Korte<span>Barber</span></strong>
         </a>
         <div className="top-actions">
-          <span className="theme-icons"><Sun size={17} /><Moon size={14} /></span>
+          <ThemeToggle compact />
           <a className="help-btn" href="/suporte"><HelpCircle size={16} /> Ajuda</a>
         </div>
       </header>
@@ -536,6 +535,16 @@ export default function AppStartPage() {
           display: flex;
           align-items: center;
           gap: 18px;
+        }
+        .top-actions .theme-toggle {
+          min-height: 42px;
+          border: 1px solid rgba(148,163,184,.18);
+          background: rgba(15,23,42,.55);
+          box-shadow: none;
+          color: #f8fafc;
+        }
+        .top-actions .theme-toggle-track {
+          background: rgba(242,201,76,.12);
         }
         .theme-icons {
           display: flex;
@@ -941,6 +950,12 @@ export default function AppStartPage() {
             width: 52px;
             height: 52px;
           }
+        }
+        [data-theme='light'] .top-actions .theme-toggle {
+          background: #ffffff;
+          color: #0f172a;
+          border-color: #e2e8f0;
+          box-shadow: 0 10px 24px rgba(15,23,42,.06);
         }
       `}</style>
     </main>

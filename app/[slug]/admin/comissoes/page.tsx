@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useTenantId } from '@/lib/useTenantId'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useUnit } from '@/lib/unit-context'
 import { useTenant } from '@/lib/tenant-context'
+import { useTheme } from '@/components/theme-provider'
 import {
   DollarSign,
   Scissors,
@@ -89,6 +90,8 @@ function calcCommission(
 export default function AdminComissoes() {
   const tenantId = useTenantId()
   const isMobile = useIsMobile()
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
   const { isPremium } = useTenant()
   const { selectedUnitId, selectedUnit } = useUnit()
   const activeUnitId = isPremium ? selectedUnitId : 'all'
@@ -252,6 +255,20 @@ export default function AdminComissoes() {
     return s + calcCommission(b, appointments, period).totalServices
   }, 0)
 
+  const themeVars = {
+    '--kb-page-bg': isLight ? '#f8fafc' : 'transparent',
+    '--kb-card-bg': isLight ? '#ffffff' : '#081120',
+    '--kb-soft-bg': isLight ? '#f8fafc' : '#0d1729',
+    '--kb-elevated-bg': isLight ? '#ffffff' : '#111827',
+    '--kb-border': isLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)',
+    '--kb-soft-border': isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
+    '--kb-title': isLight ? '#0f172a' : '#f8fafc',
+    '--kb-text': isLight ? '#1e293b' : '#e2e8f0',
+    '--kb-muted': isLight ? '#64748b' : '#94a3b8',
+    '--kb-input-bg': isLight ? '#ffffff' : '#0d1729',
+    '--kb-shadow': isLight ? '0 18px 45px rgba(15,23,42,0.08)' : 'none',
+  } as CSSProperties
+
   if (loading) {
     return (
       <div style={styles.loadingWrap}>
@@ -261,7 +278,7 @@ export default function AdminComissoes() {
   }
 
   return (
-    <div style={styles.root}>
+    <div className="kb-light-root kb-commissions-page" style={{ ...styles.root, ...themeVars }}>
 
       {/* HEADER */}
 
@@ -540,11 +557,11 @@ export default function AdminComissoes() {
                 color="#22c55e"
               />
 
-              <SummaryRow
-                label="Receita"
-                value={formatCurrency(totalRevenue)}
-                color="#ffffff"
-              />
+                <SummaryRow
+                  label="Receita"
+                  value={formatCurrency(totalRevenue)}
+                  color="var(--kb-title)"
+                />
 
               <SummaryRow
                 label="Comissões"
@@ -596,7 +613,7 @@ function StatCard({
     <div
       style={{
         ...styles.statCard,
-        background: `linear-gradient(135deg, ${color}15, transparent 70%)`,
+        background: `linear-gradient(135deg, ${color}15, transparent 70%), var(--kb-card-bg)`,
       }}
     >
       <div
@@ -634,7 +651,8 @@ function StatCard({
 const styles: Record<string, React.CSSProperties> = {
 
   root: {
-    color: '#fff',
+    background: 'var(--kb-page-bg)',
+    color: 'var(--kb-text)',
     width: '100%',
   },
 
@@ -648,7 +666,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 34,
     height: 34,
     borderRadius: '50%',
-    border: '3px solid rgba(255,255,255,0.08)',
+    border: '3px solid var(--kb-soft-border)',
     borderTopColor: '#3b82f6',
     animation: 'spin 0.8s linear infinite',
   },
@@ -670,7 +688,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   overline: {
-    color: '#64748b',
+    color: 'var(--kb-muted)',
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: 1.4,
@@ -680,13 +698,14 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: 48,
     fontWeight: 800,
+    color: 'var(--kb-title)',
     margin: 0,
     letterSpacing: '-2px',
   },
 
   subtitle: {
     marginTop: 10,
-    color: '#3b82f6',
+    color: 'var(--kb-muted)',
     fontSize: 15,
   },
 
@@ -697,9 +716,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   periodBtn: {
-    border: '1px solid rgba(255,255,255,0.06)',
-    background: '#111827',
-    color: '#94a3b8',
+    border: '1px solid var(--kb-border)',
+    background: 'var(--kb-elevated-bg)',
+    color: 'var(--kb-muted)',
     padding: '12px 18px',
     borderRadius: 14,
     cursor: 'pointer',
@@ -722,8 +741,9 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
     borderRadius: 24,
     padding: 22,
-    border: '1px solid rgba(255,255,255,0.06)',
-    backgroundColor: '#081120',
+    border: '1px solid var(--kb-border)',
+    backgroundColor: 'var(--kb-card-bg)',
+    boxShadow: 'var(--kb-shadow)',
     overflow: 'hidden',
     minHeight: 180,
   },
@@ -747,7 +767,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   statLabel: {
-    color: '#64748b',
+    color: 'var(--kb-muted)',
     fontSize: 14,
     marginBottom: 10,
   },
@@ -755,6 +775,7 @@ const styles: Record<string, React.CSSProperties> = {
   statValue: {
     fontSize: 24,
     fontWeight: 800,
+    color: 'var(--kb-title)',
     margin: 0,
   },
 
@@ -785,25 +806,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   tableCard: {
-    background: '#081120',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'var(--kb-card-bg)',
+    border: '1px solid var(--kb-border)',
     borderRadius: 26,
     overflow: 'hidden',
+    boxShadow: 'var(--kb-shadow)',
   },
 
   tableHeader: {
     padding: 24,
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    borderBottom: '1px solid var(--kb-border)',
   },
 
   cardTitle: {
     fontSize: 20,
     fontWeight: 700,
+    color: 'var(--kb-title)',
     margin: 0,
   },
 
   cardSubtitle: {
-    color: '#64748b',
+    color: 'var(--kb-muted)',
     fontSize: 13,
     marginTop: 6,
   },
@@ -815,7 +838,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   barberCard: {
     padding: 24,
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    borderBottom: '1px solid var(--kb-border)',
+    background: 'var(--kb-card-bg)',
   },
 
   barberTop: {
@@ -829,7 +853,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 52,
     height: 52,
     borderRadius: 16,
-    background: '#13233f',
+    background: 'rgba(37,99,235,0.12)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -841,13 +865,14 @@ const styles: Record<string, React.CSSProperties> = {
   barberName: {
     margin: 0,
     fontWeight: 700,
+    color: 'var(--kb-title)',
     fontSize: 16,
   },
 
   barberEmail: {
     margin: '4px 0 0',
     fontSize: 13,
-    color: '#64748b',
+    color: 'var(--kb-muted)',
   },
 
   badge: {
@@ -866,26 +891,28 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   metric: {
-    background: '#0d1729',
+    background: 'var(--kb-soft-bg)',
+    border: '1px solid var(--kb-border)',
     borderRadius: 16,
     padding: 16,
   },
 
   metricLabel: {
     display: 'block',
-    color: '#64748b',
+    color: 'var(--kb-muted)',
     fontSize: 12,
     marginBottom: 8,
   },
 
   metricValue: {
     fontSize: 16,
+    color: 'var(--kb-title)',
   },
 
   editBtn: {
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#0d1729',
-    color: '#cbd5e1',
+    border: '1px solid var(--kb-soft-border)',
+    background: 'var(--kb-input-bg)',
+    color: 'var(--kb-text)',
     borderRadius: 14,
     padding: '12px 18px',
     display: 'flex',
@@ -922,9 +949,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   input: {
-    background: '#0d1729',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: '#fff',
+    background: 'var(--kb-input-bg)',
+    border: '1px solid var(--kb-soft-border)',
+    color: 'var(--kb-title)',
     borderRadius: 14,
     padding: '12px 14px',
     outline: 'none',
@@ -942,8 +969,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: 44,
     borderRadius: 14,
     border: 'none',
-    background: '#1e293b',
-    color: '#fff',
+    background: 'var(--kb-soft-bg)',
+    color: 'var(--kb-text)',
     cursor: 'pointer',
   },
 
@@ -958,12 +985,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   summaryCard: {
-    background: '#081120',
+    background: 'var(--kb-card-bg)',
     borderRadius: 26,
-    border: '1px solid rgba(255,255,255,0.06)',
+    border: '1px solid var(--kb-border)',
     padding: 22,
     position: 'sticky',
     top: 20,
+    boxShadow: 'var(--kb-shadow)',
   },
 
   summaryHeader: {
@@ -971,6 +999,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 10,
     fontWeight: 700,
+    color: 'var(--kb-title)',
     marginBottom: 20,
   },
 
@@ -981,7 +1010,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   summaryRow: {
-    background: '#0d1729',
+    background: 'var(--kb-soft-bg)',
+    border: '1px solid var(--kb-border)',
     borderRadius: 16,
     padding: '16px 18px',
     display: 'flex',
@@ -990,7 +1020,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   summaryLabel: {
-    color: '#94a3b8',
+    color: 'var(--kb-muted)',
     fontSize: 14,
   },
 }

@@ -138,22 +138,19 @@ export default function AdminServicos() {
   const f = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   return (
-    <div style={styles.root}>
+    <div className="kb-light-root kb-services-page" style={styles.root}>
       <div style={styles.pageHeader}>
-        <div>
-          <h1 style={styles.pageTitle}>Serviços</h1>
-          <p style={styles.pageSubtitle}>{services.length} serviço{services.length !== 1 ? 's' : ''} cadastrado{services.length !== 1 ? 's' : ''}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={styles.headerIcon}>🔧</div>
+          <div>
+            <p style={styles.kicker}>Catálogo</p>
+            <h1 style={styles.pageTitle}>Serviços</h1>
+            <p style={styles.pageSubtitle}>
+              Serviços com preços, duração e destaque visual · {services.length} serviço{services.length !== 1 ? 's' : ''} cadastrado{services.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
         <button onClick={openCreate} style={styles.createBtn}>+ Novo Serviço</button>
-      </div>
-
-      {/* Stats */}
-      <div style={styles.statsGrid}>
-        <StatCard icon="✂️" label="Total de serviços" value={String(services.length)} color="#3b82f6" />
-        <StatCard icon="💰" label="Ticket médio" value={services.length ? formatCurrency(totalRevenue / services.length) : 'R$ 0,00'} color="#10b981" />
-        <StatCard icon="⏱" label="Duração média" value={`${avgDuration} min`} color="#8b5cf6" />
-        <StatCard icon="🏆" label="Mais caro" value={services.length ? formatCurrency(Math.max(...services.map(s => s.price))) : 'R$ 0,00'} color="#f59e0b" />
-        {isPremium && <StatCard icon="🏢" label="Unidades ativas" value={String(units.length)} color="#06b6d4" />}
       </div>
 
       {/* Busca */}
@@ -178,15 +175,13 @@ export default function AdminServicos() {
         <div style={styles.grid}>
           {filtered.map(s => (
             <div key={s.id} style={styles.card}>
-              <div style={styles.cardTop}>
-                <div style={styles.serviceIcon}>✂</div>
-                <div style={{ flex: 1 }}>
-                  <p style={styles.serviceName}>{s.name}</p>
-                  <p style={styles.serviceDuration}>⏱ {s.duration} minutos</p>
-                  {isPremium && <p style={styles.serviceUnit}>🏢 {getUnitName(s.unit_id)}</p>}
-                </div>
-                <p style={styles.servicePrice}>{formatCurrency(s.price)}</p>
+              <div style={styles.serviceIcon} />
+              <div>
+                <p style={styles.serviceName}>{s.name}</p>
+                <p style={styles.serviceDuration}>{s.duration} min</p>
+                {isPremium && <p style={styles.serviceUnit}>{getUnitName(s.unit_id)}</p>}
               </div>
+              <p style={styles.servicePrice}>{formatCurrency(s.price)}</p>
               <button onClick={() => openEdit(s)} style={styles.editBtn}>Editar</button>
             </div>
           ))}
@@ -264,40 +259,257 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: { minHeight: '100vh', backgroundColor: '#0f1117', color: '#e2e8f0', fontFamily: "'DM Sans','Segoe UI',sans-serif", padding: '40px 48px' },
-  pageHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 },
-  pageTitle: { fontSize: 26, fontWeight: 700, color: '#f1f5f9', margin: '0 0 4px' },
-  pageSubtitle: { fontSize: 14, color: '#64748b', margin: 0 },
-  createBtn: { padding: '10px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 28 },
-  statCard: { backgroundColor: '#161b27', borderRadius: 14, padding: '20px 20px 16px', border: '1px solid #1e2535' },
-  statValue: { fontSize: 20, fontWeight: 700, color: '#f1f5f9', margin: '8px 0 2px' },
-  statLabel: { fontSize: 12, color: '#64748b', margin: 0 },
-  searchInput: { width: '100%', padding: '10px 16px', borderRadius: 10, border: '1px solid #2d3748', background: '#161b27', color: '#f1f5f9', fontSize: 14, outline: 'none', boxSizing: 'border-box' as const },
-  loadingWrap: { display: 'flex', justifyContent: 'center', padding: '80px 0' },
-  spinner: { width: 32, height: 32, borderRadius: '50%', border: '3px solid #1e2535', borderTopColor: '#3b82f6', animation: 'spin 0.8s linear infinite' },
-  empty: { textAlign: 'center', padding: '80px 0' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 },
-  card: { backgroundColor: '#161b27', borderRadius: 14, border: '1px solid #1e2535', padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 },
+  root: {
+    minHeight: '100vh',
+    color: '#e2e8f0',
+    fontFamily: "'DM Sans','Segoe UI',sans-serif",
+    padding: '44px 52px 72px',
+    background:
+      'radial-gradient(circle at 84% 10%, rgba(37,99,235,0.14), transparent 34%), radial-gradient(circle at 12% 18%, rgba(59,130,246,0.10), transparent 30%), linear-gradient(135deg,#020617 0%,#050816 48%,#09051a 100%)',
+  },
+
+  pageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 24,
+    marginBottom: 30,
+  },
+  headerIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 18,
+    display: 'grid',
+    placeItems: 'center',
+    background: 'linear-gradient(135deg,#2563eb,#3b82f6)',
+    boxShadow: '0 18px 38px rgba(37,99,235,0.26)',
+    fontSize: 25,
+    flexShrink: 0,
+  },
+  kicker: {
+    margin: '0 0 6px',
+    color: '#93c5fd',
+    fontSize: 12,
+    fontWeight: 950,
+    letterSpacing: 2.6,
+    textTransform: 'uppercase' as const,
+  },
+  pageTitle: {
+    fontSize: 42,
+    lineHeight: 1,
+    fontWeight: 950,
+    color: '#f8fafc',
+    margin: '0 0 8px',
+    letterSpacing: -1.4,
+    textShadow: '0 4px 20px rgba(0,0,0,0.45)',
+  },
+  pageSubtitle: { fontSize: 14, color: '#94a3b8', margin: 0 },
+
+  createBtn: {
+    padding: '13px 20px',
+    borderRadius: 14,
+    background: 'linear-gradient(135deg,#2563eb,#3b82f6)',
+    border: '1px solid rgba(147,197,253,0.22)',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 900,
+    cursor: 'pointer',
+    boxShadow: '0 18px 34px rgba(37,99,235,0.24)',
+  },
+
+  statsGrid: { display: 'none' },
+  statCard: { display: 'none' },
+  statValue: {},
+  statLabel: {},
+
+  searchInput: {
+    width: '100%',
+    maxWidth: 560,
+    padding: '15px 18px',
+    borderRadius: 18,
+    border: '1px solid rgba(148,163,184,0.16)',
+    background: 'rgba(15,23,42,0.62)',
+    color: '#f1f5f9',
+    fontSize: 14,
+    outline: 'none',
+    boxSizing: 'border-box' as const,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 18px 45px rgba(0,0,0,0.18)',
+  },
+
+  loadingWrap: { display: 'flex', justifyContent: 'center', padding: '90px 0' },
+  spinner: {
+    width: 34,
+    height: 34,
+    borderRadius: '50%',
+    border: '3px solid rgba(30,41,59,0.9)',
+    borderTopColor: '#3b82f6',
+    animation: 'spin 0.8s linear infinite',
+  },
+  empty: {
+    textAlign: 'center',
+    padding: '80px 0',
+    borderRadius: 24,
+    border: '1px solid rgba(148,163,184,0.10)',
+    background: 'linear-gradient(145deg,rgba(15,23,42,0.76),rgba(8,13,28,0.66))',
+  },
+
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 22,
+  },
+  card: {
+    minHeight: 190,
+    background:
+      'radial-gradient(circle at top right, rgba(59,130,246,0.10), transparent 34%), linear-gradient(145deg,rgba(15,23,42,0.84),rgba(8,13,28,0.76))',
+    borderRadius: 22,
+    border: '1px solid rgba(148,163,184,0.12)',
+    padding: 26,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    gap: 14,
+    boxShadow: '0 24px 70px rgba(0,0,0,0.22)',
+  },
   cardTop: { display: 'flex', alignItems: 'center', gap: 14 },
-  serviceIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1e2d45', border: '1px solid #2d3f5a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 },
-  serviceName: { fontSize: 15, fontWeight: 600, color: '#f1f5f9', margin: '0 0 4px' },
-  serviceDuration: { fontSize: 13, color: '#64748b', margin: 0 },
-  serviceUnit: { fontSize: 12, color: '#38bdf8', margin: '4px 0 0', fontWeight: 700 },
-  servicePrice: { fontSize: 18, fontWeight: 700, color: '#10b981', flexShrink: 0 },
-  editBtn: { padding: '8px', borderRadius: 8, border: '1px solid #2d3f5a', background: '#1e2d45', color: '#60a5fa', fontSize: 13, cursor: 'pointer' },
-  overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24 },
-  modal: { backgroundColor: '#161b27', border: '1px solid #1e2535', borderRadius: 20, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0,0,0,0.5)' },
-  modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 28px 0' },
-  modalTitle: { fontSize: 18, fontWeight: 700, color: '#f1f5f9', margin: 0 },
-  modalClose: { background: 'transparent', border: 'none', color: '#64748b', fontSize: 18, cursor: 'pointer' },
-  modalBody: { padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 },
-  modalFooter: { display: 'flex', gap: 10, justifyContent: 'flex-end', padding: '0 28px 24px', alignItems: 'center' },
-  input: { padding: '10px 12px', backgroundColor: '#0f1117', border: '1px solid #2d3748', borderRadius: 10, color: '#f1f5f9', fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box' as const },
-  feedbackBar: { padding: '12px 16px', borderRadius: 10, fontSize: 14 },
-  fbSuccess: { backgroundColor: '#10b98115', border: '1px solid #10b98130', color: '#6ee7b7' },
-  fbError: { backgroundColor: '#ef444415', border: '1px solid #ef444430', color: '#f87171' },
-  deleteBtn: { marginRight: 'auto', padding: '10px 18px', borderRadius: 10, border: '1px solid #ef444440', background: 'transparent', color: '#f87171', fontSize: 14, cursor: 'pointer' },
-  cancelBtn: { padding: '10px 20px', borderRadius: 10, border: '1px solid #2d3748', background: 'transparent', color: '#94a3b8', fontSize: 14, cursor: 'pointer' },
-  confirmBtn: { padding: '10px 22px', borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+
+  serviceIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    background: 'linear-gradient(135deg,#2563eb,#7c3aed)',
+    boxShadow: '0 18px 34px rgba(37,99,235,0.22)',
+  },
+  serviceName: {
+    fontSize: 17,
+    fontWeight: 950,
+    color: '#f8fafc',
+    margin: '4px 0 10px',
+  },
+  serviceDuration: {
+    fontSize: 13,
+    color: '#94a3b8',
+    margin: 0,
+  },
+  serviceUnit: {
+    fontSize: 12,
+    color: '#38bdf8',
+    margin: '8px 0 0',
+    fontWeight: 800,
+  },
+  servicePrice: {
+    fontSize: 25,
+    fontWeight: 950,
+    color: '#f8fafc',
+    margin: '8px 0 0',
+    letterSpacing: -0.6,
+  },
+  editBtn: {
+    alignSelf: 'flex-start',
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: '1px solid rgba(96,165,250,0.20)',
+    background: 'rgba(59,130,246,0.08)',
+    color: '#93c5fd',
+    fontSize: 13,
+    fontWeight: 800,
+    cursor: 'pointer',
+  },
+
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(2,6,23,0.72)',
+    backdropFilter: 'blur(10px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+    padding: 24,
+  },
+  modal: {
+    background: 'linear-gradient(145deg,rgba(15,23,42,0.98),rgba(8,13,28,0.98))',
+    border: '1px solid rgba(148,163,184,0.14)',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 460,
+    boxShadow: '0 34px 110px rgba(0,0,0,0.64)',
+  },
+  modalHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '26px 30px 0',
+  },
+  modalTitle: { fontSize: 20, fontWeight: 950, color: '#f8fafc', margin: 0 },
+  modalClose: {
+    background: 'rgba(15,23,42,0.8)',
+    border: '1px solid rgba(148,163,184,0.14)',
+    color: '#94a3b8',
+    fontSize: 16,
+    cursor: 'pointer',
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+  },
+  modalBody: {
+    padding: '22px 30px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  modalFooter: {
+    display: 'flex',
+    gap: 10,
+    justifyContent: 'flex-end',
+    padding: '0 30px 28px',
+    alignItems: 'center',
+  },
+  input: {
+    padding: '12px 13px',
+    backgroundColor: 'rgba(2,6,23,0.48)',
+    border: '1px solid rgba(148,163,184,0.16)',
+    borderRadius: 12,
+    color: '#f1f5f9',
+    fontSize: 14,
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box' as const,
+  },
+  feedbackBar: { padding: '12px 16px', borderRadius: 12, fontSize: 14 },
+  fbSuccess: { backgroundColor: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.28)', color: '#6ee7b7' },
+  fbError: { backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.28)', color: '#f87171' },
+
+  deleteBtn: {
+    marginRight: 'auto',
+    padding: '10px 18px',
+    borderRadius: 12,
+    border: '1px solid rgba(239,68,68,0.28)',
+    background: 'rgba(239,68,68,0.08)',
+    color: '#f87171',
+    fontSize: 14,
+    cursor: 'pointer',
+    fontWeight: 800,
+  },
+  cancelBtn: {
+    padding: '10px 20px',
+    borderRadius: 12,
+    border: '1px solid rgba(148,163,184,0.16)',
+    background: 'rgba(15,23,42,0.62)',
+    color: '#94a3b8',
+    fontSize: 14,
+    cursor: 'pointer',
+    fontWeight: 800,
+  },
+  confirmBtn: {
+    padding: '10px 22px',
+    borderRadius: 12,
+    background: 'linear-gradient(135deg,#2563eb,#3b82f6)',
+    border: 'none',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 900,
+    cursor: 'pointer',
+    boxShadow: '0 14px 30px rgba(37,99,235,0.22)',
+  },
 }

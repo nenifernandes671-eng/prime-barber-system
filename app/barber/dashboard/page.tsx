@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { getTenantAccess } from '@/lib/subscription-access'
@@ -384,10 +385,13 @@ export default function BarberDashboard() {
             <span>{now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           </div>
 
-          <button onClick={() => barber && fetchAppointments(barber)} className="refresh-btn" disabled={refreshing}>
-            <RefreshCcw size={16} className={refreshing ? 'spinning' : ''} />
-            {refreshing ? 'Atualizando...' : 'Atualizar'}
-          </button>
+          <div className="header-actions">
+            <ThemeToggle compact />
+            <button onClick={() => barber && fetchAppointments(barber)} className="refresh-btn" disabled={refreshing}>
+              <RefreshCcw size={16} className={refreshing ? 'spinning' : ''} />
+              {refreshing ? 'Atualizando...' : 'Atualizar'}
+            </button>
+          </div>
         </header>
 
         <section className="hero-grid">
@@ -757,6 +761,25 @@ const css = `
   margin-top: 6px;
   color: #94a3b8;
   font-size: 14px;
+}
+
+.header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-actions .theme-toggle,
+.header-actions .theme-toggle span {
+  margin-top: 0;
+  color: inherit;
+  font-size: 12px;
+}
+
+.header-actions .theme-toggle-track,
+.header-actions .theme-toggle-thumb {
+  display: inline-flex;
 }
 
 .refresh-btn {

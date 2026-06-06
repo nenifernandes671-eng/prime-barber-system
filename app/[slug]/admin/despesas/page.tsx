@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useTheme } from '@/components/theme-provider'
 import {
   Plus,
   Search,
@@ -84,6 +85,8 @@ function inPeriod(dateStr: string, period: Period) {
 export default function DespesasPage() {
   const pathname = usePathname()
   const slug = pathname.split('/').filter(Boolean)[0]
+  const { theme } = useTheme()
+  const isLight = theme === 'light'
 
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -272,7 +275,20 @@ export default function DespesasPage() {
   }
 
   return (
-    <div className="expenses-page">
+    <div
+      className="expenses-page kb-light-root kb-expenses-page"
+      style={{
+        '--kb-page-bg': isLight ? '#f8fafc' : 'transparent',
+        '--kb-card-bg': isLight ? '#ffffff' : 'linear-gradient(145deg, rgba(15,23,42,.94), rgba(8,13,28,.97))',
+        '--kb-soft-bg': isLight ? '#f8fafc' : 'rgba(2,6,23,.50)',
+        '--kb-border': isLight ? 'rgba(15,23,42,0.08)' : 'rgba(148,163,184,.12)',
+        '--kb-title': isLight ? '#0f172a' : '#f8fafc',
+        '--kb-text': isLight ? '#1e293b' : '#cbd5e1',
+        '--kb-muted': isLight ? '#64748b' : '#94a3b8',
+        '--kb-input-bg': isLight ? '#ffffff' : 'rgba(2,6,23,.54)',
+        '--kb-shadow': isLight ? '0 18px 45px rgba(15,23,42,0.08)' : '0 24px 60px rgba(0,0,0,.22)',
+      } as CSSProperties}
+    >
       <style>{css}</style>
 
       <div className="expenses-header">
@@ -492,7 +508,8 @@ function paymentLabel(method?: string | null) {
 const css=`
 .expenses-page {
   min-height: 100vh;
-  color: #f8fafc;
+  background: var(--kb-page-bg);
+  color: var(--kb-text);
   font-family: 'Inter', 'DM Sans', 'Segoe UI', sans-serif;
 }
 
@@ -524,12 +541,13 @@ const css=`
   font-size: 38px;
   font-weight: 950;
   letter-spacing: -.06em;
+  color: var(--kb-title);
 }
 
 .expenses-header span {
   display: block;
   margin-top: 7px;
-  color: #94a3b8;
+  color: var(--kb-muted);
   font-size: 14px;
 }
 
@@ -591,9 +609,9 @@ const css=`
 }
 
 .periods button {
-  border: 1px solid rgba(148,163,184,.09);
-  background: rgba(15,23,42,.82);
-  color: #94a3b8;
+  border: 1px solid var(--kb-border);
+  background: var(--kb-card-bg);
+  color: var(--kb-muted);
   border-radius: 12px;
   padding: 9px 16px;
   font-size: 13px;
@@ -618,10 +636,9 @@ const css=`
   min-height: 128px;
   border-radius: 22px;
   padding: 18px;
-  background:
-    radial-gradient(circle at top right, rgba(59,130,246,.12), transparent 35%),
-    linear-gradient(145deg, rgba(15,23,42,.94), rgba(8,13,28,.97));
-  border: 1px solid rgba(148,163,184,.12);
+  background: var(--kb-card-bg);
+  border: 1px solid var(--kb-border);
+  box-shadow: var(--kb-shadow);
 }
 
 .stat-icon {
@@ -636,7 +653,7 @@ const css=`
 
 .stat-card span {
   display: block;
-  color: #94a3b8;
+  color: var(--kb-muted);
   font-size: 12px;
   font-weight: 800;
 }
@@ -647,16 +664,15 @@ const css=`
   font-size: 23px;
   font-weight: 950;
   letter-spacing: -.04em;
+  color: var(--kb-title);
 }
 
 .content-card {
   border-radius: 24px;
   padding: 20px;
-  background:
-    radial-gradient(circle at top right, rgba(37,99,235,.12), transparent 32%),
-    linear-gradient(145deg, rgba(15,23,42,.94), rgba(8,13,28,.97));
-  border: 1px solid rgba(148,163,184,.11);
-  box-shadow: 0 24px 60px rgba(0,0,0,.22);
+  background: var(--kb-card-bg);
+  border: 1px solid var(--kb-border);
+  box-shadow: var(--kb-shadow);
 }
 
 .table-head {
@@ -671,6 +687,7 @@ const css=`
   margin: 0;
   font-size: 18px;
   font-weight: 950;
+  color: var(--kb-title);
 }
 
 .search-box {
@@ -681,9 +698,9 @@ const css=`
   align-items: center;
   gap: 10px;
   padding: 0 13px;
-  background: rgba(2,6,23,.50);
-  border: 1px solid rgba(148,163,184,.12);
-  color: #94a3b8;
+  background: var(--kb-input-bg);
+  border: 1px solid var(--kb-border);
+  color: var(--kb-muted);
 }
 
 .search-box input {
@@ -691,7 +708,7 @@ const css=`
   background: transparent;
   border: 0;
   outline: 0;
-  color: #f8fafc;
+  color: var(--kb-title);
   font-size: 13px;
 }
 
@@ -707,24 +724,25 @@ table {
 
 th {
   text-align: left;
-  color: #64748b;
+  color: var(--kb-muted);
   font-size: 10px;
   font-weight: 950;
   letter-spacing: .08em;
   text-transform: uppercase;
   padding: 12px;
-  border-bottom: 1px solid rgba(148,163,184,.10);
+  background: var(--kb-soft-bg);
+  border-bottom: 1px solid var(--kb-border);
 }
 
 td {
   padding: 14px 12px;
-  border-bottom: 1px solid rgba(148,163,184,.06);
-  color: #cbd5e1;
+  border-bottom: 1px solid var(--kb-border);
+  color: var(--kb-text);
   font-size: 13px;
 }
 
 tr:hover td {
-  background: rgba(255,255,255,.018);
+  background: var(--kb-soft-bg);
 }
 
 .category-pill {
@@ -761,7 +779,7 @@ tr:hover td {
   display: grid;
   place-items: center;
   text-align: center;
-  color: #94a3b8;
+  color: var(--kb-muted);
 }
 
 .empty div {
@@ -770,7 +788,7 @@ tr:hover td {
 
 .empty h3 {
   margin: 12px 0 6px;
-  color: #f8fafc;
+  color: var(--kb-title);
   font-size: 20px;
 }
 
@@ -803,11 +821,9 @@ tr:hover td {
 .modal {
   width: min(520px, 100%);
   border-radius: 24px;
-  background:
-    radial-gradient(circle at top right, rgba(245,158,11,.18), transparent 36%),
-    linear-gradient(145deg, rgba(15,23,42,.98), rgba(8,13,28,.99));
-  border: 1px solid rgba(148,163,184,.14);
-  box-shadow: 0 30px 90px rgba(0,0,0,.55);
+  background: var(--kb-card-bg);
+  border: 1px solid var(--kb-border);
+  box-shadow: var(--kb-shadow);
 }
 
 .modal-head {
@@ -822,15 +838,16 @@ tr:hover td {
   font-size: 24px;
   font-weight: 950;
   letter-spacing: -.04em;
+  color: var(--kb-title);
 }
 
 .modal-head button {
   width: 40px;
   height: 40px;
   border-radius: 14px;
-  border: 1px solid rgba(148,163,184,.14);
-  background: rgba(15,23,42,.82);
-  color: #94a3b8;
+  border: 1px solid var(--kb-border);
+  background: var(--kb-soft-bg);
+  color: var(--kb-muted);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -845,7 +862,7 @@ tr:hover td {
 .modal-body label {
   display: grid;
   gap: 8px;
-  color: #cbd5e1;
+  color: var(--kb-text);
   font-size: 13px;
   font-weight: 850;
 }
@@ -854,9 +871,9 @@ tr:hover td {
 .modal-body select {
   min-height: 46px;
   border-radius: 14px;
-  border: 1px solid rgba(148,163,184,.14);
-  background: rgba(2,6,23,.54);
-  color: #f8fafc;
+  border: 1px solid var(--kb-border);
+  background: var(--kb-input-bg);
+  color: var(--kb-title);
   outline: none;
   padding: 0 14px;
   font-size: 14px;
