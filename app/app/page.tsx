@@ -949,8 +949,19 @@ export default function AppStartPage() {
           }
           .trust-card a,
           .client-row button,
-          .login-form button {
+          .login-form button[type="submit"] {
             width: 100%;
+          }
+          .login-form .toggle-password {
+            position: absolute;
+            right: 9px;
+            top: 50%;
+            width: 38px !important;
+            height: 38px !important;
+            min-height: 38px !important;
+            max-width: 38px !important;
+            padding: 0 !important;
+            transform: translateY(-50%);
           }
           .app-footer {
             align-items: flex-start;
