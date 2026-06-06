@@ -423,13 +423,65 @@ export default function Home() {
 
         .hero-showcase {
           position: absolute;
-          right: clamp(120px, 9vw, 190px);
-          bottom: 78px;
+          right: clamp(112px, 8vw, 164px);
+          bottom: 126px;
           z-index: 2;
-          width: min(48vw, 760px);
-          min-width: 520px;
+          width: min(54vw, 860px);
+          min-width: 580px;
           pointer-events: none;
           animation: fadeUp 0.9s 0.28s ease both;
+        }
+
+        .hero-showcase::before {
+          content: "";
+          position: absolute;
+          right: -58px;
+          top: -34px;
+          width: 290px;
+          height: 300px;
+          border-radius: 48px;
+          background:
+            radial-gradient(circle at 32% 30%, rgba(245, 240, 232, 0.20), transparent 12%),
+            radial-gradient(circle at 54% 33%, rgba(201, 168, 76, 0.14), transparent 13%),
+            linear-gradient(130deg, rgba(201, 168, 76, 0.08), rgba(255, 255, 255, 0.04));
+          filter: blur(3px);
+          opacity: 0.78;
+        }
+
+        .hero-showcase::after {
+          content: "";
+          position: absolute;
+          left: 9%;
+          right: 5%;
+          bottom: -18px;
+          height: 82px;
+          border-radius: 50%;
+          background: radial-gradient(ellipse, rgba(245, 240, 232, 0.16) 0%, rgba(201, 168, 76, 0.10) 32%, transparent 72%);
+          filter: blur(10px);
+          opacity: 0.72;
+        }
+
+        .hero-device-image {
+          position: relative;
+          z-index: 1;
+          display: block;
+          width: 100%;
+          height: auto;
+          object-fit: contain;
+          opacity: 0.99;
+          filter:
+            drop-shadow(0 42px 60px rgba(0, 0, 0, 0.56))
+            drop-shadow(0 0 34px rgba(201, 168, 76, 0.12));
+        }
+
+        .hero-showcase .showcase-glow,
+        .hero-showcase .showcase-props,
+        .hero-showcase .showcase-desk,
+        .hero-showcase .macbook,
+        .hero-showcase .phone,
+        .hero-showcase .showcase-caption,
+        .hero-showcase .hero-pills {
+          display: none !important;
         }
 
         .showcase-glow {
@@ -2073,6 +2125,11 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-showcase" aria-hidden="true">
+          <img
+            className="hero-device-image"
+            src="/landing-macbook-transparent.png"
+            alt=""
+          />
           <div className="showcase-glow" />
           <div className="showcase-props" />
           <div className="showcase-desk" />
