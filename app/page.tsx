@@ -178,6 +178,114 @@ export default function Home() {
           font-weight: 300;
         }
 
+        [data-theme='light'] .korte-page,
+        [data-theme='light'] .korte-page .hero,
+        [data-theme='light'] .korte-page .features,
+        [data-theme='light'] .korte-page .pricing,
+        [data-theme='light'] .korte-page .cta-section,
+        [data-theme='light'] .korte-page .testimonials,
+        [data-theme='light'] .korte-page .how,
+        [data-theme='light'] .korte-page .korte-footer {
+          background-color: var(--black) !important;
+          color: var(--white) !important;
+        }
+
+        [data-theme='light'] .korte-page .features,
+        [data-theme='light'] .korte-page .pricing,
+        [data-theme='light'] .korte-page .cta-section {
+          background: var(--dark) !important;
+        }
+
+        [data-theme='light'] .korte-page .hero {
+          background: var(--black) !important;
+          border-color: var(--border) !important;
+          box-shadow: none !important;
+        }
+
+        [data-theme='light'] .korte-page .korte-nav {
+          background: rgba(10, 10, 10, 0.85) !important;
+          border-color: var(--border) !important;
+          box-shadow: none !important;
+        }
+
+        [data-theme='light'] .korte-page .hero-bg {
+          background:
+            radial-gradient(ellipse 60% 60% at 70% 50%, rgba(201, 168, 76, 0.08) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 40% at 10% 80%, rgba(192, 57, 43, 0.06) 0%, transparent 60%) !important;
+        }
+
+        [data-theme='light'] .korte-page .hero-lines {
+          background-image:
+            linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px) !important;
+        }
+
+        [data-theme='light'] .korte-page .feature-card,
+        [data-theme='light'] .korte-page .plan,
+        [data-theme='light'] .korte-page .testimonial,
+        [data-theme='light'] .korte-page .mockup-window,
+        [data-theme='light'] .korte-page .mock-card,
+        [data-theme='light'] .korte-page .mock-panel {
+          background: var(--card) !important;
+          border-color: var(--border) !important;
+          color: var(--white) !important;
+          box-shadow: none !important;
+        }
+
+        [data-theme='light'] .korte-page h1,
+        [data-theme='light'] .korte-page h2,
+        [data-theme='light'] .korte-page h3,
+        [data-theme='light'] .korte-page strong,
+        [data-theme='light'] .korte-page .nav-logo span,
+        [data-theme='light'] .korte-page .footer-logo span,
+        [data-theme='light'] .korte-page .feature-name,
+        [data-theme='light'] .korte-page .step-title,
+        [data-theme='light'] .korte-page .mock-header,
+        [data-theme='light'] .korte-page .plan-name,
+        [data-theme='light'] .korte-page .test-name,
+        [data-theme='light'] .korte-page .btn-ghost {
+          color: var(--white) !important;
+        }
+
+        [data-theme='light'] .korte-page .hero h1 .accent,
+        [data-theme='light'] .korte-page .cta-title .gold,
+        [data-theme='light'] .korte-page .nav-logo,
+        [data-theme='light'] .korte-page .footer-logo,
+        [data-theme='light'] .korte-page .section-label,
+        [data-theme='light'] .korte-page .hero-tag,
+        [data-theme='light'] .korte-page .stat-number,
+        [data-theme='light'] .korte-page .feature-badge,
+        [data-theme='light'] .korte-page .stars {
+          color: var(--gold) !important;
+        }
+
+        [data-theme='light'] .korte-page .hero h1 .line2,
+        [data-theme='light'] .korte-page p,
+        [data-theme='light'] .korte-page span,
+        [data-theme='light'] .korte-page small,
+        [data-theme='light'] .korte-page .hero-sub,
+        [data-theme='light'] .korte-page .section-desc,
+        [data-theme='light'] .korte-page .feature-desc,
+        [data-theme='light'] .korte-page .step-text,
+        [data-theme='light'] .korte-page .stat-label,
+        [data-theme='light'] .korte-page .test-text,
+        [data-theme='light'] .korte-page .test-role,
+        [data-theme='light'] .korte-page .cta-sub,
+        [data-theme='light'] .korte-page .cta-note,
+        [data-theme='light'] .korte-page .korte-footer p,
+        [data-theme='light'] .korte-page .nav-links a,
+        [data-theme='light'] .korte-page .footer-links a {
+          color: var(--muted) !important;
+        }
+
+        [data-theme='light'] .korte-page .btn-primary,
+        [data-theme='light'] .korte-page .nav-cta,
+        [data-theme='light'] .korte-page .plan.featured .plan-btn {
+          background: var(--gold) !important;
+          color: var(--black) !important;
+          box-shadow: none !important;
+        }
+
         .korte-page *,
         .korte-page *::before,
         .korte-page *::after {
