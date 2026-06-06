@@ -840,6 +840,7 @@ export default function AppStartPage() {
         }
         .field-wrap {
           position: relative;
+          display: block;
         }
         .field-wrap svg:first-child {
           position: absolute;
@@ -847,25 +848,44 @@ export default function AppStartPage() {
           top: 50%;
           transform: translateY(-50%);
           color: #8792a6;
+          z-index: 2;
+          pointer-events: none;
         }
         .field-wrap input {
+          position: relative;
+          z-index: 1;
           padding-left: 44px;
         }
         .field-wrap.password input {
-          padding-right: 48px;
+          padding-right: 56px;
         }
         .toggle-password {
           position: absolute;
-          right: 8px;
+          right: 9px;
           top: 50%;
           transform: translateY(-50%);
-          min-height: 34px;
-          width: 34px;
+          z-index: 3;
+          width: 38px;
+          height: 38px;
+          min-height: 38px;
           padding: 0;
           border-radius: 9px;
-          background: transparent;
+          display: grid;
+          place-items: center;
+          background: transparent !important;
           color: #a8b1c3;
-          box-shadow: none;
+          box-shadow: none !important;
+          cursor: pointer;
+        }
+        .toggle-password svg {
+          position: static !important;
+          transform: none !important;
+          color: currentColor;
+          pointer-events: none;
+        }
+        .toggle-password:hover {
+          background: rgba(148,163,184,.10) !important;
+          color: #f8fafc;
         }
         .error-box {
           padding: 10px 12px;
