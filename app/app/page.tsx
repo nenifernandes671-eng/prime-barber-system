@@ -22,7 +22,6 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 const LAST_ACCESS_KEY = 'kortebarber:last-access'
 const LAST_CLIENT_SLUG_KEY = 'kortebarber:last-client-slug'
@@ -365,7 +364,6 @@ export default function AppStartPage() {
           <strong>Korte<span>Barber</span></strong>
         </a>
         <div className="top-actions">
-          <ThemeToggle compact />
           <a className="help-btn" href="/suporte"><HelpCircle size={16} /> Ajuda</a>
         </div>
       </header>
@@ -982,11 +980,91 @@ export default function AppStartPage() {
             height: 52px;
           }
         }
-        [data-theme='light'] .top-actions .theme-toggle {
-          background: #ffffff;
-          color: #0f172a;
-          border-color: #e2e8f0;
-          box-shadow: 0 10px 24px rgba(15,23,42,.06);
+        [data-theme='light'] .app-page {
+          color: #f8fafc !important;
+          background:
+            linear-gradient(90deg, rgba(4,8,16,.96), rgba(6,13,24,.82) 48%, rgba(4,8,16,.98)),
+            radial-gradient(circle at 28% 32%, rgba(224,182,65,.15), transparent 34%),
+            radial-gradient(circle at 78% 76%, rgba(37,99,235,.14), transparent 38%),
+            #050913 !important;
+        }
+        [data-theme='light'] .app-page::before {
+          background:
+            linear-gradient(rgba(5,9,19,.38), rgba(5,9,19,.92)),
+            url('/kortebarber-logo.jpg') center left / 820px auto no-repeat !important;
+          opacity: .18 !important;
+          filter: saturate(.85) !important;
+        }
+        [data-theme='light'] .app-page .topbar,
+        [data-theme='light'] .app-page .access-card,
+        [data-theme='light'] .app-page .trust-card,
+        [data-theme='light'] .app-page .check-card {
+          border-color: rgba(148,163,184,.15) !important;
+          color: #f8fafc !important;
+          box-shadow: 0 30px 90px rgba(0,0,0,.28) !important;
+        }
+        [data-theme='light'] .app-page .topbar {
+          background: rgba(4,8,16,.72) !important;
+        }
+        [data-theme='light'] .app-page .access-card {
+          background: linear-gradient(135deg, rgba(20,27,39,.92), rgba(9,15,27,.84)) !important;
+        }
+        [data-theme='light'] .app-page .access-card.featured {
+          border-color: rgba(242,201,76,.34) !important;
+          background:
+            radial-gradient(circle at top left, rgba(242,201,76,.14), transparent 36%),
+            linear-gradient(135deg, rgba(20,27,39,.96), rgba(9,15,27,.84)) !important;
+        }
+        [data-theme='light'] .app-page .trust-card,
+        [data-theme='light'] .app-page .check-card {
+          background: linear-gradient(135deg, rgba(15,23,42,.76), rgba(15,23,42,.38)) !important;
+        }
+        [data-theme='light'] .app-page h1,
+        [data-theme='light'] .app-page h2,
+        [data-theme='light'] .app-page strong,
+        [data-theme='light'] .app-page .brand,
+        [data-theme='light'] .app-page .feature strong,
+        [data-theme='light'] .app-page .access-card h2,
+        [data-theme='light'] .app-page .trust-card strong {
+          color: #f8fafc !important;
+        }
+        [data-theme='light'] .app-page h1 span,
+        [data-theme='light'] .app-page .brand span,
+        [data-theme='light'] .app-page .brand-icon,
+        [data-theme='light'] .app-page .welcome-pill,
+        [data-theme='light'] .app-page .feature div,
+        [data-theme='light'] .app-page .access-icon,
+        [data-theme='light'] .app-page .trust-icon,
+        [data-theme='light'] .app-page .check-card h2,
+        [data-theme='light'] .app-page .check-grid svg,
+        [data-theme='light'] .app-page .help-btn svg {
+          color: #f2c94c !important;
+        }
+        [data-theme='light'] .app-page p,
+        [data-theme='light'] .app-page small,
+        [data-theme='light'] .app-page .lead,
+        [data-theme='light'] .app-page .feature span,
+        [data-theme='light'] .app-page .access-card p,
+        [data-theme='light'] .app-page .trust-card span,
+        [data-theme='light'] .app-page .check-grid span,
+        [data-theme='light'] .app-page .app-footer,
+        [data-theme='light'] .app-page .app-footer a {
+          color: #a8b1c3 !important;
+        }
+        [data-theme='light'] .app-page input {
+          background: rgba(2,6,23,.38) !important;
+          border-color: rgba(148,163,184,.18) !important;
+          color: #f8fafc !important;
+          box-shadow: none !important;
+        }
+        [data-theme='light'] .app-page input::placeholder {
+          color: #8a94a8 !important;
+        }
+        [data-theme='light'] .app-page .help-btn {
+          background: rgba(15,23,42,.55) !important;
+          border-color: rgba(148,163,184,.18) !important;
+          color: #f8fafc !important;
+          box-shadow: none !important;
         }
       `}</style>
     </main>
