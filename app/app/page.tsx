@@ -787,8 +787,23 @@ export default function AppStartPage() {
         }
         .client-row {
           display: grid;
-          grid-template-columns: 1fr auto;
+          grid-template-columns: minmax(0, 1fr) minmax(156px, auto);
           gap: 12px;
+          align-items: stretch;
+          max-width: 100%;
+        }
+        .client-row input {
+          min-width: 0;
+          background: rgba(2,6,23,.48);
+          border-color: rgba(148,163,184,.22);
+          color: #f8fafc;
+        }
+        .client-row input::placeholder {
+          color: #9aa4b8;
+        }
+        .client-row button {
+          min-width: 156px;
+          padding: 0 18px;
         }
         input {
           width: 100%;
@@ -940,6 +955,13 @@ export default function AppStartPage() {
           .client-row,
           .trust-card {
             grid-template-columns: 1fr;
+          }
+          .client-row {
+            gap: 10px;
+          }
+          .client-row input,
+          .client-row button {
+            width: 100%;
           }
           .feature-row {
             gap: 18px;
