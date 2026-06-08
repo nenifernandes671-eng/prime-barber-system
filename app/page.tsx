@@ -387,6 +387,33 @@ export default function Home() {
           transform: translateY(-1px);
         }
 
+        .nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .nav-login {
+          min-width: 142px;
+          border: 1px solid #d4af37;
+          background: transparent;
+          color: #d4af37;
+          padding: 9px 24px;
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: 1px;
+          text-align: center;
+          text-decoration: none;
+          text-transform: uppercase;
+          transition: background 0.25s ease, color 0.25s ease, transform 0.2s ease;
+        }
+
+        .nav-login:hover {
+          background: #d4af37;
+          color: var(--black);
+          transform: translateY(-1px);
+        }
+
         .hero {
           position: relative;
           display: flex;
@@ -2014,6 +2041,17 @@ export default function Home() {
             display: none;
           }
 
+          .nav-actions {
+            gap: 10px;
+          }
+
+          .nav-login,
+          .nav-cta {
+            min-width: auto;
+            padding: 10px 14px;
+            font-size: 11px;
+          }
+
           .korte-section {
             padding: 80px 24px;
           }
@@ -2103,7 +2141,10 @@ export default function Home() {
           <li><a href="#planos">Planos</a></li>
           <li><a href="#depoimentos">Depoimentos</a></li>
         </ul>
-        <Link href="/pricing" className="nav-cta">Começar grátis</Link>
+        <div className="nav-actions">
+          <Link href="/app" className="nav-login">Entrar</Link>
+          <Link href="/pricing" className="nav-cta">Começar grátis</Link>
+        </div>
       </nav>
 
       <section className="hero" id="inicio">
