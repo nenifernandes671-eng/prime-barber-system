@@ -12,10 +12,13 @@ import {
   DollarSign,
   Eye,
   EyeOff,
-  HelpCircle,
+  Download,
+  Home,
   Lock,
   Mail,
+  Menu,
   Scissors,
+  Share2,
   ShieldCheck,
   UserRound,
   Users,
@@ -360,70 +363,74 @@ export default function AppStartPage() {
     <main className="app-page">
       <header className="topbar">
         <a className="brand" href="/">
-          <span className="brand-icon"><Scissors size={28} /></span>
+          <img src="/icons/kortebarber-192.png" alt="KorteBarber" />
           <strong>Korte<span>Barber</span></strong>
         </a>
-        <div className="top-actions">
-          <a className="help-btn" href="/suporte"><HelpCircle size={16} /> Ajuda</a>
-        </div>
+        <nav className="topnav" aria-label="Navegacao principal">
+          <a href="/#funcionalidades">Recursos</a>
+          <a href="/#como-funciona">Para quem e</a>
+          <a href="/pricing">Precos</a>
+          <a href="/suporte">Suporte</a>
+        </nav>
+        <a className="top-login" href="#acesso"><UserRound size={18} /> Entrar</a>
       </header>
 
-      <section className="app-grid">
-        <div className="left-panel">
-          <div className="welcome-pill"><Scissors size={13} /> Bem-vindo ao KorteBarber</div>
-          <h1>Tudo que sua barbearia precisa, <span>em um so lugar.</span></h1>
+      <section className="hero-shell" id="acesso">
+        <div className="hero-content">
+          <div className="eyebrow">Sistema completo para barbearias</div>
+          <h1>Menos gestao.<span>Mais crescimento.</span></h1>
           <p className="lead">
-            Agendamentos, clientes, barbeiros, comissoes e relatorios. Organize sua
-            barbearia e ofereca a melhor experiencia.
+            Agendamentos, clientes, financeiro e relatorios. Tudo que sua barbearia precisa, em um so lugar.
           </p>
+          <a className="primary-cta" href="#acesso"><Download size={28} /> Acessar o sistema</a>
+          <div className="safe-note"><ShieldCheck size={18} /> Seguro, rapido e sempre atualizado</div>
 
           <div className="feature-row">
             {FEATURE_ITEMS.map((item) => {
               const Icon = item.icon
               return (
                 <article className="feature" key={item.title}>
-                  <div><Icon size={25} /></div>
+                  <div><Icon size={28} /></div>
                   <strong>{item.title}</strong>
-                  <span>{item.text}</span>
                 </article>
               )
             })}
           </div>
+        </div>
 
-          <div className="trust-card">
-            <div className="trust-icon"><ShieldCheck size={28} /></div>
-            <div>
-              <strong>Seguro e confiavel</strong>
-              <span>Seus dados e informacoes estao protegidos com criptografia e backups automaticos.</span>
+        <div className="hero-device" aria-hidden="true">
+          <div className="k-glow">K</div>
+          <div className="phone-mockup">
+            <div className="phone-notch" />
+            <div className="phone-status">11:47</div>
+            <div className="phone-top"><UserRound size={16} /> <span>Ola, Thiago</span><Menu size={18} /></div>
+            <p>Resumo financeiro</p>
+            <small>Este mes</small>
+            <strong>R$ 12.750,00</strong>
+            <em>+18,4% no mes passado</em>
+            <div className="bars">
+              <i style={{ height: '36%' }} />
+              <i style={{ height: '54%' }} />
+              <i style={{ height: '45%' }} />
+              <i style={{ height: '72%' }} />
+              <i style={{ height: '50%' }} />
+              <i style={{ height: '80%' }} />
             </div>
-            <a href="/suporte">Saiba mais</a>
+            <div className="phone-list"><span>Agendamentos</span><b>28</b></div>
+            <div className="phone-list"><span>Clientes</span><b>38</b></div>
+            <div className="phone-list"><span>Servicos</span><b>67</b></div>
+            <div className="phone-list"><span>Faturamento</span><b>R$ 12.750,00</b></div>
+            <div className="phone-nav"><Home size={15} /><CalendarDays size={15} /><button>+</button><Users size={15} /><BarChart3 size={15} /></div>
           </div>
-
-          <div className="check-card">
-            <h2>Feito para barbearias que querem crescer</h2>
-            <div className="check-grid">
-              {CHECK_ITEMS.map((item) => (
-                <span key={item}><CheckCircle2 size={18} /> {item}</span>
-              ))}
-            </div>
-          </div>
-
-          <footer className="app-footer">
-            <span>KorteBarber © 2026 - Todos os direitos reservados.</span>
-            <nav>
-              <a href="/termos">Termos de uso</a>
-              <a href="/privacidade">Politica de privacidade</a>
-            </nav>
-          </footer>
         </div>
 
         <div className="access-stack">
-          <article className="access-card featured">
+          <article className="access-card">
             <div className="access-head">
-              <div className="access-icon"><UserRound size={28} /></div>
+              <div className="access-icon"><UserRound size={30} /></div>
               <div>
                 <h2>Sou cliente</h2>
-                <p>Acesse a pagina publica da barbearia e agende seu horario.</p>
+                <p>Acesse a pagina publica da barbearia</p>
               </div>
             </div>
             <div className="client-row">
@@ -432,665 +439,622 @@ export default function AppStartPage() {
                 onChange={(event) => setBarbershop(event.target.value)}
                 onBlur={() => setBarbershop((value) => cleanSlug(value))}
                 onKeyDown={(event) => { if (event.key === 'Enter') goToShop() }}
-                placeholder="Digite o link da barbearia"
+                placeholder="Link da barbearia"
                 autoCapitalize="none"
                 autoCorrect="off"
               />
-              <button onClick={goToShop}>Abrir agenda <ArrowRight size={16} /></button>
+              <button onClick={goToShop}>Abrir agenda</button>
             </div>
-            <small>Nao precisa colocar o dominio. Use apenas o nome do link da barbearia.</small>
           </article>
 
           <article className="access-card">
             <div className="access-head">
-              <div className="access-icon"><Scissors size={28} /></div>
+              <div className="access-icon"><Scissors size={30} /></div>
               <div>
                 <h2>Sou barbeiro</h2>
-                <p>Entre no seu painel para ver seus horarios, clientes e comissoes.</p>
+                <p>Entre no painel para ver seus horarios, clientes e comissoes.</p>
               </div>
             </div>
             <form className="login-form" onSubmit={signInBarber}>
-              <Field icon={<Mail size={16} />} placeholder="E-mail do barbeiro" type="email" value={barberEmail} onChange={setBarberEmail} />
+              <Field icon={<Mail size={16} />} placeholder="E-mail ou telefone" type="email" value={barberEmail} onChange={setBarberEmail} />
               <PasswordField value={barberPassword} onChange={setBarberPassword} show={showBarberPassword} onToggle={() => setShowBarberPassword((value) => !value)} />
               {barberError && <div className="error-box">{barberError}</div>}
-              <button type="submit" disabled={barberLoading}>{barberLoading ? 'Entrando...' : 'Entrar como barbeiro'} <ArrowRight size={16} /></button>
+              <button type="submit" disabled={barberLoading}>{barberLoading ? 'Entrando...' : 'Entrar como barbeiro'}</button>
             </form>
           </article>
 
           <article className="access-card">
             <div className="access-head">
-              <div className="access-icon"><Crown size={29} /></div>
+              <div className="access-icon"><Crown size={30} /></div>
               <div>
                 <h2>Sou dono</h2>
-                <p>Acesse o painel administrativo e gerencie toda a sua barbearia.</p>
+                <p>Acesse o painel administrativo e gerencie sua barbearia.</p>
               </div>
             </div>
             <form className="login-form" onSubmit={signInOwner}>
-              <Field icon={<Mail size={16} />} placeholder="E-mail do dono" type="email" value={ownerEmail} onChange={setOwnerEmail} />
+              <Field icon={<Mail size={16} />} placeholder="E-mail ou telefone" type="email" value={ownerEmail} onChange={setOwnerEmail} />
               <PasswordField value={ownerPassword} onChange={setOwnerPassword} show={showOwnerPassword} onToggle={() => setShowOwnerPassword((value) => !value)} />
               {ownerError && <div className="error-box">{ownerError}</div>}
-              <button type="submit" disabled={ownerLoading}>{ownerLoading ? 'Entrando...' : 'Entrar como dono'} <ArrowRight size={16} /></button>
+              <button type="submit" disabled={ownerLoading}>{ownerLoading ? 'Entrando...' : 'Entrar como dono'}</button>
             </form>
           </article>
         </div>
       </section>
+
+      <section className="install-card">
+        <div className="install-copy">
+          <h2>Como instalar o KorteBarber no seu celular</h2>
+          <p>Tenha o sistema sempre na palma da mao.</p>
+          <div className="install-steps">
+            <span><b>1</b><Share2 size={23} /> Toque no botao Compartilhar no navegador.</span>
+            <span><b>2</b><span className="plus-mini">+</span> Selecione Adicionar a Tela de Inicio.</span>
+            <span><b>3</b><CheckCircle2 size={24} /> Pronto. O KorteBarber estara na sua tela.</span>
+          </div>
+        </div>
+        <div className="install-phone" aria-hidden="true">
+          <div className="install-notch" />
+          <img src="/icons/kortebarber-192.png" alt="" />
+          <strong>KorteBarber</strong>
+        </div>
+        <div className="hand-note">Use como<br />um aplicativo!</div>
+      </section>
+
+      <footer className="app-footer">
+        <span>© 2026 KorteBarber. Todos os direitos reservados.</span>
+        <nav>
+          <a href="/termos">Termos de uso</a>
+          <a href="/privacidade">Politica de privacidade</a>
+        </nav>
+      </footer>
 
       <style jsx global>{`
         .app-page {
           min-height: 100vh;
           color: #f8fafc;
           background:
-            linear-gradient(90deg, rgba(4,8,16,.96), rgba(6,13,24,.82) 48%, rgba(4,8,16,.98)),
-            radial-gradient(circle at 28% 32%, rgba(224,182,65,.15), transparent 34%),
-            radial-gradient(circle at 78% 76%, rgba(37,99,235,.14), transparent 38%),
-            #050913;
+            radial-gradient(circle at 53% 18%, rgba(37, 99, 235, .38), transparent 24%),
+            radial-gradient(circle at 82% 56%, rgba(22, 78, 160, .28), transparent 34%),
+            linear-gradient(90deg, rgba(2,6,23,.99), rgba(3,10,24,.93) 48%, rgba(2,6,23,.99)),
+            #020617;
           font-family: var(--font-geist-sans), Arial, sans-serif;
           overflow-x: hidden;
         }
         .app-page::before {
           content: '';
           position: fixed;
-          inset: 80px 0 0;
+          inset: 82px 0 0;
           pointer-events: none;
           background:
-            linear-gradient(rgba(5,9,19,.38), rgba(5,9,19,.92)),
-            url('/kortebarber-logo.jpg') center left / 820px auto no-repeat;
-          opacity: .18;
-          filter: saturate(.85);
+            linear-gradient(rgba(2,6,23,.82), rgba(2,6,23,.88)),
+            url('/kortebarber-logo.jpg') center / 900px auto no-repeat;
+          opacity: .12;
+          filter: saturate(.8);
         }
         .topbar {
-          position: relative;
-          z-index: 2;
-          min-height: 80px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          min-height: 82px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 clamp(24px, 5vw, 72px);
-          border-bottom: 1px solid rgba(148,163,184,.13);
-          background: rgba(4,8,16,.72);
-          backdrop-filter: blur(18px);
+          gap: 28px;
+          padding: 0 clamp(22px, 3vw, 38px);
+          border-bottom: 1px solid rgba(30,64,175,.22);
+          background: rgba(0,0,0,.72);
+          backdrop-filter: blur(20px);
         }
         .brand {
           display: inline-flex;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
           color: #fff;
           text-decoration: none;
-          font-size: 22px;
+          font-size: clamp(24px, 2.2vw, 32px);
           font-weight: 950;
+          letter-spacing: -1px;
         }
-        .brand span,
-        .brand-icon {
-          color: #f2c94c;
+        .brand img {
+          width: 44px;
+          height: 44px;
+          border-radius: 8px;
+          box-shadow: 0 0 30px rgba(37,99,235,.4);
         }
-        .brand-icon {
-          width: 34px;
-          height: 34px;
-          display: grid;
-          place-items: center;
-        }
-        .top-actions {
+        .brand span { color: #0b63ff; }
+        .topnav {
           display: flex;
           align-items: center;
-          gap: 18px;
+          gap: clamp(28px, 4vw, 54px);
         }
-        .top-actions .theme-toggle {
-          min-height: 42px;
-          border: 1px solid rgba(148,163,184,.18);
-          background: rgba(15,23,42,.55);
-          box-shadow: none;
-          color: #f8fafc;
-        }
-        .top-actions .theme-toggle-track {
-          background: rgba(242,201,76,.12);
-        }
-        .theme-icons {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #f2c94c;
-        }
-        .theme-icons svg:last-child {
-          color: #64748b;
-        }
-        .help-btn {
-          height: 42px;
-          padding: 0 18px;
-          border-radius: 12px;
-          border: 1px solid rgba(148,163,184,.18);
-          color: #f8fafc;
+        .topnav a,
+        .top-login {
+          color: #fff;
           text-decoration: none;
+          font-size: 16px;
+          font-weight: 700;
+        }
+        .topnav a:hover { color: #3b82f6; }
+        .top-login {
+          min-height: 46px;
+          padding: 0 22px;
+          border-radius: 7px;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          font-weight: 800;
-          background: rgba(15,23,42,.55);
+          gap: 12px;
+          border: 1px solid #0b63ff;
+          background: rgba(2,6,23,.4);
+          transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
         }
-        .help-btn svg {
-          color: #f2c94c;
+        .top-login:hover {
+          background: #0b63ff;
+          transform: translateY(-1px);
+          box-shadow: 0 16px 36px rgba(37,99,235,.28);
         }
-        .app-grid {
+        .hero-shell {
           position: relative;
           z-index: 1;
-          min-height: calc(100vh - 80px);
-          width: min(1440px, calc(100% - 64px));
+          width: min(1510px, calc(100% - 76px));
           margin: 0 auto;
+          min-height: calc(100vh - 82px);
           display: grid;
-          grid-template-columns: minmax(0, 1.04fr) minmax(420px, .72fr);
-          gap: 72px;
+          grid-template-columns: minmax(390px, .92fr) minmax(300px, .72fr) minmax(390px, .66fr);
+          gap: 32px;
           align-items: center;
-          padding: 52px 0 34px;
+          padding: 20px 0 28px;
         }
-        .left-panel {
-          min-width: 0;
-        }
-        .welcome-pill {
-          width: fit-content;
-          height: 36px;
-          padding: 0 16px;
-          border-radius: 999px;
-          border: 1px solid rgba(242,201,76,.28);
-          color: #f2c94c;
-          background: rgba(15,23,42,.56);
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
+        .hero-content { min-width: 0; }
+        .eyebrow {
+          color: #0b72ff;
           text-transform: uppercase;
-          letter-spacing: .16em;
-          font-size: 11px;
-          font-weight: 950;
+          letter-spacing: .18em;
+          font-size: 15px;
+          font-weight: 900;
+          margin-bottom: 24px;
         }
         h1 {
-          max-width: 690px;
-          margin: 24px 0 18px;
-          font-size: clamp(48px, 5.2vw, 78px);
+          margin: 0 0 22px;
+          font-size: clamp(58px, 5vw, 78px);
           line-height: .98;
-          letter-spacing: -1.8px;
+          letter-spacing: -2px;
           font-weight: 950;
         }
         h1 span {
-          color: #f2c94c;
+          display: block;
+          color: #0b63ff;
         }
         .lead {
-          max-width: 620px;
+          max-width: 600px;
+          color: #d6deeb;
+          font-size: 21px;
+          line-height: 1.38;
           margin: 0;
-          color: #a8b1c3;
-          font-size: 18px;
-          line-height: 1.65;
         }
+        .primary-cta {
+          width: fit-content;
+          min-height: 64px;
+          margin-top: 30px;
+          padding: 0 36px;
+          border-radius: 7px;
+          display: inline-flex;
+          align-items: center;
+          gap: 18px;
+          color: #fff;
+          text-decoration: none;
+          font-size: 21px;
+          font-weight: 900;
+          background: linear-gradient(135deg, #116bff, #0f43cb);
+          box-shadow: 0 22px 52px rgba(37,99,235,.28);
+        }
+        .safe-note {
+          margin-top: 18px;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: #d6deeb;
+          font-size: 15px;
+        }
+        .safe-note svg { color: #0b72ff; }
         .feature-row {
-          margin-top: 62px;
+          margin-top: 58px;
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 28px;
         }
-        .feature div,
-        .trust-icon {
-          width: 58px;
-          height: 58px;
-          border-radius: 999px;
+        .feature { text-align: center; }
+        .feature div {
+          width: 54px;
+          height: 54px;
+          margin: 0 auto 14px;
+          border-radius: 12px;
           display: grid;
           place-items: center;
-          color: #f2c94c;
-          background: rgba(242,201,76,.12);
-          border: 1px solid rgba(242,201,76,.1);
-          margin-bottom: 18px;
+          color: #0b72ff;
+          background: rgba(15, 23, 42, .84);
+          border: 1px solid rgba(37,99,235,.28);
+          box-shadow: 0 0 28px rgba(37,99,235,.18);
         }
         .feature strong {
           display: block;
           color: #fff;
           font-size: 15px;
-          margin-bottom: 8px;
+          line-height: 1.35;
         }
-        .feature span {
-          display: block;
-          color: #9aa4b8;
-          font-size: 14px;
-          line-height: 1.45;
-        }
-        .trust-card,
-        .check-card {
-          margin-top: 34px;
-          border-radius: 16px;
-          border: 1px solid rgba(148,163,184,.13);
-          background: linear-gradient(135deg, rgba(15,23,42,.76), rgba(15,23,42,.38));
-          box-shadow: 0 20px 70px rgba(0,0,0,.22);
-        }
-        .trust-card {
-          min-height: 110px;
+        .hero-device {
+          position: relative;
+          min-height: 640px;
           display: grid;
-          grid-template-columns: 68px 1fr auto;
-          align-items: center;
-          gap: 16px;
-          padding: 18px 24px;
-          max-width: 710px;
+          place-items: center;
         }
-        .trust-icon {
-          margin: 0;
+        .hero-device::before {
+          content: '';
+          position: absolute;
+          inset: 12% -34% 0 -22%;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(37,99,235,.26), transparent 60%);
+          filter: blur(18px);
         }
-        .trust-card strong,
-        .check-card h2 {
-          display: block;
-          color: #fff;
-          font-size: 15px;
-          margin: 0 0 6px;
-        }
-        .trust-card span {
-          color: #9aa4b8;
-          font-size: 14px;
-          line-height: 1.45;
-        }
-        .trust-card a {
-          min-height: 42px;
-          padding: 0 18px;
-          border-radius: 12px;
-          display: inline-flex;
-          align-items: center;
-          color: #fff;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: 900;
-          background: rgba(148,163,184,.12);
-        }
-        .check-card {
-          max-width: 710px;
-          padding: 24px;
-        }
-        .check-card h2 {
-          color: #f2c94c;
-          font-size: 16px;
-          padding-bottom: 18px;
-          border-bottom: 1px solid rgba(148,163,184,.2);
-        }
-        .check-grid {
+        .k-glow {
+          position: absolute;
+          top: 8%;
+          right: 4%;
+          width: 96px;
+          height: 96px;
+          border-radius: 20px;
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 18px;
-          margin-top: 20px;
+          place-items: center;
+          color: #fff;
+          font-size: 64px;
+          font-weight: 950;
+          background: linear-gradient(145deg, #0b63ff, #001a77);
+          box-shadow: 0 0 54px rgba(37,99,235,.76);
+          opacity: .92;
         }
-        .check-grid span {
-          color: #a8b1c3;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 13px;
-          line-height: 1.25;
+        .phone-mockup {
+          position: relative;
+          width: 246px;
+          min-height: 528px;
+          padding: 22px 18px;
+          border-radius: 34px;
+          color: #fff;
+          background: linear-gradient(150deg, #111827, #020617 58%, #06193f);
+          border: 9px solid #05070c;
+          box-shadow: 0 34px 80px rgba(0,0,0,.74), 0 0 0 1px rgba(255,255,255,.18);
+          transform: rotate(8deg);
         }
-        .check-grid svg {
-          color: #f2c94c;
-          flex-shrink: 0;
+        .phone-notch {
+          position: absolute;
+          top: 8px;
+          left: 50%;
+          width: 86px;
+          height: 20px;
+          border-radius: 0 0 16px 16px;
+          transform: translateX(-50%);
+          background: #05070c;
         }
-        .app-footer {
-          max-width: 710px;
-          margin-top: 26px;
+        .phone-status,
+        .phone-top,
+        .phone-mockup small,
+        .phone-mockup em,
+        .phone-list span { color: #cbd5e1; }
+        .phone-status { font-size: 10px; font-weight: 900; }
+        .phone-top {
+          margin-top: 24px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
-          color: #8a94a8;
-          font-size: 13px;
+          font-size: 11px;
         }
-        .app-footer nav {
+        .phone-mockup p { margin: 22px 0 14px; font-size: 13px; font-weight: 900; }
+        .phone-mockup small { display: block; font-size: 10px; }
+        .phone-mockup strong { display: block; margin-top: 8px; font-size: 24px; }
+        .phone-mockup em { display: block; margin-top: 7px; color: #0b72ff; font-size: 10px; font-style: normal; }
+        .bars {
+          height: 86px;
+          margin: 18px 0 20px;
           display: flex;
-          gap: 22px;
+          align-items: end;
+          gap: 10px;
+          border-bottom: 1px solid rgba(148,163,184,.18);
         }
-        .app-footer a {
-          color: #8a94a8;
-          text-decoration: none;
+        .bars i {
+          flex: 1;
+          border-radius: 4px 4px 0 0;
+          background: linear-gradient(#0b72ff, #1d4ed8);
+        }
+        .phone-list {
+          min-height: 42px;
+          margin-top: 8px;
+          padding: 0 12px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(15,23,42,.86);
+          font-size: 11px;
+        }
+        .phone-nav {
+          margin-top: 18px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          color: #94a3b8;
+        }
+        .phone-nav button {
+          width: 36px;
+          height: 36px;
+          min-height: 36px;
+          padding: 0;
+          border-radius: 999px;
+          background: #0b63ff;
+          color: #fff;
+          font-size: 24px;
         }
         .access-stack {
           display: grid;
-          gap: 14px;
+          gap: 8px;
         }
         .access-card {
-          border-radius: 18px;
-          border: 1px solid rgba(148,163,184,.15);
-          background:
-            linear-gradient(135deg, rgba(20,27,39,.92), rgba(9,15,27,.84));
-          box-shadow: 0 30px 90px rgba(0,0,0,.28);
-          padding: 30px;
+          border-radius: 13px;
+          border: 1px solid rgba(37,99,235,.18);
+          background: linear-gradient(145deg, rgba(15,23,42,.72), rgba(2,6,23,.76));
+          box-shadow: 0 28px 70px rgba(0,0,0,.25);
+          padding: 24px 26px;
           backdrop-filter: blur(22px);
-        }
-        .access-card.featured {
-          border-color: rgba(242,201,76,.34);
-          background:
-            radial-gradient(circle at top left, rgba(242,201,76,.14), transparent 36%),
-            linear-gradient(135deg, rgba(20,27,39,.96), rgba(9,15,27,.84));
         }
         .access-head {
           display: grid;
-          grid-template-columns: 62px 1fr;
-          gap: 18px;
+          grid-template-columns: 50px 1fr;
+          gap: 14px;
           align-items: center;
-          margin-bottom: 24px;
+          margin-bottom: 16px;
         }
         .access-icon {
-          width: 62px;
-          height: 62px;
-          border-radius: 999px;
+          width: 48px;
+          height: 48px;
+          border-radius: 9px;
           display: grid;
           place-items: center;
-          color: #f2c94c;
-          background: rgba(242,201,76,.13);
+          color: #0b72ff;
+          background: rgba(2,6,23,.42);
+          border: 1px solid rgba(37,99,235,.42);
         }
         .access-card h2 {
           margin: 0;
           font-size: 24px;
+          line-height: 1;
           font-weight: 950;
         }
         .access-card p {
           margin: 7px 0 0;
-          color: #a8b1c3;
-          font-size: 14px;
-          line-height: 1.5;
+          color: #cbd5e1;
+          font-size: 13px;
+          line-height: 1.35;
         }
-        .client-row {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(156px, auto);
-          gap: 12px;
-          align-items: stretch;
-          max-width: 100%;
-        }
-        .client-row input {
-          min-width: 0;
-          background: rgba(2,6,23,.48);
-          border-color: rgba(148,163,184,.22);
-          color: #f8fafc;
-        }
-        .client-row input::placeholder {
-          color: #9aa4b8;
-        }
-        .client-row button {
-          min-width: 156px;
-          padding: 0 18px;
-        }
+        .client-row,
+        .login-form { display: grid; gap: 10px; }
         input {
           width: 100%;
-          min-height: 46px;
-          border: 1px solid rgba(148,163,184,.18);
-          border-radius: 10px;
-          background: rgba(2,6,23,.38);
+          min-height: 40px;
+          border: 1px solid rgba(148,163,184,.14);
+          border-radius: 7px;
+          background: rgba(15,23,42,.58);
           color: #f8fafc;
           outline: none;
-          padding: 0 15px;
+          padding: 0 14px;
           font-size: 14px;
           font-weight: 700;
         }
+        input::placeholder { color: #9aa4b8; }
         input:focus {
-          border-color: rgba(242,201,76,.72);
-          box-shadow: 0 0 0 4px rgba(242,201,76,.1);
-        }
-        .access-card small {
-          display: block;
-          margin-top: 12px;
-          color: #8a94a8;
-          font-size: 12px;
+          border-color: rgba(37,99,235,.75);
+          box-shadow: 0 0 0 4px rgba(37,99,235,.12);
         }
         button {
-          min-height: 46px;
+          min-height: 40px;
           border: 0;
-          border-radius: 10px;
-          padding: 0 20px;
+          border-radius: 7px;
+          padding: 0 18px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          background: linear-gradient(135deg, #f8d86d, #d7a52e);
-          color: #090d14;
+          background: linear-gradient(135deg, #116bff, #0f43cb);
+          color: #fff;
           font-size: 14px;
-          font-weight: 950;
+          font-weight: 900;
           cursor: pointer;
           white-space: nowrap;
         }
-        button:disabled {
-          opacity: .7;
-          cursor: wait;
-        }
-        .login-form {
-          display: grid;
-          gap: 11px;
-        }
-        .field-wrap {
-          position: relative;
-          display: block;
-        }
+        button:disabled { opacity: .72; cursor: wait; }
+        .field-wrap { position: relative; display: block; }
         .field-wrap svg:first-child {
           position: absolute;
-          left: 15px;
+          left: 14px;
           top: 50%;
           transform: translateY(-50%);
-          color: #8792a6;
+          color: #94a3b8;
           z-index: 2;
           pointer-events: none;
         }
-        .field-wrap input {
-          position: relative;
-          z-index: 1;
-          padding-left: 44px;
-        }
-        .field-wrap.password input {
-          padding-right: 56px;
-        }
+        .field-wrap input { padding-left: 42px; }
+        .field-wrap.password input { padding-right: 52px; }
         .toggle-password {
           position: absolute;
-          right: 9px;
+          right: 8px;
           top: 50%;
           transform: translateY(-50%);
           z-index: 3;
-          width: 38px;
-          height: 38px;
-          min-height: 38px;
+          width: 34px;
+          height: 34px;
+          min-height: 34px;
           padding: 0;
-          border-radius: 9px;
+          border-radius: 7px;
           display: grid;
           place-items: center;
           background: transparent !important;
-          color: #a8b1c3;
+          color: #94a3b8;
           box-shadow: none !important;
-          cursor: pointer;
         }
         .toggle-password svg {
           position: static !important;
           transform: none !important;
-          color: currentColor;
           pointer-events: none;
         }
-        .toggle-password:hover {
-          background: rgba(148,163,184,.10) !important;
-          color: #f8fafc;
-        }
+        .toggle-password:hover { background: rgba(148,163,184,.11) !important; color: #fff; }
         .error-box {
           padding: 10px 12px;
-          border-radius: 10px;
+          border-radius: 9px;
           border: 1px solid rgba(248,113,113,.28);
           background: rgba(239,68,68,.1);
           color: #fca5a5;
           font-size: 12px;
           font-weight: 800;
         }
-        @media (max-width: 1100px) {
-          .app-grid {
-            grid-template-columns: 1fr;
-            gap: 34px;
-            align-items: start;
-          }
-          .feature-row,
-          .check-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-          .access-stack {
-            max-width: 680px;
-          }
+        .install-card {
+          position: relative;
+          z-index: 1;
+          width: min(1510px, calc(100% - 76px));
+          min-height: 178px;
+          margin: 0 auto 26px;
+          padding: 22px 30px;
+          border-radius: 16px;
+          border: 1px solid rgba(37,99,235,.22);
+          background: linear-gradient(135deg, rgba(15,23,42,.66), rgba(2,6,23,.76));
+          display: grid;
+          grid-template-columns: 1fr 250px 220px;
+          gap: 24px;
+          align-items: center;
+          overflow: hidden;
         }
-        @media (max-width: 680px) {
-          .topbar {
-            min-height: 72px;
-            padding: 0 18px;
-          }
-          .brand {
-            font-size: 19px;
-          }
-          .theme-icons {
-            display: none;
-          }
-          .help-btn {
-            height: 38px;
-            padding: 0 12px;
-            font-size: 13px;
-          }
-          .app-grid {
-            width: min(100% - 28px, 1440px);
-            padding: 30px 0 24px;
-          }
-          h1 {
-            font-size: clamp(40px, 12vw, 56px);
-            letter-spacing: -1px;
-          }
-          .lead {
-            font-size: 15px;
-          }
-          .feature-row,
-          .check-grid,
-          .client-row,
-          .trust-card {
-            grid-template-columns: 1fr;
-          }
-          .client-row {
-            gap: 10px;
-          }
-          .client-row input,
-          .client-row button {
-            width: 100%;
-          }
-          .feature-row {
-            gap: 18px;
-            margin-top: 34px;
-          }
-          .trust-card a,
-          .client-row button,
-          .login-form button[type="submit"] {
-            width: 100%;
-          }
-          .login-form .toggle-password {
-            position: absolute;
-            right: 9px;
-            top: 50%;
-            width: 38px !important;
-            height: 38px !important;
-            min-height: 38px !important;
-            max-width: 38px !important;
-            padding: 0 !important;
-            transform: translateY(-50%);
-          }
-          .app-footer {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .app-footer nav {
-            flex-wrap: wrap;
-          }
-          .access-card {
-            padding: 22px;
-          }
-          .access-head {
-            grid-template-columns: 52px 1fr;
-            gap: 14px;
-          }
-          .access-icon {
-            width: 52px;
-            height: 52px;
-          }
+        .install-card h2 { margin: 0 0 6px; font-size: 22px; }
+        .install-card p { margin: 0 0 20px; color: #cbd5e1; font-size: 16px; }
+        .install-steps {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
         }
+        .install-steps span {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          color: #e2e8f0;
+          font-size: 13px;
+          line-height: 1.3;
+        }
+        .install-steps b {
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          border: 1px solid rgba(37,99,235,.7);
+          display: grid;
+          place-items: center;
+          color: #fff;
+          flex-shrink: 0;
+        }
+        .install-steps svg,
+        .plus-mini { color: #0b72ff; flex-shrink: 0; }
+        .plus-mini {
+          width: 34px;
+          height: 34px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          background: rgba(37,99,235,.15);
+          font-size: 26px;
+          font-weight: 900;
+        }
+        .install-phone {
+          width: 162px;
+          height: 230px;
+          justify-self: end;
+          margin-bottom: -78px;
+          border: 8px solid #05070c;
+          border-radius: 28px 28px 0 0;
+          background: linear-gradient(145deg, #0f172a, #020617);
+          display: grid;
+          place-items: center;
+          box-shadow: 0 24px 70px rgba(0,0,0,.5);
+        }
+        .install-phone img { width: 54px; height: 54px; border-radius: 10px; }
+        .install-phone strong { margin-top: -58px; font-size: 13px; }
+        .hand-note {
+          color: #fff;
+          font-size: 30px;
+          line-height: 1.05;
+          font-weight: 900;
+          transform: rotate(-5deg);
+        }
+        .app-footer {
+          position: relative;
+          z-index: 1;
+          width: min(1510px, calc(100% - 76px));
+          margin: 0 auto;
+          padding: 0 0 26px;
+          display: flex;
+          justify-content: center;
+          gap: clamp(32px, 14vw, 360px);
+          color: #8a94a8;
+          font-size: 14px;
+        }
+        .app-footer nav { display: flex; gap: 34px; }
+        .app-footer a { color: #8a94a8; text-decoration: none; }
         [data-theme='light'] .app-page {
           color: #f8fafc !important;
           background:
-            linear-gradient(90deg, rgba(4,8,16,.96), rgba(6,13,24,.82) 48%, rgba(4,8,16,.98)),
-            radial-gradient(circle at 28% 32%, rgba(224,182,65,.15), transparent 34%),
-            radial-gradient(circle at 78% 76%, rgba(37,99,235,.14), transparent 38%),
-            #050913 !important;
+            radial-gradient(circle at 53% 18%, rgba(37, 99, 235, .38), transparent 24%),
+            radial-gradient(circle at 82% 56%, rgba(22, 78, 160, .28), transparent 34%),
+            linear-gradient(90deg, rgba(2,6,23,.99), rgba(3,10,24,.93) 48%, rgba(2,6,23,.99)),
+            #020617 !important;
         }
-        [data-theme='light'] .app-page::before {
-          background:
-            linear-gradient(rgba(5,9,19,.38), rgba(5,9,19,.92)),
-            url('/kortebarber-logo.jpg') center left / 820px auto no-repeat !important;
-          opacity: .18 !important;
-          filter: saturate(.85) !important;
+        @media (max-width: 1180px) {
+          .hero-shell {
+            grid-template-columns: 1fr;
+            align-items: start;
+            padding-top: 46px;
+          }
+          .hero-device { min-height: 520px; order: 3; }
+          .access-stack { max-width: 760px; }
+          .install-card { grid-template-columns: 1fr; }
+          .install-phone, .hand-note { display: none; }
         }
-        [data-theme='light'] .app-page .topbar,
-        [data-theme='light'] .app-page .access-card,
-        [data-theme='light'] .app-page .trust-card,
-        [data-theme='light'] .app-page .check-card {
-          border-color: rgba(148,163,184,.15) !important;
-          color: #f8fafc !important;
-          box-shadow: 0 30px 90px rgba(0,0,0,.28) !important;
-        }
-        [data-theme='light'] .app-page .topbar {
-          background: rgba(4,8,16,.72) !important;
-        }
-        [data-theme='light'] .app-page .access-card {
-          background: linear-gradient(135deg, rgba(20,27,39,.92), rgba(9,15,27,.84)) !important;
-        }
-        [data-theme='light'] .app-page .access-card.featured {
-          border-color: rgba(242,201,76,.34) !important;
-          background:
-            radial-gradient(circle at top left, rgba(242,201,76,.14), transparent 36%),
-            linear-gradient(135deg, rgba(20,27,39,.96), rgba(9,15,27,.84)) !important;
-        }
-        [data-theme='light'] .app-page .trust-card,
-        [data-theme='light'] .app-page .check-card {
-          background: linear-gradient(135deg, rgba(15,23,42,.76), rgba(15,23,42,.38)) !important;
-        }
-        [data-theme='light'] .app-page h1,
-        [data-theme='light'] .app-page h2,
-        [data-theme='light'] .app-page strong,
-        [data-theme='light'] .app-page .brand,
-        [data-theme='light'] .app-page .feature strong,
-        [data-theme='light'] .app-page .access-card h2,
-        [data-theme='light'] .app-page .trust-card strong {
-          color: #f8fafc !important;
-        }
-        [data-theme='light'] .app-page h1 span,
-        [data-theme='light'] .app-page .brand span,
-        [data-theme='light'] .app-page .brand-icon,
-        [data-theme='light'] .app-page .welcome-pill,
-        [data-theme='light'] .app-page .feature div,
-        [data-theme='light'] .app-page .access-icon,
-        [data-theme='light'] .app-page .trust-icon,
-        [data-theme='light'] .app-page .check-card h2,
-        [data-theme='light'] .app-page .check-grid svg,
-        [data-theme='light'] .app-page .help-btn svg {
-          color: #f2c94c !important;
-        }
-        [data-theme='light'] .app-page p,
-        [data-theme='light'] .app-page small,
-        [data-theme='light'] .app-page .lead,
-        [data-theme='light'] .app-page .feature span,
-        [data-theme='light'] .app-page .access-card p,
-        [data-theme='light'] .app-page .trust-card span,
-        [data-theme='light'] .app-page .check-grid span,
-        [data-theme='light'] .app-page .app-footer,
-        [data-theme='light'] .app-page .app-footer a {
-          color: #a8b1c3 !important;
-        }
-        [data-theme='light'] .app-page input {
-          background: rgba(2,6,23,.38) !important;
-          border-color: rgba(148,163,184,.18) !important;
-          color: #f8fafc !important;
-          box-shadow: none !important;
-        }
-        [data-theme='light'] .app-page input::placeholder {
-          color: #8a94a8 !important;
-        }
-        [data-theme='light'] .app-page .help-btn {
-          background: rgba(15,23,42,.55) !important;
-          border-color: rgba(148,163,184,.18) !important;
-          color: #f8fafc !important;
-          box-shadow: none !important;
+        @media (max-width: 760px) {
+          .topbar { min-height: 76px; padding: 0 18px; }
+          .topnav { display: none; }
+          .brand { font-size: 24px; }
+          .brand img { width: 40px; height: 40px; }
+          .top-login { min-height: 42px; padding: 0 14px; font-size: 14px; }
+          .hero-shell,
+          .install-card,
+          .app-footer { width: min(100% - 28px, 1510px); }
+          .hero-shell { padding-top: 34px; gap: 26px; }
+          h1 { font-size: clamp(48px, 15vw, 70px); letter-spacing: -1.4px; }
+          .lead { font-size: 18px; }
+          .primary-cta { width: 100%; justify-content: center; min-height: 58px; font-size: 18px; }
+          .feature-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 36px; }
+          .hero-device { display: none; }
+          .access-card { padding: 20px; }
+          .access-head { grid-template-columns: 46px 1fr; }
+          .access-icon { width: 44px; height: 44px; }
+          .client-row button,
+          .login-form button[type='submit'] { width: 100%; }
+          .field-wrap.password input { padding-right: 50px; }
+          .login-form .toggle-password {
+            width: 34px !important;
+            height: 34px !important;
+            min-height: 34px !important;
+            max-width: 34px !important;
+            right: 8px;
+            padding: 0 !important;
+          }
+          .install-card { padding: 22px; }
+          .install-steps { grid-template-columns: 1fr; }
+          .app-footer { flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+          .app-footer nav { gap: 20px; flex-wrap: wrap; justify-content: center; }
         }
       `}</style>
     </main>
   )
+
 }
 
 function Field({
