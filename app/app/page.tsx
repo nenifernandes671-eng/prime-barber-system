@@ -1006,6 +1006,110 @@ export default function AppStartPage() {
             linear-gradient(90deg, rgba(2,6,23,.99), rgba(3,10,24,.93) 48%, rgba(2,6,23,.99)),
             #020617 !important;
         }
+
+        /* A pagina publica /app deve ficar sempre escura, mesmo quando o tema claro estiver salvo no sistema. */
+        html[data-theme='light'] .app-page,
+        html[data-theme='dark'] .app-page,
+        .app-page {
+          color-scheme: dark;
+        }
+        html[data-theme='light'] body:has(.app-page) {
+          background: #020617 !important;
+        }
+        html[data-theme='light'] .app-page .topbar {
+          background: rgba(0,0,0,.72) !important;
+          border-bottom-color: rgba(30,64,175,.22) !important;
+          color: #f8fafc !important;
+        }
+        html[data-theme='light'] .app-page .brand,
+        html[data-theme='light'] .app-page .brand strong,
+        html[data-theme='light'] .app-page .topnav a,
+        html[data-theme='light'] .app-page .top-login,
+        html[data-theme='light'] .app-page h1,
+        html[data-theme='light'] .app-page .feature strong,
+        html[data-theme='light'] .app-page .access-card h2,
+        html[data-theme='light'] .app-page .install-card h2,
+        html[data-theme='light'] .app-page .install-phone strong,
+        html[data-theme='light'] .app-page .hand-note {
+          color: #f8fafc !important;
+        }
+        html[data-theme='light'] .app-page .brand span,
+        html[data-theme='light'] .app-page h1 span,
+        html[data-theme='light'] .app-page .eyebrow,
+        html[data-theme='light'] .app-page .feature div,
+        html[data-theme='light'] .app-page .access-icon,
+        html[data-theme='light'] .app-page .safe-note svg,
+        html[data-theme='light'] .app-page .install-steps svg,
+        html[data-theme='light'] .app-page .plus-mini {
+          color: #0b72ff !important;
+        }
+        html[data-theme='light'] .app-page .lead,
+        html[data-theme='light'] .app-page .safe-note,
+        html[data-theme='light'] .app-page .access-card p,
+        html[data-theme='light'] .app-page .install-card p,
+        html[data-theme='light'] .app-page .install-steps span,
+        html[data-theme='light'] .app-page .app-footer,
+        html[data-theme='light'] .app-page .app-footer a,
+        html[data-theme='light'] .app-page .phone-status,
+        html[data-theme='light'] .app-page .phone-top,
+        html[data-theme='light'] .app-page .phone-mockup small,
+        html[data-theme='light'] .app-page .phone-mockup em,
+        html[data-theme='light'] .app-page .phone-list span {
+          color: #cbd5e1 !important;
+        }
+        html[data-theme='light'] .app-page .top-login {
+          border-color: #0b63ff !important;
+          background: rgba(2,6,23,.4) !important;
+        }
+        html[data-theme='light'] .app-page .top-login:hover {
+          background: #0b63ff !important;
+          color: #fff !important;
+        }
+        html[data-theme='light'] .app-page .feature div {
+          background: rgba(15, 23, 42, .84) !important;
+          border-color: rgba(37,99,235,.28) !important;
+        }
+        html[data-theme='light'] .app-page .access-card,
+        html[data-theme='light'] .app-page .install-card {
+          border-color: rgba(37,99,235,.18) !important;
+          background: linear-gradient(145deg, rgba(15,23,42,.72), rgba(2,6,23,.76)) !important;
+          box-shadow: 0 28px 70px rgba(0,0,0,.25) !important;
+        }
+        html[data-theme='light'] .app-page .access-icon {
+          background: rgba(2,6,23,.42) !important;
+          border-color: rgba(37,99,235,.42) !important;
+        }
+        html[data-theme='light'] .app-page input {
+          background: rgba(15,23,42,.58) !important;
+          border-color: rgba(148,163,184,.14) !important;
+          color: #f8fafc !important;
+          box-shadow: none !important;
+        }
+        html[data-theme='light'] .app-page input::placeholder {
+          color: #9aa4b8 !important;
+        }
+        html[data-theme='light'] .app-page button,
+        html[data-theme='light'] .app-page .primary-cta {
+          background: linear-gradient(135deg, #116bff, #0f43cb) !important;
+          color: #fff !important;
+        }
+        html[data-theme='light'] .app-page .toggle-password {
+          background: transparent !important;
+          color: #94a3b8 !important;
+        }
+        html[data-theme='light'] .app-page .toggle-password:hover {
+          background: rgba(148,163,184,.11) !important;
+          color: #fff !important;
+        }
+        html[data-theme='light'] .app-page .phone-mockup,
+        html[data-theme='light'] .app-page .install-phone {
+          background: linear-gradient(150deg, #111827, #020617 58%, #06193f) !important;
+          border-color: #05070c !important;
+          color: #f8fafc !important;
+        }
+        html[data-theme='light'] .app-page .phone-list {
+          background: rgba(15,23,42,.86) !important;
+        }
         @media (max-width: 1180px) {
           .hero-shell {
             grid-template-columns: 1fr;
