@@ -51,25 +51,6 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var theme = localStorage.getItem('theme') || 'dark';
-                if (theme !== 'light' && theme !== 'dark') theme = 'dark';
-                document.documentElement.dataset.theme = theme;
-                document.documentElement.classList.toggle('light', theme === 'light');
-                document.documentElement.classList.toggle('dark', theme === 'dark');
-                document.documentElement.style.colorScheme = theme;
-              } catch (_) {
-                document.documentElement.dataset.theme = 'dark';
-                document.documentElement.classList.add('dark');
-              }
-            `,
-          }}
-        />
-      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>

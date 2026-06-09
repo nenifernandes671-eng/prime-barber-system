@@ -12,7 +12,11 @@ import {
   Copy,
   Crown,
   ExternalLink,
+  GripVertical,
+  Image as ImageIcon,
   Lock,
+  Star,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react'
@@ -29,6 +33,15 @@ interface Service {
   name: string
   price: number
   photo_url?: string
+}
+
+interface GalleryImage {
+  id: string
+  image_url: string
+  storage_path?: string | null
+  position: number
+  is_cover?: boolean
+  created_at?: string
 }
 
 type Tab = 'barbearia' | 'landing' | 'barbeiros' | 'servicos'
@@ -93,6 +106,9 @@ export default function ConfiguracoesPage() {
   const [landingPrimaryColor, setLandingPrimaryColor] = useState('#c9a84c')
   const [landingBannerUrl, setLandingBannerUrl] = useState('')
   const [savingLandingBanner, setSavingLandingBanner] = useState(false)
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([])
+  const [savingGallery, setSavingGallery] = useState(false)
+  const [draggedGalleryId, setDraggedGalleryId] = useState<string | null>(null)
 
   const [savingInfo, setSavingInfo] = useState(false)
   const [savedInfo, setSavedInfo] = useState(false)
@@ -186,6 +202,7 @@ export default function ConfiguracoesPage() {
     if (!token) {
       setBarbers([])
       setServices([])
+      setGalleryImages([])
       setLoading(false)
       return
     }
@@ -199,10 +216,12 @@ export default function ConfiguracoesPage() {
     if (response.ok) {
       setBarbers(data.barbers ?? [])
       setServices(data.services ?? [])
+      setGalleryImages(data.gallery ?? [])
     } else {
       console.error(data.error ?? 'Erro ao carregar configuracoes.')
       setBarbers([])
       setServices([])
+      setGalleryImages([])
     }
 
     setLoading(false)
@@ -465,6 +484,176 @@ export default function ConfiguracoesPage() {
     }
 
     setLandingBannerUrl('')
+  }
+
+  function sortGallery(images: GalleryImage[]) {
+    return [...images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  }
+
+  function isValidGalleryFile(file: File) {
+    return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+  }
+
+  async function compressGalleryFile(file: File) {
+    if (typeof window === 'undefined') return file
+
+    return new Promise<File>((resolve) => {
+      const image = new window.Image()
+      const objectUrl = URL.createObjectURL(file)
+
+      image.onload = () => {
+        const maxSize = 1600
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
+        const width = Math.max(1, Math.round(image.width * scale))
+        const height = Math.max(1, Math.round(image.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')
+
+        if (!context) {
+          URL.revokeObjectURL(objectUrl)
+          resolve(file)
+          return
+        }
+
+        context.drawImage(image, 0, 0, width, height)
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(objectUrl)
+            if (!blob) {
+              resolve(file)
+              return
+            }
+
+            const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '-').toLowerCase()
+            resolve(new File([blob], `${baseName || 'galeria'}.webp`, { type: 'image/webp' }))
+          },
+          'image/webp',
+          0.84
+        )
+      }
+
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        resolve(file)
+      }
+
+      image.src = objectUrl
+    })
+  }
+
+  async function uploadGalleryFiles(fileList: FileList | File[]) {
+    if (!currentTenantId || savingGallery) return
+
+    const files = Array.from(fileList).filter(isValidGalleryFile)
+    if (files.length === 0) {
+      alert('Envie apenas imagens JPG, PNG ou WEBP.')
+      return
+    }
+
+    const remaining = 20 - galleryImages.length
+    if (remaining <= 0) {
+      alert('Limite de 20 imagens atingido.')
+      return
+    }
+
+    const selectedFiles = files.slice(0, remaining)
+    if (files.length > selectedFiles.length) {
+      alert(`A galeria aceita ate 20 imagens. Vou enviar apenas ${selectedFiles.length}.`)
+    }
+
+    setSavingGallery(true)
+
+    try {
+      const uploadedImages = []
+
+      for (const [index, file] of selectedFiles.entries()) {
+        const compressed = await compressGalleryFile(file)
+        const safeName = compressed.name.replace(/[^a-z0-9._-]/gi, '-').toLowerCase()
+        const path = `gallery/${currentTenantId}/${Date.now()}-${index}-${safeName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('barbershop-media')
+          .upload(path, compressed, {
+            upsert: false,
+            cacheControl: '31536000',
+            contentType: compressed.type || 'image/webp',
+          })
+
+        if (uploadError) throw uploadError
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('barbershop-media').getPublicUrl(path)
+
+        uploadedImages.push({
+          image_url: `${publicUrl}?v=${Date.now()}`,
+          storage_path: path,
+        })
+      }
+
+      const result = await saveAssetChange('create_gallery_images', { images: uploadedImages })
+      if (!result.ok) throw new Error(String(result.error))
+
+      setGalleryImages(sortGallery((result.gallery ?? []) as GalleryImage[]))
+      setSavedInfo(true)
+      setTimeout(() => setSavedInfo(false), 2500)
+    } catch (error: any) {
+      alert('Erro ao enviar galeria: ' + (error.message ?? 'tente novamente.'))
+    } finally {
+      setSavingGallery(false)
+    }
+  }
+
+  async function removeGalleryImage(imageId: string) {
+    if (!confirm('Remover esta imagem da galeria?')) return
+
+    const result = await saveAssetChange('delete_gallery_image', { gallery_id: imageId })
+    if (!result.ok) {
+      alert('Erro ao remover imagem: ' + result.error)
+      return
+    }
+
+    setGalleryImages(sortGallery((result.gallery ?? []) as GalleryImage[]))
+  }
+
+  async function setGalleryCover(imageId: string) {
+    const result = await saveAssetChange('set_gallery_cover', { gallery_id: imageId })
+    if (!result.ok) {
+      alert('Erro ao definir capa: ' + result.error)
+      return
+    }
+
+    setGalleryImages(sortGallery((result.gallery ?? []) as GalleryImage[]))
+  }
+
+  async function moveGalleryImage(targetId: string) {
+    if (!draggedGalleryId || draggedGalleryId === targetId) return
+
+    const ordered = sortGallery(galleryImages)
+    const fromIndex = ordered.findIndex((image) => image.id === draggedGalleryId)
+    const toIndex = ordered.findIndex((image) => image.id === targetId)
+    if (fromIndex < 0 || toIndex < 0) return
+
+    const next = [...ordered]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    const normalized = next.map((image, index) => ({ ...image, position: index }))
+    setGalleryImages(normalized)
+    setDraggedGalleryId(null)
+
+    const result = await saveAssetChange('update_gallery_order', {
+      images: normalized.map((image) => ({ id: image.id, position: image.position })),
+    })
+
+    if (!result.ok) {
+      alert('Erro ao ordenar imagens: ' + result.error)
+      fetchData()
+      return
+    }
+
+    setGalleryImages(sortGallery((result.gallery ?? normalized) as GalleryImage[]))
   }
 
   const avatarColors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
@@ -987,6 +1176,168 @@ export default function ConfiguracoesPage() {
                 Ver landing
               </a>
             </div>
+          </section>
+
+          <section style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 14,
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: 'rgba(201,168,76,0.14)',
+                    color: '#e8c96a',
+                    border: '1px solid rgba(201,168,76,0.22)',
+                  }}
+                >
+                  <ImageIcon size={20} />
+                </div>
+
+                <div>
+                  <h2 style={{ fontSize: 17, fontWeight: 900, color: '#f1f5f9', margin: 0 }}>
+                    Galeria de Trabalhos
+                  </h2>
+                  <p style={{ fontSize: 13, color: '#94a3b8', margin: '5px 0 0', maxWidth: 560 }}>
+                    Mostre seus melhores cortes, barba, ambiente e trabalhos para seus clientes.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#e8c96a', padding: '8px 12px', border: '1px solid rgba(201,168,76,0.24)', borderRadius: 999 }}>
+                {galleryImages.length}/20 imagens
+              </div>
+            </div>
+
+            <label
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault()
+                uploadGalleryFiles(event.dataTransfer.files)
+              }}
+              style={{
+                minHeight: 148,
+                borderRadius: 18,
+                border: '1px dashed rgba(201,168,76,0.46)',
+                background: 'linear-gradient(135deg, rgba(201,168,76,0.10), rgba(59,130,246,0.06))',
+                display: 'grid',
+                placeItems: 'center',
+                textAlign: 'center',
+                color: '#f8fafc',
+                padding: 22,
+                cursor: savingGallery || galleryImages.length >= 20 ? 'not-allowed' : 'pointer',
+                opacity: savingGallery ? 0.72 : 1,
+              }}
+            >
+              <div>
+                <Upload size={28} style={{ color: '#e8c96a', marginBottom: 10 }} />
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 900 }}>
+                  {savingGallery ? 'Enviando e comprimindo imagens...' : 'Arraste imagens aqui ou clique para enviar'}
+                </p>
+                <p style={{ margin: '7px 0 0', color: '#94a3b8', fontSize: 12 }}>
+                  JPG, PNG ou WEBP. Compressao automatica e limite de 20 fotos.
+                </p>
+              </div>
+
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                disabled={savingGallery || galleryImages.length >= 20}
+                onChange={(event) => {
+                  if (event.target.files?.length) uploadGalleryFiles(event.target.files)
+                  event.currentTarget.value = ''
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+
+            {galleryImages.length === 0 ? (
+              <div style={{ marginTop: 18, padding: '20px 16px', borderRadius: 16, background: 'rgba(15,23,42,0.48)', border: '1px solid rgba(148,163,184,0.12)', color: '#94a3b8', textAlign: 'center' }}>
+                Nenhuma imagem cadastrada ainda. A landing usara imagens padrao ate voce enviar seus trabalhos.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: 14,
+                  marginTop: 18,
+                }}
+              >
+                {sortGallery(galleryImages).map((image, index) => (
+                  <div
+                    key={image.id}
+                    draggable
+                    onDragStart={() => setDraggedGalleryId(image.id)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => moveGalleryImage(image.id)}
+                    style={{
+                      position: 'relative',
+                      height: 150,
+                      overflow: 'hidden',
+                      borderRadius: 16,
+                      border: image.is_cover ? '1px solid rgba(232,201,106,0.78)' : '1px solid rgba(148,163,184,0.16)',
+                      background: 'rgba(2,6,23,0.68)',
+                      boxShadow: image.is_cover ? '0 18px 40px rgba(201,168,76,0.16)' : '0 12px 28px rgba(0,0,0,0.18)',
+                    }}
+                    title="Arraste para reordenar"
+                  >
+                    <img src={image.image_url} alt={`Trabalho ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(2,6,23,0.08), rgba(2,6,23,0.72))' }} />
+
+                    <div style={{ position: 'absolute', top: 9, left: 9, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 28, height: 28, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'rgba(2,6,23,0.72)', color: '#e8c96a', border: '1px solid rgba(255,255,255,0.12)' }}>
+                        <GripVertical size={15} />
+                      </span>
+                      {image.is_cover && (
+                        <span style={{ padding: '6px 8px', borderRadius: 999, fontSize: 11, fontWeight: 900, color: '#0a0a0a', background: '#e8c96a' }}>
+                          Capa
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ position: 'absolute', right: 9, bottom: 9, display: 'flex', gap: 7 }}>
+                      <button
+                        type="button"
+                        onClick={() => setGalleryCover(image.id)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 10,
+                          border: '1px solid rgba(232,201,106,0.35)',
+                          background: image.is_cover ? '#e8c96a' : 'rgba(2,6,23,0.72)',
+                          color: image.is_cover ? '#0a0a0a' : '#e8c96a',
+                          cursor: 'pointer',
+                        }}
+                        title="Definir como capa"
+                      >
+                        <Star size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(image.id)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 10,
+                          border: '1px solid rgba(248,113,113,0.35)',
+                          background: 'rgba(127,29,29,0.70)',
+                          color: '#fecaca',
+                          cursor: 'pointer',
+                        }}
+                        title="Excluir imagem"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       )}

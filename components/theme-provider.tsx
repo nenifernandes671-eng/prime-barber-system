@@ -12,15 +12,12 @@ type ThemeContextValue = {
   toggleTheme: () => void
 }
 
-const STORAGE_KEY = 'theme'
+const STORAGE_KEY = 'korte-admin-theme'
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme
-  document.documentElement.classList.toggle('light', theme === 'light')
-  document.documentElement.classList.toggle('dark', theme === 'dark')
-  document.documentElement.style.colorScheme = theme
+  void theme
 }
 
 function getInitialTheme(): Theme {

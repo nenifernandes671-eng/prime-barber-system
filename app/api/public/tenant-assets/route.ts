@@ -18,6 +18,11 @@ function publicMediaUrl(path: string) {
   return supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(path).data.publicUrl
 }
 
+function isMissingGalleryTable(error: any) {
+  const message = String(error?.message ?? '')
+  return error?.code === '42P01' || error?.code === 'PGRST205' || message.includes('tenant_gallery_images')
+}
+
 async function listMedia(folder: MediaFolder) {
   const { data, error } = await supabaseAdmin.storage.from(MEDIA_BUCKET).list(folder, { limit: 1000 })
   if (error) return []
@@ -35,6 +40,22 @@ function mediaUrl(folder: MediaFolder, file: StorageFile | null) {
   return version ? `${url}?v=${encodeURIComponent(version)}` : url
 }
 
+async function loadGalleryImages(tenantId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('tenant_gallery_images')
+    .select('id, image_url, position, is_cover, created_at')
+    .eq('tenant_id', tenantId)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    if (isMissingGalleryTable(error)) return []
+    throw error
+  }
+
+  return data ?? []
+}
+
 export async function GET(req: NextRequest) {
   try {
     const tenantId = req.nextUrl.searchParams.get('tenant_id') ?? ''
@@ -45,6 +66,7 @@ export async function GET(req: NextRequest) {
       { data: services, error: servicesError },
       barberFiles,
       serviceFiles,
+      gallery,
     ] = await Promise.all([
       supabaseAdmin
         .from('barbeiros')
@@ -59,6 +81,7 @@ export async function GET(req: NextRequest) {
         .order('price'),
       listMedia('barbers'),
       listMedia('services'),
+      loadGalleryImages(tenantId),
     ])
 
     if (barbersError) return jsonError(barbersError.message, 400)
@@ -73,6 +96,7 @@ export async function GET(req: NextRequest) {
         ...service,
         photo_url: service.photo_url ?? mediaUrl('services', findMedia(serviceFiles, String(service.id))),
       })),
+      gallery,
     })
   } catch (error: any) {
     return jsonError(error.message ?? 'Erro ao carregar dados publicos.', 500)

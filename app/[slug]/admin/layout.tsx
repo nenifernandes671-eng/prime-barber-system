@@ -8,6 +8,7 @@ import { TenantProvider, useTenant } from '@/lib/tenant-context'
 import { UnitProvider, useUnit } from '@/lib/unit-context'
 import { getBlockedPlanForPath, isAdminPathAllowed } from '@/lib/permissions'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { useTheme } from '@/components/theme-provider'
 import { BarChart3 } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import {
@@ -40,6 +41,7 @@ function progressPercent(start?: string | null, end?: string | null) {
 function AdminLayoutInner({ slug, children }: { slug: string; children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { theme } = useTheme()
   const { tenant, loading, isTrialing, trialDaysLeft, hasAccess, accessReason, isPremium, isProOrPremium } = useTenant()
   const { units, selectedUnitId, setSelectedUnitId, loadingUnits } = useUnit()
 
@@ -409,7 +411,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   )
 
   return (
-    <div className="admin-shell">
+    <div className="admin-shell" data-theme={theme}>
       <aside className="admin-sidebar admin-sidebar-desktop"><SidebarContent /></aside>
 
       <header className="admin-mobile-header">

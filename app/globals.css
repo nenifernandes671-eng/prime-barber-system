@@ -456,9 +456,18 @@ body {
 }
 
 /* Light Mode: estrutura SaaS clara para paginas internas */
-[data-theme='light'] body {
-  background: #f8fafc;
-  color: #0f172a;
+.admin-shell[data-theme='light'] {
+  background: radial-gradient(circle at top left, rgba(37,99,235,.06), transparent 30%), #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.admin-shell[data-theme='light'] .admin-main {
+  background: transparent !important;
+  color: #0f172a !important;
+}
+
+.admin-shell[data-theme='light'] .admin-main-inner {
+  color: #0f172a !important;
 }
 
 [data-theme='light'] .admin-shell,

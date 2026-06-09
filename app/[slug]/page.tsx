@@ -8,6 +8,7 @@ interface Service { id: string; name: string; price: number; duration: number; d
 interface Barber  { id: string; nome: string; avatar_url?: string; unit_id?: string | null }
 interface Unit { id: string; tenant_id: string; name: string; address?: string | null; phone?: string | null; active: boolean }
 interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string; opening_time?: string; closing_time?: string; slot_interval?: number; endereco?: string; landing_headline?: string; landing_description?: string; landing_whatsapp?: string; landing_instagram?: string; landing_address?: string; landing_primary_color?: string; landing_banner_url?: string }
+interface GalleryImage { id: string; image_url: string; position: number; is_cover?: boolean; created_at?: string }
 
 function timeToMinutes(time?: string) {
   const [hours, minutes] = String(time || '08:00').split(':').map(Number)
@@ -63,6 +64,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [tenant, setTenant]     = useState<Tenant | null>(null)
   const [services, setServices] = useState<Service[]>([])
   const [barbers, setBarbers]   = useState<Barber[]>([])
+  const [tenantGallery, setTenantGallery] = useState<GalleryImage[]>([])
   const [units, setUnits]       = useState<Unit[]>([])
   const [bookedTimes, setBookedTimes] = useState<string[]>([])
   const [mobileNav, setMobileNav] = useState(false)
@@ -79,6 +81,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [submitting, setSubmitting]           = useState(false)
   const [success, setSuccess]                 = useState(false)
   const [error, setError]                     = useState('')
+  const [lightboxIndex, setLightboxIndex]     = useState<number | null>(null)
 
   const isPro = tenant?.plano === 'pro' || tenant?.plano === 'premium'
   const isPremium = tenant?.plano === 'premium'
@@ -115,6 +118,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         setTenant(null)
         setServices([])
         setBarbers([])
+        setTenantGallery([])
         setUnits([])
         setTenantChecked(true)
         return
@@ -138,11 +142,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       if (response.ok) {
         setServices(assets.services ?? [])
         setBarbers(assets.barbers ?? [])
+        setTenantGallery(assets.gallery ?? [])
       } else {
         const { data: sv } = await supabase.from('services').select('*').eq('tenant_id', t.id).order('price')
         const { data: br } = await supabase.from('barbeiros').select('*').eq('tenant_id', t.id).eq('ativo', true)
         setServices(sv ?? [])
         setBarbers(br ?? [])
+        setTenantGallery([])
       }
       setTenantChecked(true)
     }
@@ -298,8 +304,39 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
     </div>
   )
 
+  const whatsappDigits = landingWhatsapp.replace(/\D/g, '')
+  const whatsappHref = whatsappDigits ? `https://wa.me/55${whatsappDigits}` : ''
+  const operatingHours = `${tenant?.opening_time || '08:00'} às ${tenant?.closing_time || '19:00'}`
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=900&q=80&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=900&q=80&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=900&q=80&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1517832606299-7ae9b720a186?w=900&q=80&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1582984563026-3d78053964ff?w=900&q=80&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1519500528352-2d1460418d41?w=900&q=80&auto=format&fit=crop',
+  ]
+  const uploadedGalleryImages = [...tenantGallery]
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((image, index) => ({ src: image.image_url, alt: `Trabalho ${index + 1}` }))
+  const galleryImages = (
+    uploadedGalleryImages.length > 0
+      ? uploadedGalleryImages
+      : [
+          ...filteredServices.filter((service) => service.photo_url).map((service) => ({ src: service.photo_url!, alt: service.name })),
+          ...filteredBarbers.filter((barber) => barber.avatar_url).map((barber) => ({ src: barber.avatar_url!, alt: barber.nome })),
+          ...fallbackImages.map((src, index) => ({ src, alt: `Trabalho ${index + 1}` })),
+        ]
+  ).slice(0, 12)
+  const lightboxImage = lightboxIndex !== null ? galleryImages[lightboxIndex] : null
+  const reviews = [
+    ['Ambiente top, atendimento impecável e corte sempre fica do jeito que eu gosto.', 'Rafael Costa'],
+    ['Profissionais incríveis, atenção nos mínimos detalhes.', 'Lucas Almeida'],
+    ['Melhor barbearia da região, não abro mão.', 'João Victor'],
+    ['Agendamento fácil e pontualidade que faz diferença.', 'Matheus Silva'],
+  ]
+
   return (
-    <div style={{ minHeight:'100vh', background:'#fff', color:'#1a1a1a', fontFamily:"'Outfit','Segoe UI',sans-serif", overflowX:'hidden' }}>
+    <div style={{ minHeight:'100vh', background:'#060503', color:'#f8f1df', fontFamily:"'Outfit','Segoe UI',sans-serif", overflowX:'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');
         *{box-sizing:border-box;}
@@ -324,10 +361,30 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         .gold-btn{transition:all 0.2s;cursor:pointer;}
         .gold-btn:hover{transform:translateY(-2px);filter:brightness(1.08);}
         .gold-btn:disabled{opacity:0.5;transform:none!important;cursor:not-allowed;}
-        .book-select{width:100%;padding:13px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;color:#374151;outline:none;background:#fff;font-family:'Outfit',sans-serif;transition:border-color 0.2s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23c9a84c' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
-        .book-select:focus{border-color:#c9a84c;}
-        .book-input{width:100%;padding:13px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;color:#374151;outline:none;background:#fff;font-family:'Outfit',sans-serif;transition:border-color 0.2s;box-sizing:border-box;}
-        .book-input:focus{border-color:#c9a84c;}
+        .book-select{width:100%;padding:13px 14px;border:1px solid rgba(255,255,255,0.12);border-radius:10px;font-size:14px;color:#f8f1df;outline:none;background:rgba(255,255,255,0.06);font-family:'Outfit',sans-serif;transition:border-color 0.2s;}
+        .book-select option{background:#111;color:#fff;}
+        .book-select:focus{border-color:#e8c96a;box-shadow:0 0 0 4px rgba(201,168,76,0.12);}
+        .book-input{width:100%;padding:13px 14px;border:1px solid rgba(255,255,255,0.12);border-radius:10px;font-size:14px;color:#f8f1df;outline:none;background:rgba(255,255,255,0.06);font-family:'Outfit',sans-serif;transition:border-color 0.2s;box-sizing:border-box;color-scheme:dark;}
+        .book-input::placeholder{color:#8b857a;}
+        .book-input:focus{border-color:#e8c96a;box-shadow:0 0 0 4px rgba(201,168,76,0.12);}
+        .premium-card{border:1px solid rgba(232,201,106,0.28);background:linear-gradient(145deg,rgba(255,255,255,0.065),rgba(255,255,255,0.025));border-radius:14px;box-shadow:0 18px 52px rgba(0,0,0,0.28);}
+        .gallery-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;}
+        .gallery-item{height:160px;border-radius:12px;overflow:hidden;border:1px solid rgba(232,201,106,0.24);background:#17140f;position:relative;cursor:pointer;box-shadow:0 18px 44px rgba(0,0,0,0.24);}
+        .gallery-item:after{content:'Ver foto';position:absolute;inset:auto 10px 10px 10px;padding:9px 10px;border-radius:999px;background:rgba(5,5,5,0.72);border:1px solid rgba(232,201,106,0.34);color:#e8c96a;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1.4px;text-align:center;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;}
+        .gallery-item img{width:100%;height:100%;object-fit:cover;filter:brightness(0.82);transition:transform .25s,filter .25s;}
+        .gallery-item:hover img{transform:scale(1.06);filter:brightness(1);}
+        .gallery-item:hover:after{opacity:1;transform:translateY(0);}
+        .lightbox-backdrop{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:32px;}
+        .lightbox-image{max-width:min(1120px,92vw);max-height:82vh;object-fit:contain;border-radius:18px;border:1px solid rgba(232,201,106,0.32);box-shadow:0 35px 90px rgba(0,0,0,0.55);}
+        .lightbox-button{position:absolute;border:1px solid rgba(232,201,106,0.34);background:rgba(12,10,7,0.72);color:#e8c96a;border-radius:999px;width:46px;height:46px;display:grid;place-items:center;cursor:pointer;font-size:24px;font-weight:800;}
+        .lightbox-close{top:24px;right:24px;}
+        .lightbox-prev{left:28px;}
+        .lightbox-next{right:28px;}
+        .review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+        .about-grid-premium{display:grid;grid-template-columns:minmax(0,1fr) 420px 250px;gap:28px;align-items:center;}
+        @media(max-width:960px){.gallery-grid{grid-template-columns:repeat(3,1fr)}.review-grid,.stat-grid{grid-template-columns:repeat(2,1fr)}.about-grid-premium{grid-template-columns:1fr!important;}}
+        @media(max-width:600px){.gallery-grid{grid-template-columns:repeat(2,1fr)}.review-grid,.stat-grid{grid-template-columns:1fr}.gallery-item{height:140px}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
         @keyframes spin{to{transform:rotate(360deg);}}
         .anim{animation:fadeUp 0.6s ease both;}
@@ -451,9 +508,9 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           </div>
 
           {/* ── BOOKING CARD ── */}
-          <div id="agendar" className="booking-float" style={{ background:'#fff', borderRadius:16, width:380, flexShrink:0, boxShadow:'0 32px 80px rgba(0,0,0,0.5)', overflow:'hidden' }}>
-            <div style={{ padding:'22px 26px 18px', borderBottom:'3px solid #f0e8d0' }}>
-              <h3 style={{ fontSize:20, fontWeight:800, color:'#1a1a1a', margin:'0 0 4px', fontFamily:"'Playfair Display',serif" }}>Agende seu horário</h3>
+          <div id="agendar" className="booking-float" style={{ background:'linear-gradient(145deg, rgba(17,16,13,0.94), rgba(7,6,4,0.86))', border:'1px solid rgba(232,201,106,0.32)', backdropFilter:'blur(22px)', borderRadius:22, width:400, flexShrink:0, boxShadow:'0 32px 80px rgba(0,0,0,0.5)', overflow:'hidden' }}>
+            <div style={{ padding:'22px 26px 18px', borderBottom:'1px solid rgba(232,201,106,0.2)' }}>
+              <h3 style={{ fontSize:20, fontWeight:800, color:'#fff', margin:'0 0 4px', fontFamily:"'Playfair Display',serif" }}>Agende seu horário</h3>
               <p style={{ fontSize:13, color:'#9ca3af', margin:0 }}>Rápido, fácil e online</p>
               <p style={{ fontSize:12, color:'#b8973a', margin:'8px 0 0', fontWeight:700 }}>Funcionamento: {tenant?.opening_time || '08:00'} às {tenant?.closing_time || '19:00'}</p>
             </div>
@@ -473,7 +530,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
               {/* Serviço */}
               <div>
-                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#d7d0c3', marginBottom:7, letterSpacing:0.3 }}>
                   <span style={{ color:primaryColor }}>✂</span> Selecione o serviço
                 </label>
                 <select
@@ -489,7 +546,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
               {/* Barbeiro */}
               <div>
-                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#d7d0c3', marginBottom:7, letterSpacing:0.3 }}>
                   <span style={{ color:primaryColor }}>👤</span> Selecione o barbeiro
                 </label>
                 <select
@@ -505,15 +562,15 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
               {/* Data */}
               <div>
-                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#d7d0c3', marginBottom:7, letterSpacing:0.3 }}>
                   <span style={{ color:primaryColor }}>📅</span> Selecione a data
                 </label>
-                <input type="date" className="book-input" value={selectedDate} min={todayStr} onChange={e=>handleDateChange(e.target.value)} style={{ color: selectedDate?'#374151':'#9ca3af' }} />
+                <input type="date" className="book-input" value={selectedDate} min={todayStr} onChange={e=>handleDateChange(e.target.value)} />
               </div>
 
               {/* Horário */}
               <div>
-                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7, letterSpacing:0.3 }}>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:600, color:'#d7d0c3', marginBottom:7, letterSpacing:0.3 }}>
                   <span style={{ color:primaryColor }}>🕐</span> Selecione o horário
                 </label>
                 {selectedDate && selectedBarber ? (
@@ -527,7 +584,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
                     </div>
                   )
                 ) : (
-                  <div style={{ padding:'11px 14px', border:'1.5px solid #e5e7eb', borderRadius:10, color:'#c4c4c4', fontSize:14 }}>
+                  <div style={{ padding:'11px 14px', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.04)', borderRadius:10, color:'#8b857a', fontSize:14 }}>
                     Selecione barbeiro e data
                   </div>
                 )}
@@ -537,11 +594,11 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
               {selectedTime && (
                 <>
                   <div>
-                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7 }}>👤 Seu nome</label>
+                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#d7d0c3', marginBottom:7 }}>👤 Seu nome</label>
                     <input className="book-input" placeholder="Nome completo" value={clientName} onChange={e=>setClientName(e.target.value)} />
                   </div>
                   <div>
-                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#6b7280', marginBottom:7 }}>📱 WhatsApp</label>
+                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#d7d0c3', marginBottom:7 }}>📱 WhatsApp</label>
                     <input className="book-input" placeholder="(47) 99999-9999" value={clientPhone} onChange={e=>setClientPhone(e.target.value)} />
                   </div>
                 </>
@@ -575,13 +632,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         ))}
       </div>
 
-      {/* ── SERVIÇOS (fundo claro) ── */}
-      <section id="servicos" style={{ padding:'80px 32px', background:'#f8f4ee' }}>
+      {/* ── SERVIÇOS ── */}
+      <section id="servicos" style={{ padding:'80px 32px', background:'#060503', borderTop:'1px solid rgba(232,201,106,0.14)' }}>
         <div className="services-layout" style={{ maxWidth:1100, margin:'0 auto', display:'grid', gridTemplateColumns:'260px 1fr', gap:60, alignItems:'start' }}>
           <div className="services-copy">
             <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 12px' }}>NOSSOS SERVIÇOS</p>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#1a1a1a', lineHeight:1.2, margin:'0 0 20px' }}>Escolha o serviço ideal para você</h2>
-            <a href="#agendar" className="gold-btn" style={{ display:'inline-block', padding:'12px 24px', borderRadius:8, background:'transparent', border:`1.5px solid #1a1a1a`, color:'#1a1a1a', fontSize:13, fontWeight:600, textDecoration:'none', letterSpacing:0.3 }}>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#fff', lineHeight:1.2, margin:'0 0 20px' }}>Escolha o serviço ideal para você</h2>
+            <a href="#agendar" className="gold-btn" style={{ display:'inline-block', padding:'12px 24px', borderRadius:8, background:'transparent', border:'1px solid rgba(232,201,106,0.55)', color:primaryColor, fontSize:13, fontWeight:600, textDecoration:'none', letterSpacing:0.3 }}>
               Ver todos os serviços →
             </a>
           </div>
@@ -589,19 +646,19 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             {filteredServices.length === 0 ? (
               <p style={{ color:'#9ca3af', gridColumn:'span 4' }}>Nenhum serviço cadastrado.</p>
             ) : filteredServices.map(sv=>(
-              <div key={sv.id} className={`sv-card${selectedService?.id===sv.id?' sel':''}`} onClick={()=>setSelectedService(sv)} style={{ background:'#fff', borderRadius:14, overflow:'hidden' }}>
+              <div key={sv.id} className={`sv-card${selectedService?.id===sv.id?' sel':''}`} onClick={()=>setSelectedService(sv)} style={{ background:'linear-gradient(145deg,rgba(255,255,255,0.065),rgba(255,255,255,0.025))', border:'1px solid rgba(232,201,106,0.28)', borderRadius:14, overflow:'hidden' }}>
                 {isPro && sv.photo_url ? (
                   <img src={sv.photo_url} alt={sv.name} style={{ width:'100%', height:130, objectFit:'cover', display:'block' }} />
                 ) : (
-                  <div style={{ width:'100%', height:100, background:'#f0ebe0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <div style={{ width:56, height:56, borderRadius:'50%', background:'#1a1a1a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, color:'#fff' }}>
+                  <div style={{ width:'100%', height:100, background:'#17140f', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <div style={{ width:56, height:56, borderRadius:'50%', background:'rgba(201,168,76,0.12)', border:'1px solid rgba(232,201,106,0.28)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, color:primaryColor }}>
                       {getServiceIcon(sv.name)}
                     </div>
                   </div>
                 )}
                 <div className="service-card-body" style={{ padding:'16px 18px' }}>
-                  <h4 className="service-card-title" style={{ fontSize:15, fontWeight:700, color:'#1a1a1a', margin:'0 0 4px' }}>{sv.name}</h4>
-                  <p className="service-card-desc" style={{ fontSize:12, color:'#6b7280', margin:'0 0 8px', lineHeight:1.5 }}>{sv.description || 'Atendimento premium e acabamento perfeito.'}</p>
+                  <h4 className="service-card-title" style={{ fontSize:15, fontWeight:700, color:'#fff', margin:'0 0 4px' }}>{sv.name}</h4>
+                  <p className="service-card-desc" style={{ fontSize:12, color:'#b8b2a7', margin:'0 0 8px', lineHeight:1.5 }}>{sv.description || 'Atendimento premium e acabamento perfeito.'}</p>
                   {sv.duration && <p style={{ fontSize:11, color:'#9ca3af', margin:'0 0 6px' }}>⏱ {sv.duration} min</p>}
                   <p style={{ fontSize:20, fontWeight:800, color:primaryColor, margin:0, fontFamily:"'Playfair Display',serif" }}>R$ {sv.price?.toFixed(2)}</p>
                 </div>
@@ -611,29 +668,57 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         </div>
       </section>
 
+      <section style={{ padding:'72px 32px', background:'#060503', borderTop:'1px solid rgba(232,201,106,0.14)' }}>
+        <div style={{ maxWidth:1100, margin:'0 auto' }}>
+          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:20, marginBottom:22, flexWrap:'wrap' }}>
+            <div>
+              <p style={{ fontSize:11, fontWeight:800, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 8px' }}>ÚLTIMOS TRABALHOS</p>
+              <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#fff', margin:0 }}>Confira alguns dos nossos cortes</h2>
+            </div>
+            <a href="#agendar" className="gold-btn" style={{ display:'inline-flex', padding:'12px 20px', borderRadius:8, background:'transparent', border:'1px solid rgba(232,201,106,0.55)', color:primaryColor, fontSize:13, fontWeight:700, textDecoration:'none' }}>
+              Ver mais trabalhos →
+            </a>
+          </div>
+          <div className="gallery-grid">
+            {galleryImages.map((image, index) => (
+              <button
+                type="button"
+                className="gallery-item"
+                key={`${image.src}-${index}`}
+                onClick={() => setLightboxIndex(index)}
+                style={{ padding: 0 }}
+                aria-label={`Abrir foto ${index + 1}`}
+              >
+                <img src={image.src} alt={image.alt} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── BARBEIROS ── */}
       {filteredBarbers.length > 0 && (
-        <section id="barbeiros" style={{ padding:'80px 32px', background:'#fff' }}>
+        <section id="barbeiros" style={{ padding:'80px 32px', background:'#060503', borderTop:'1px solid rgba(232,201,106,0.14)' }}>
           <div style={{ maxWidth:1100, margin:'0 auto' }}>
             <p style={{ fontSize:11, fontWeight:700, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 10px' }}>NOSSA EQUIPE</p>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#1a1a1a', margin:'0 0 36px' }}>Barbeiros Profissionais</h2>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#fff', margin:'0 0 36px' }}>Barbeiros Profissionais</h2>
             <div className="br-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:20 }}>
               {filteredBarbers.map(b=>{
                 const color = getAvatarColor(b.nome)
                 return (
-                  <div key={b.id} className={`br-card${selectedBarber?.id===b.id?' sel':''}`} onClick={()=>handleBarberChange(b)} style={{ background:'#f8f4ee', borderRadius:14, overflow:'hidden', textAlign:'center' }}>
+                  <div key={b.id} className={`br-card${selectedBarber?.id===b.id?' sel':''}`} onClick={()=>handleBarberChange(b)} style={{ background:'linear-gradient(145deg,rgba(255,255,255,0.065),rgba(255,255,255,0.025))', border:'1px solid rgba(232,201,106,0.28)', borderRadius:14, overflow:'hidden', textAlign:'center' }}>
                     {isPro && b.avatar_url ? (
                       <img src={b.avatar_url} alt={b.nome} style={{ width:'100%', height:180, objectFit:'cover', display:'block' }} />
                     ) : (
-                      <div style={{ width:'100%', height:120, background:'#ede8de', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:'100%', height:120, background:'#17140f', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         <div style={{ width:70, height:70, borderRadius:'50%', background:`${color}22`, border:`3px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, fontWeight:800, color, fontFamily:"'Playfair Display',serif" }}>
                           {getInitial(b.nome)}
                         </div>
                       </div>
                     )}
                     <div style={{ padding:'16px' }}>
-                      <h4 style={{ fontSize:16, fontWeight:700, color:'#1a1a1a', margin:'0 0 4px' }}>{b.nome}</h4>
-                      <p style={{ fontSize:12, color:'#6b7280', margin:'0 0 8px' }}>Barbeiro Profissional</p>
+                      <h4 style={{ fontSize:16, fontWeight:700, color:'#fff', margin:'0 0 4px' }}>{b.nome}</h4>
+                      <p style={{ fontSize:12, color:'#b8b2a7', margin:'0 0 8px' }}>Barbeiro Profissional</p>
                       <p style={{ fontSize:14, color:primaryColor, margin:0, letterSpacing:3 }}>★★★★★</p>
                     </div>
                   </div>
@@ -644,8 +729,64 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         </section>
       )}
 
+      <section style={{ padding:'72px 32px', background:'#060503', borderTop:'1px solid rgba(232,201,106,0.14)' }}>
+        <div style={{ maxWidth:1100, margin:'0 auto' }}>
+          <p style={{ fontSize:11, fontWeight:800, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 8px' }}>AVALIAÇÕES</p>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#fff', margin:'0 0 24px' }}>O que nossos clientes dizem</h2>
+          <div className="review-grid">
+            {reviews.map(([quote, name]) => (
+              <article key={name} className="premium-card" style={{ padding:'22px' }}>
+                <div style={{ color:primaryColor, letterSpacing:2, marginBottom:14 }}>★★★★★</div>
+                <p style={{ color:'#d7d0c3', fontSize:14, lineHeight:1.65, margin:'0 0 18px' }}>“{quote}”</p>
+                <p style={{ color:'#fff', fontWeight:800, margin:0 }}>— {name}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="sobre" style={{ padding:'72px 32px', background:'#060503', borderTop:'1px solid rgba(232,201,106,0.14)' }}>
+        <div className="about-grid-premium" style={{ maxWidth:1100, margin:'0 auto' }}>
+          <div>
+            <p style={{ fontSize:11, fontWeight:800, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 8px' }}>SOBRE NÓS</p>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(28px,3.5vw,42px)', fontWeight:900, color:'#fff', margin:'0 0 18px', lineHeight:1.05 }}>Mais que uma barbearia, um estilo de vida.</h2>
+            <p style={{ color:'#d7d0c3', fontSize:15, lineHeight:1.75, margin:0 }}>
+              A {tenantName} nasceu para entregar mais que cortes. Aqui, cada detalhe é pensado para proporcionar uma experiência única, unindo técnica, atendimento premium e um ambiente feito para você relaxar e sair ainda melhor.
+            </p>
+          </div>
+          <img src={galleryImages[0]?.src || fallbackImages[0]} alt={`Ambiente ${tenantName}`} style={{ width:'100%', height:250, objectFit:'cover', borderRadius:14, border:'1px solid rgba(232,201,106,0.24)', filter:'brightness(0.82)' }} />
+          <div style={{ display:'grid', gap:14 }}>
+            {['Profissionais experientes','Produtos premium','Ambiente climatizado','Atendimento personalizado'].map((item) => (
+              <div key={item} className="premium-card" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', color:'#f8f1df', fontWeight:700 }}>
+                <span style={{ width:32, height:32, borderRadius:10, display:'grid', placeItems:'center', background:'rgba(201,168,76,0.12)', color:primaryColor }}>✦</span>
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ padding:'28px 32px 72px', background:'#060503' }}>
+        <div className="stat-grid" style={{ maxWidth:1100, margin:'0 auto' }}>
+          {[
+            ['✂','+5 anos','De experiência'],
+            ['⬟','+5.000','Atendimentos realizados'],
+            ['●','+1.200','Clientes satisfeitos'],
+            ['★','4.9','Avaliação média'],
+          ].map(([icon, value, label]) => (
+            <div key={label} className="premium-card" style={{ padding:'22px', display:'flex', alignItems:'center', gap:16 }}>
+              <span style={{ width:42, height:42, borderRadius:12, display:'grid', placeItems:'center', border:'1px solid rgba(232,201,106,0.28)', background:'rgba(201,168,76,0.1)', color:primaryColor }}>{icon}</span>
+              <div>
+                <strong style={{ display:'block', color:primaryColor, fontSize:26, lineHeight:1 }}>{value}</strong>
+                <small style={{ color:'#d7d0c3' }}>{label}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── FEATURES (fundo escuro) ── */}
-      <section id="sobre" style={{ padding:'72px 32px', background:'#1a1a1a' }}>
+      <section style={{ padding:'72px 32px', background:'#1a1a1a' }}>
         <div style={{ maxWidth:960, margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:32 }}>
           {[
             { icon:'📅', title:'Agendamento Online', desc:'Agende seu horário quando quiser, 24h por dia, pelo celular ou computador.' },
@@ -705,6 +846,55 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         <a href={`https://wa.me/55${landingWhatsapp.replace(/\D/g,'')}`} target="_blank" className="gold-btn" style={{ position:'fixed', bottom:24, right:24, width:54, height:54, borderRadius:'50%', background:'#25d366', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, textDecoration:'none', boxShadow:'0 4px 24px rgba(37,211,102,0.45)', zIndex:50 }}>
           💬
         </a>
+      )}
+      {lightboxImage && (
+        <div className="lightbox-backdrop" onClick={() => setLightboxIndex(null)}>
+          <button
+            type="button"
+            className="lightbox-button lightbox-close"
+            onClick={(event) => {
+              event.stopPropagation()
+              setLightboxIndex(null)
+            }}
+            aria-label="Fechar galeria"
+          >
+            ×
+          </button>
+
+          {galleryImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="lightbox-button lightbox-prev"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setLightboxIndex((current) => (current === null ? 0 : (current - 1 + galleryImages.length) % galleryImages.length))
+                }}
+                aria-label="Imagem anterior"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="lightbox-button lightbox-next"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setLightboxIndex((current) => (current === null ? 0 : (current + 1) % galleryImages.length))
+                }}
+                aria-label="Proxima imagem"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <img
+            src={lightboxImage.src}
+            alt={lightboxImage.alt}
+            className="lightbox-image"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   )
