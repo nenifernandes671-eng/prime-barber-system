@@ -51,6 +51,7 @@ interface FinancialEntry {
   amount: number
   payment_method: string
   entry_date: string
+  category?: string | null
   created_at?: string
 }
 
@@ -64,6 +65,18 @@ interface CommissionPayment {
   status: string
   paid_at: string
   created_at?: string
+}
+
+interface BarberCommissionSetting {
+  id?: string
+  name: string
+  email?: string | null
+  tenant_id?: string
+  unit_id?: string | null
+  commission_percent?: number | null
+  commission_percentage?: number | null
+  commission_type?: string | null
+  ativo?: boolean | null
 }
 
 interface Unit { id: string; tenant_id: string; name: string; active: boolean }
@@ -149,6 +162,27 @@ function normalizePaymentMethod(method?: string | null) {
   return 'outros'
 }
 
+function parseMoney(value: string) {
+  const normalized = value
+    .trim()
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\.(?=\d{3}(?:\D|$))/g, '')
+    .replace(',', '.')
+
+  return Number(normalized)
+}
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function isCommissionEntry(entry: FinancialEntry) {
+  const category = (entry.category || '').toLowerCase()
+  const description = (entry.description || '').toLowerCase()
+
+  return category.includes('comiss') || description.startsWith('pagamento de comiss')
+}
+
 function useIsMobile() {
   const [m, setM] = useState(false)
 
@@ -217,6 +251,7 @@ export default function FinanceiroPage() {
   const [barberPhotos, setBarberPhotos] = useState<Record<string, string>>({})
   const [entries, setEntries] = useState<FinancialEntry[]>([])
   const [commissionPayments, setCommissionPayments] = useState<CommissionPayment[]>([])
+  const [commissionSettings, setCommissionSettings] = useState<BarberCommissionSetting[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [selectedUnitId, setSelectedUnitId] = useState('all')
   const [operationModal, setOperationModal] = useState<OperationModal>('closed')
@@ -259,6 +294,11 @@ export default function FinanceiroPage() {
           .eq('tenant_id', t.id)
           .order('paid_at', { ascending: false })
 
+        const { data: commissionSettingRows } = await supabase
+          .from('barbers')
+          .select('id,name,email,tenant_id,unit_id,commission_percentage,commission_type,ativo')
+          .eq('tenant_id', t.id)
+
         const { data: unitRows } = isPremium
           ? await supabase
               .from('units')
@@ -285,6 +325,7 @@ export default function FinanceiroPage() {
         setAppts(data ?? [])
         setEntries((entryRows ?? []) as FinancialEntry[])
         setCommissionPayments((commissionRows ?? []) as CommissionPayment[])
+        setCommissionSettings((commissionSettingRows ?? []) as BarberCommissionSetting[])
         setUnits(isPremium ? (unitRows ?? []) as Unit[] : [])
         setBarberPhotos(
           Object.fromEntries(
@@ -336,14 +377,16 @@ export default function FinanceiroPage() {
   }
 
   function openOperationModal(type: OperationModal) {
+    const defaultCommission = commissionBalances.find((barber) => barber.pending > 0) || commissionBalances[0]
+
     setOperationMsg(null)
     setEntryDescription('')
     setEntryAmount('')
     setEntryMethod('pix')
     setEntryDate(localDateKey())
     setEntryUnitId(activeUnitId !== 'all' ? activeUnitId : '')
-    setCommissionBarber(barberData[0]?.name ?? '')
-    setCommissionAmount('')
+    setCommissionBarber(defaultCommission?.name ?? '')
+    setCommissionAmount(defaultCommission?.pending ? String(defaultCommission.pending.toFixed(2)).replace('.', ',') : '')
     setCommissionMethod('pix')
     setCommissionUnitId(activeUnitId !== 'all' ? activeUnitId : '')
     setOperationModal(type)
@@ -352,7 +395,7 @@ export default function FinanceiroPage() {
   async function saveFinancialEntry(type: 'entrada' | 'despesa') {
     if (!tenantId) return
 
-    const amount = Number(entryAmount.replace(',', '.'))
+    const amount = parseMoney(entryAmount)
 
     if (!entryDescription.trim()) {
       setOperationMsg({ type: 'error', text: 'Informe uma descrição.' })
@@ -398,45 +441,113 @@ export default function FinanceiroPage() {
   async function saveCommissionPayment() {
     if (!tenantId) return
 
-    const amount = Number(commissionAmount.replace(',', '.'))
+    const amount = roundMoney(parseMoney(commissionAmount))
+    const selectedBalance = commissionBalances.find((barber) => barber.name === commissionBarber)
 
     if (!commissionBarber.trim()) {
       setOperationMsg({ type: 'error', text: 'Selecione um barbeiro.' })
       return
     }
 
+    if (!selectedBalance) {
+      setOperationMsg({ type: 'error', text: 'Nao encontrei comissao pendente para este barbeiro.' })
+      return
+    }
+
     if (!amount || amount <= 0) {
-      setOperationMsg({ type: 'error', text: 'Informe um valor válido.' })
+      setOperationMsg({ type: 'error', text: 'Informe um valor valido.' })
+      return
+    }
+
+    if (!commissionMethod) {
+      setOperationMsg({ type: 'error', text: 'Selecione o metodo de pagamento.' })
+      return
+    }
+
+    if (amount > selectedBalance.pending + 0.009) {
+      setOperationMsg({ type: 'error', text: `O valor maximo pendente para ${commissionBarber} e ${fmt(selectedBalance.pending)}.` })
       return
     }
 
     setOperationLoading(true)
     setOperationMsg(null)
 
-    const payload = {
+    const paymentMethod = normalizePaymentMethod(commissionMethod)
+    const unitId = isPremium ? commissionUnitId || null : null
+    const paidAt = new Date().toISOString()
+    const description = `Pagamento de comissao - ${commissionBarber}`
+
+    const commissionPayload = {
       tenant_id: tenantId,
-      unit_id: isPremium ? commissionUnitId || null : null,
+      unit_id: unitId,
       barber_name: commissionBarber,
       amount,
-      payment_method: normalizePaymentMethod(commissionMethod),
+      payment_method: paymentMethod,
       status: 'paid',
-      paid_at: new Date().toISOString(),
+      paid_at: paidAt,
     }
 
-    const { data, error } = await supabase
+    const { data: commissionData, error: commissionError } = await supabase
       .from('commission_payments')
-      .insert(payload)
+      .insert(commissionPayload)
       .select('*')
       .single()
 
-    if (error) {
-      setOperationMsg({ type: 'error', text: 'Erro ao registrar comissão. Verifique as policies/RLS da tabela commission_payments.' })
+    if (commissionError) {
+      setOperationMsg({ type: 'error', text: commissionError.message || 'Erro ao registrar pagamento de comissao.' })
       setOperationLoading(false)
       return
     }
 
-    setCommissionPayments(prev => [data as CommissionPayment, ...prev])
-    setOperationMsg({ type: 'success', text: 'Pagamento de comissão registrado.' })
+    const entryPayload = {
+      tenant_id: tenantId,
+      unit_id: unitId,
+      type: 'despesa',
+      description,
+      amount,
+      payment_method: paymentMethod,
+      entry_date: localDateKey(),
+      category: 'comissao',
+    }
+
+    const { data: entryData, error: entryError } = await supabase
+      .from('financial_entries')
+      .insert(entryPayload)
+      .select('*')
+      .single()
+
+    if (entryError) {
+      if (commissionData?.id) {
+        await supabase
+          .from('commission_payments')
+          .delete()
+          .eq('id', commissionData.id)
+          .eq('tenant_id', tenantId)
+      }
+
+      setOperationMsg({ type: 'error', text: entryError.message || 'Erro ao registrar a saida financeira da comissao.' })
+      setOperationLoading(false)
+      return
+    }
+
+    const [{ data: refreshedEntries }, { data: refreshedCommissions }] = await Promise.all([
+      supabase
+        .from('financial_entries')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('entry_date', { ascending: false }),
+      supabase
+        .from('commission_payments')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('paid_at', { ascending: false }),
+    ])
+
+    setEntries((refreshedEntries ?? [entryData]) as FinancialEntry[])
+    setCommissionPayments((refreshedCommissions ?? [commissionData]) as CommissionPayment[])
+    setCommissionAmount('')
+    setCommissionMethod('pix')
+    setOperationMsg({ type: 'success', text: 'Pagamento de comissao registrado com sucesso.' })
     setTimeout(() => setOperationModal('closed'), 650)
     setOperationLoading(false)
   }
@@ -483,7 +594,7 @@ export default function FinanceiroPage() {
     .filter((entry) => entry.type === 'entrada')
     .reduce((s, entry) => s + Number(entry.amount || 0), 0)
   const manualExpenses = filteredEntries
-    .filter((entry) => entry.type === 'despesa')
+    .filter((entry) => entry.type === 'despesa' && !isCommissionEntry(entry))
     .reduce((s, entry) => s + Number(entry.amount || 0), 0)
   const commissionPaidTotal = filteredCommissionPayments.reduce((s, p) => s + Number(p.amount || 0), 0)
   const totalRev = appointmentRevenue + manualIncome
@@ -588,6 +699,47 @@ export default function FinanceiroPage() {
       }))
       .sort((a, b) => b.r - a.r)
   }, [rev, barberPhotos])
+
+  function getCommissionPercent(barberName: string) {
+    const match = commissionSettings.find((row) => nameKey(row.name) === nameKey(barberName))
+    return Number(match?.commission_percent ?? match?.commission_percentage ?? 0)
+  }
+
+  const commissionBalances = useMemo(() => {
+    const balances: Record<string, { name: string; earned: number; paid: number; pending: number; percent: number }> = {}
+
+    rev.forEach((appointment) => {
+      const name = appointment.barber || '—'
+      const percent = getCommissionPercent(name)
+      const amount = roundMoney(Number(appointment.price || 0) * (percent / 100))
+
+      if (!balances[name]) {
+        balances[name] = { name, earned: 0, paid: 0, pending: 0, percent }
+      }
+
+      balances[name].earned = roundMoney(balances[name].earned + amount)
+      balances[name].percent = percent
+    })
+
+    filteredCommissionPayments.forEach((payment) => {
+      const name = payment.barber_name || '—'
+
+      if (!balances[name]) {
+        balances[name] = { name, earned: 0, paid: 0, pending: 0, percent: getCommissionPercent(name) }
+      }
+
+      balances[name].paid = roundMoney(balances[name].paid + Number(payment.amount || 0))
+    })
+
+    return Object.values(balances)
+      .map((balance) => ({
+        ...balance,
+        pending: Math.max(0, roundMoney(balance.earned - balance.paid)),
+      }))
+      .sort((a, b) => b.pending - a.pending || b.earned - a.earned)
+  }, [rev, filteredCommissionPayments, commissionSettings])
+
+  const selectedCommissionBalance = commissionBalances.find((barber) => barber.name === commissionBarber)
 
   const recentTransactions = useMemo(() => {
     return filtered.slice(0, 5)
@@ -1382,6 +1534,35 @@ export default function FinanceiroPage() {
           font-weight: 850;
         }
 
+        .commission-pending-box {
+          display: grid;
+          gap: 4px;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(139, 92, 246, 0.24);
+          background: rgba(139, 92, 246, 0.1);
+        }
+
+        .commission-pending-box span {
+          color: #94a3b8;
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: .06em;
+          text-transform: uppercase;
+        }
+
+        .commission-pending-box strong {
+          color: #f8fafc;
+          font-size: 22px;
+          font-weight: 950;
+        }
+
+        .commission-pending-box small {
+          color: #94a3b8;
+          font-size: 12px;
+          line-height: 1.35;
+        }
+
         .operation-body input,
         .operation-body select {
           min-height: 46px;
@@ -2081,13 +2262,33 @@ export default function FinanceiroPage() {
               <div className="operation-body">
                 <label>
                   Barbeiro
-                  <select value={commissionBarber} onChange={(event) => setCommissionBarber(event.target.value)}>
+                  <select
+                    value={commissionBarber}
+                    onChange={(event) => {
+                      const name = event.target.value
+                      const balance = commissionBalances.find((barber) => barber.name === name)
+                      setCommissionBarber(name)
+                      setCommissionAmount(balance?.pending ? String(balance.pending.toFixed(2)).replace('.', ',') : '')
+                    }}
+                  >
                     <option value="">Selecione</option>
-                    {barberData.map((barber) => (
-                      <option key={barber.name} value={barber.name}>{barber.name}</option>
+                    {commissionBalances.map((barber) => (
+                      <option key={barber.name} value={barber.name}>
+                        {barber.name} - pendente {fmt(barber.pending)}
+                      </option>
                     ))}
                   </select>
                 </label>
+
+                {selectedCommissionBalance && (
+                  <div className="commission-pending-box">
+                    <span>Comissão pendente</span>
+                    <strong>{fmt(selectedCommissionBalance.pending)}</strong>
+                    <small>
+                      Gerado: {fmt(selectedCommissionBalance.earned)} · Pago: {fmt(selectedCommissionBalance.paid)} · {selectedCommissionBalance.percent}% de comissão
+                    </small>
+                  </div>
+                )}
 
                 <label>
                   Valor pago
