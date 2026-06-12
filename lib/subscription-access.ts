@@ -18,9 +18,7 @@ export function getTenantAccess(tenant?: TenantAccessInput | null) {
   const normalizedStatus = String(tenant.subscription_status || tenant.status || '').toLowerCase()
   const isTrial = normalizedStatus === 'trialing' || normalizedStatus === 'trial'
   const isActive = normalizedStatus === 'active'
-  const accessEnd = isTrial
-    ? tenant.trial_end || tenant.trial_ends_at
-    : tenant.trial_ends_at
+  const accessEnd = tenant.trial_ends_at || tenant.trial_end
   const now = Date.now()
   const endMs = accessEnd ? new Date(accessEnd).getTime() : null
   const daysLeft = endMs ? Math.max(0, Math.ceil((endMs - now) / 86400000)) : 0

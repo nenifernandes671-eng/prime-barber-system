@@ -34,6 +34,12 @@ interface TenantContextType {
   refreshTenant: () => Promise<void>
 }
 
+interface AccessState {
+  allowed: boolean
+  reason: string
+  daysLeft: number
+}
+
 const TenantContext = createContext<TenantContextType>({
   tenant: null,
   loading: true,
@@ -52,6 +58,11 @@ const TenantContext = createContext<TenantContextType>({
 export function TenantProvider({ slug, children }: { slug: string; children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [loading, setLoading] = useState(true)
+  const [accessState, setAccessState] = useState<AccessState>({
+    allowed: false,
+    reason: 'loading',
+    daysLeft: 0,
+  })
 
   const fetchTenant = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -61,6 +72,7 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
 
     if (!token) {
       setTenant(null)
+      setAccessState({ allowed: false, reason: 'unauthenticated', daysLeft: 0 })
       setLoading(false)
       return
     }
@@ -74,8 +86,12 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
     if (!response.ok) {
       console.error('TenantContext error:', result.error || response.statusText)
       setTenant(null)
+      setAccessState({ allowed: false, reason: 'forbidden', daysLeft: 0 })
     } else {
       setTenant(result.tenant ?? null)
+      setAccessState(
+        result.access ?? getTenantAccess(result.tenant),
+      )
     }
 
     setLoading(false)
@@ -88,8 +104,18 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
       if (!active) return
       await fetchTenant(showLoading)
     }
-    const handlePageHide = () => setLoading(true)
-    const handlePageShow = () => refresh(true)
+    const handlePageHide = () => {
+      setAccessState((current) => ({ ...current, allowed: false, reason: 'revalidating' }))
+      setLoading(true)
+    }
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        window.location.reload()
+        return
+      }
+      refresh(true)
+    }
+    const handleFocus = () => refresh(true)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') refresh(true)
     }
@@ -97,7 +123,7 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
     refresh(true)
     window.addEventListener('pagehide', handlePageHide)
     window.addEventListener('pageshow', handlePageShow)
-    window.addEventListener('focus', handlePageShow)
+    window.addEventListener('focus', handleFocus)
     document.addEventListener('visibilitychange', handleVisibility)
     const interval = window.setInterval(() => refresh(false), 30000)
 
@@ -105,17 +131,17 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
       active = false
       window.removeEventListener('pagehide', handlePageHide)
       window.removeEventListener('pageshow', handlePageShow)
-      window.removeEventListener('focus', handlePageShow)
+      window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.clearInterval(interval)
     }
   }, [fetchTenant])
 
-  const access = getTenantAccess(tenant)
   const plan = getPlanFlags(tenant?.plano)
   const isTrialing =
     (tenant?.subscription_status === 'trialing' || tenant?.status === 'trial') &&
-    access.allowed
+    accessState.allowed
+  const refreshTenant = useCallback(() => fetchTenant(true), [fetchTenant])
 
   return (
     <TenantContext.Provider
@@ -123,10 +149,10 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
         tenant,
         loading,
         isTrialing,
-        trialDaysLeft: access.daysLeft,
-        hasAccess: access.allowed,
-        accessReason: access.reason,
-        refreshTenant: () => fetchTenant(true),
+        trialDaysLeft: accessState.daysLeft,
+        hasAccess: accessState.allowed,
+        accessReason: accessState.reason,
+        refreshTenant,
         ...plan,
       }}
     >

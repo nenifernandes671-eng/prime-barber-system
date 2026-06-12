@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, use } from 'react'
+import { useEffect, useMemo, useState, use } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TenantProvider, useTenant } from '@/lib/tenant-context'
 import { UnitProvider, useUnit } from '@/lib/unit-context'
@@ -42,18 +42,16 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const pathname = usePathname()
   const router = useRouter()
   const { theme } = useTheme()
-  const { tenant, loading, isTrialing, trialDaysLeft, hasAccess, accessReason, isPremium, isProOrPremium } = useTenant()
+  const { tenant, loading, isTrialing, trialDaysLeft, hasAccess, accessReason, isPremium, isProOrPremium, refreshTenant } = useTenant()
   const { units, selectedUnitId, setSelectedUnitId, loadingUnits } = useUnit()
 
   const [checking, setChecking] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [adminEmail, setAdminEmail] = useState('')
   const [copied, setCopied] = useState(false)
-  const [syncingAccess, setSyncingAccess] = useState(false)
-  const [syncMessage, setSyncMessage] = useState('')
+  const [validatedPath, setValidatedPath] = useState<string | null>(null)
   const [renewing, setRenewing] = useState(false)
   const [renewError, setRenewError] = useState('')
-  const syncAttemptedRef = useRef(false)
 
   const t = tenant as any
   const planName = t?.plano ? String(t.plano).toUpperCase() : 'PRO'
@@ -119,6 +117,8 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   ]
 
   useEffect(() => {
+    setChecking(true)
+
     if (pathname === `/${slug}/login`) {
       setChecking(false)
       return
@@ -172,71 +172,22 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   }, [pathname])
 
   useEffect(() => {
-    if (loading || checking || hasAccess || !tenant?.slug || syncingAccess || syncAttemptedRef.current) return
-
     let active = true
 
-    async function syncAsaasAccess() {
-      syncAttemptedRef.current = true
-      setSyncingAccess(true)
-      setSyncMessage('Verificando pagamento no Asaas...')
-
+    async function validateRouteAccess() {
       try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData.session?.access_token
-
-        if (!token) {
-          if (active) setSyncMessage('')
-          return
-        }
-
-        const response = await fetch('/api/asaas/sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ slug }),
-        })
-
-        const result = await response.json().catch(() => ({}))
-
-        if (!active) return
-
-        if (result.active) {
-          setSyncMessage('Pagamento confirmado. Liberando acesso...')
-          window.location.reload()
-          return
-        }
-
-        if (accessReason === 'trial-expired') {
-          await fetch('/api/tenant/expire-trial', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ slug }),
-          })
-
-          setSyncMessage('Seu teste terminou. Renove a assinatura para continuar.')
-          return
-        }
-
-        setSyncMessage(result.message || 'Pagamento ainda nao confirmado no Asaas.')
-      } catch {
-        if (active) setSyncMessage('Nao foi possivel verificar o pagamento agora.')
+        await refreshTenant()
       } finally {
-        if (active) setSyncingAccess(false)
+        if (active) setValidatedPath(pathname)
       }
     }
 
-    syncAsaasAccess()
+    void validateRouteAccess()
 
     return () => {
       active = false
     }
-  }, [loading, checking, hasAccess, tenant?.slug, syncingAccess, slug, accessReason, router])
+  }, [pathname, refreshTenant])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -278,7 +229,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     }
   }
 
-  if (loading || checking) {
+  if (loading || checking || validatedPath !== pathname) {
     return (
       <div className="admin-loading">
         <div className="admin-loader" />
@@ -307,9 +258,9 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             Para continuar usando o painel e a página de agendamento da sua barbearia, regularize sua assinatura.
           </p>
-          {(renewError || syncMessage) && (
-            <p style={{ color: renewError ? '#fca5a5' : '#93c5fd', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
-              {renewError || syncMessage}
+          {renewError && (
+            <p style={{ color: '#fca5a5', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
+              {renewError}
             </p>
           )}
           <button
@@ -341,11 +292,6 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             Este recurso esta disponivel apenas no plano {isPremiumBlock ? 'Premium' : 'Pro ou Premium'}.
           </p>
-          {syncMessage && (
-            <p style={{ color: '#93c5fd', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
-              {syncMessage}
-            </p>
-          )}
           <Link href="/pricing" style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', textDecoration: 'none', fontWeight: 900 }}>
             Fazer upgrade
           </Link>

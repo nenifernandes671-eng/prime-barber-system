@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getTenantAccess } from '@/lib/subscription-access'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,5 +62,11 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ tenant }, { headers: noStoreHeaders })
+  return NextResponse.json(
+    {
+      tenant,
+      access: getTenantAccess(tenant),
+    },
+    { headers: noStoreHeaders },
+  )
 }
