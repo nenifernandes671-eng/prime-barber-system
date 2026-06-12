@@ -15,45 +15,37 @@ export function getTenantAccess(tenant?: TenantAccessInput | null) {
     }
   }
 
-  const normalizedStatus = String(tenant.subscription_status || tenant.status || '').toLowerCase()
-  const isTrial = normalizedStatus === 'trialing' || normalizedStatus === 'trial'
-  const isActive = normalizedStatus === 'active'
+  const subscriptionStatus = String(tenant.subscription_status || '').toLowerCase()
   const accessEnd = tenant.trial_ends_at || tenant.trial_end
   const now = Date.now()
   const endMs = accessEnd ? new Date(accessEnd).getTime() : null
-  const daysLeft = endMs ? Math.max(0, Math.ceil((endMs - now) / 86400000)) : 0
+  const hasActiveSubscription = subscriptionStatus === 'active'
+  const hasActiveTrial = Boolean(endMs && Number.isFinite(endMs) && endMs > now)
+  const daysLeft = hasActiveTrial && endMs
+    ? Math.max(1, Math.ceil((endMs - now) / 86400000))
+    : 0
 
-  if (
-    ['cancelled', 'suspended', 'blocked', 'trial_expired'].includes(normalizedStatus) ||
-    tenant.status === 'cancelled' ||
-    tenant.status === 'suspended'
-  ) {
-    return {
-      allowed: false,
-      reason: normalizedStatus || tenant.status || 'blocked',
-      daysLeft: 0,
-    }
-  }
-
-  if (tenant.subscription_status === 'active') {
+  if (hasActiveSubscription) {
     return {
       allowed: true,
-      reason: 'ok' as const,
+      reason: 'subscription-active' as const,
       daysLeft,
     }
   }
 
-  if ((isTrial || isActive) && endMs && endMs <= now) {
+  if (hasActiveTrial) {
     return {
-      allowed: false,
-      reason: isTrial ? 'trial-expired' as const : 'subscription-expired' as const,
-      daysLeft: 0,
+      allowed: true,
+      reason: 'trial' as const,
+      daysLeft,
     }
   }
 
   return {
-    allowed: isTrial || isActive,
-    reason: 'ok' as const,
-    daysLeft,
+    allowed: false,
+    reason: endMs && endMs <= now
+      ? 'subscription-expired' as const
+      : subscriptionStatus || tenant.status || 'inactive',
+    daysLeft: 0,
   }
 }

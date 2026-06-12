@@ -58,18 +58,14 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const tenantName = t?.nome ?? slug
   const initial = tenantName?.slice(0, 2).toUpperCase() || 'NB'
   const emailInitial = adminEmail?.slice(0, 1).toUpperCase() || 'A'
-  const isTrial =
-    t?.subscription_status === 'trialing' ||
-    (!t?.subscription_status && t?.status === 'trial')
-  const periodEnd = isTrial
-    ? t?.trial_end ?? t?.trial_ends_at ?? null
-    : t?.trial_ends_at ?? null
+  const isSubscriptionActive = t?.subscription_status === 'active'
+  const isTrial = hasAccess && !isSubscriptionActive
+  const periodEnd = t?.trial_ends_at ?? t?.trial_end ?? null
   const periodStart = isTrial
     ? t?.trial_start ?? t?.created_at ?? null
     : t?.created_at ?? null
-  const remainingDays = daysLeft(periodEnd)
+  const remainingDays = isSubscriptionActive ? null : daysLeft(periodEnd)
   const planProgress = progressPercent(periodStart, periodEnd)
-  const isActive = t?.status === 'active'
 
   const publicBookingUrl = useMemo(() => {
     if (typeof window === 'undefined') return `/${slug}`
@@ -323,7 +319,13 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         <div className="tenant-avatar">{initial}</div>
         <div className="tenant-info">
           <strong>{tenantName}</strong>
-          <span>{isTrial ? 'Teste ativo' : isActive ? 'Sistema ativo' : 'Status: ' + (t?.status ?? 'indefinido')}</span>
+          <span>
+            {hasAccess
+              ? isSubscriptionActive
+                ? 'Sistema ativo'
+                : 'Teste ativo'
+              : 'Sistema bloqueado'}
+          </span>
           <button type="button" onClick={copyBookingLink} className="copy-link-btn">
             {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
             {copied ? 'Link copiado' : 'Copiar agenda'}
@@ -398,7 +400,9 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           <span>Seu plano</span>
           <strong>{planName}</strong>
           <small>
-            {remainingDays !== null
+            {isSubscriptionActive
+              ? 'Assinatura ativa'
+              : remainingDays !== null
               ? `${remainingDays} dia${remainingDays !== 1 ? 's' : ''} restante${remainingDays !== 1 ? 's' : ''}`
               : 'Vencimento não informado'}
           </small>

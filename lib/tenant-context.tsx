@@ -138,9 +138,7 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
   }, [fetchTenant])
 
   const plan = getPlanFlags(tenant?.plano)
-  const isTrialing =
-    (tenant?.subscription_status === 'trialing' || tenant?.status === 'trial') &&
-    accessState.allowed
+  const isTrialing = accessState.allowed && accessState.reason === 'trial'
   const refreshTenant = useCallback(() => fetchTenant(true), [fetchTenant])
 
   return (
