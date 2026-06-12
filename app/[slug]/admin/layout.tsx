@@ -49,7 +49,6 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const [mobileOpen, setMobileOpen] = useState(false)
   const [adminEmail, setAdminEmail] = useState('')
   const [copied, setCopied] = useState(false)
-  const [validatedPath, setValidatedPath] = useState<string | null>(null)
   const [renewing, setRenewing] = useState(false)
   const [renewError, setRenewError] = useState('')
 
@@ -113,8 +112,6 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   ]
 
   useEffect(() => {
-    setChecking(true)
-
     if (pathname === `/${slug}/login`) {
       setChecking(false)
       return
@@ -124,29 +121,6 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push(`/${slug}/login`)
-        return
-      }
-
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('id')
-        .eq('slug', slug)
-        .maybeSingle()
-
-      if (!tenantData) {
-        router.push(`/${slug}/login`)
-        return
-      }
-
-      const { data: membership } = await supabase
-        .from('tenant_users')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('tenant_id', tenantData.id)
-        .maybeSingle()
-
-      if (!membership) {
         router.push(`/${slug}/login`)
         return
       }
@@ -161,28 +135,14 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     }
 
     checkAuth()
-  }, [pathname, slug, router])
+  }, [slug, router])
 
   useEffect(() => {
     setMobileOpen(false)
   }, [pathname])
 
   useEffect(() => {
-    let active = true
-
-    async function validateRouteAccess() {
-      try {
-        await refreshTenant()
-      } finally {
-        if (active) setValidatedPath(pathname)
-      }
-    }
-
-    void validateRouteAccess()
-
-    return () => {
-      active = false
-    }
+    void refreshTenant({ silent: true })
   }, [pathname, refreshTenant])
 
   const handleLogout = async () => {
@@ -225,7 +185,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     }
   }
 
-  if (loading || checking || validatedPath !== pathname) {
+  if (loading || checking) {
     return (
       <div className="admin-loading">
         <div className="admin-loader" />

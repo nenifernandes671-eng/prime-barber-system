@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
 import { getPlanFlags, type PlanKey } from '@/lib/permissions'
@@ -31,7 +31,7 @@ interface TenantContextType {
   isPro: boolean
   isPremium: boolean
   isProOrPremium: boolean
-  refreshTenant: () => Promise<void>
+  refreshTenant: (options?: RefreshTenantOptions) => Promise<void>
 }
 
 interface AccessState {
@@ -39,6 +39,22 @@ interface AccessState {
   reason: string
   daysLeft: number
 }
+
+interface RefreshTenantOptions {
+  force?: boolean
+  silent?: boolean
+}
+
+interface CachedTenantAccess {
+  tenant: Tenant
+  access: AccessState
+  expiresAt: number
+}
+
+const ACCESS_CACHE_TTL = 2 * 60 * 1000
+const ACCESS_REVALIDATE_INTERVAL = 5 * 60 * 1000
+const accessCache = new Map<string, CachedTenantAccess>()
+const accessRequests = new Map<string, Promise<CachedTenantAccess>>()
 
 const TenantContext = createContext<TenantContextType>({
   tenant: null,
@@ -63,83 +79,120 @@ export function TenantProvider({ slug, children }: { slug: string; children: Rea
     reason: 'loading',
     daysLeft: 0,
   })
+  const mountedRef = useRef(true)
 
-  const fetchTenant = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true)
-
+  const fetchTenant = useCallback(async (options: RefreshTenantOptions = {}) => {
+    const { force = false, silent = false } = options
     const { data: sessionData } = await supabase.auth.getSession()
-    const token = sessionData.session?.access_token
+    const session = sessionData.session
+    const token = session?.access_token
 
     if (!token) {
-      setTenant(null)
-      setAccessState({ allowed: false, reason: 'unauthenticated', daysLeft: 0 })
-      setLoading(false)
+      if (mountedRef.current) {
+        setTenant(null)
+        setAccessState({ allowed: false, reason: 'unauthenticated', daysLeft: 0 })
+        setLoading(false)
+      }
       return
     }
 
-    const response = await fetch(`/api/tenant/access?slug=${encodeURIComponent(slug)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    const result = await response.json().catch(() => ({}))
+    const cacheKey = `${session.user.id}:${slug}`
+    const cached = accessCache.get(cacheKey)
 
-    if (!response.ok) {
-      console.error('TenantContext error:', result.error || response.statusText)
-      setTenant(null)
-      setAccessState({ allowed: false, reason: 'forbidden', daysLeft: 0 })
-    } else {
-      setTenant(result.tenant ?? null)
-      setAccessState(
-        result.access ?? getTenantAccess(result.tenant),
-      )
+    if (!force && cached && cached.expiresAt > Date.now()) {
+      if (mountedRef.current) {
+        setTenant(cached.tenant)
+        setAccessState(cached.access)
+        setLoading(false)
+      }
+      return
     }
 
-    setLoading(false)
+    if (!silent) setLoading(true)
+
+    let request = accessRequests.get(cacheKey)
+
+    if (!request) {
+      request = (async () => {
+        const response = await fetch(`/api/tenant/access?slug=${encodeURIComponent(slug)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        const result = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          const error = new Error(result.error || response.statusText) as Error & {
+            status?: number
+          }
+          error.status = response.status
+          throw error
+        }
+
+        const nextTenant = result.tenant as Tenant
+        const nextAccess = result.access ?? getTenantAccess(nextTenant)
+        const entry = {
+          tenant: nextTenant,
+          access: nextAccess,
+          expiresAt: Date.now() + ACCESS_CACHE_TTL,
+        }
+        accessCache.set(cacheKey, entry)
+        return entry
+      })().finally(() => {
+        accessRequests.delete(cacheKey)
+      })
+      accessRequests.set(cacheKey, request)
+    }
+
+    try {
+      const result = await request
+      if (mountedRef.current) {
+        setTenant(result.tenant)
+        setAccessState(result.access)
+      }
+    } catch (error) {
+      const status = (error as Error & { status?: number }).status
+      console.error('TenantContext error:', error)
+
+      // Authentication/authorization failures are definitive. Transient server or
+      // network failures keep the current screen visible until the next revalidation.
+      if (mountedRef.current && [401, 403, 404].includes(status ?? 0)) {
+        setTenant(null)
+        setAccessState({ allowed: false, reason: 'forbidden', daysLeft: 0 })
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false)
+    }
   }, [slug])
 
   useEffect(() => {
-    let active = true
+    mountedRef.current = true
 
-    const refresh = async (showLoading = true) => {
-      if (!active) return
-      await fetchTenant(showLoading)
-    }
-    const handlePageHide = () => {
-      setAccessState((current) => ({ ...current, allowed: false, reason: 'revalidating' }))
-      setLoading(true)
-    }
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        window.location.reload()
-        return
+        void fetchTenant({ force: true, silent: true })
       }
-      refresh(true)
-    }
-    const handleFocus = () => refresh(true)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') refresh(true)
     }
 
-    refresh(true)
-    window.addEventListener('pagehide', handlePageHide)
+    void fetchTenant()
     window.addEventListener('pageshow', handlePageShow)
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibility)
-    const interval = window.setInterval(() => refresh(false), 30000)
+    const interval = window.setInterval(
+      () => void fetchTenant({ force: true, silent: true }),
+      ACCESS_REVALIDATE_INTERVAL,
+    )
 
     return () => {
-      active = false
-      window.removeEventListener('pagehide', handlePageHide)
+      mountedRef.current = false
       window.removeEventListener('pageshow', handlePageShow)
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibility)
       window.clearInterval(interval)
     }
   }, [fetchTenant])
 
   const plan = getPlanFlags(tenant?.plano)
   const isTrialing = accessState.allowed && accessState.reason === 'trial'
-  const refreshTenant = useCallback(() => fetchTenant(true), [fetchTenant])
+  const refreshTenant = useCallback(
+    (options?: RefreshTenantOptions) => fetchTenant(options),
+    [fetchTenant],
+  )
 
   return (
     <TenantContext.Provider
