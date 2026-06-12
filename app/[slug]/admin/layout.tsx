@@ -51,6 +51,8 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const [copied, setCopied] = useState(false)
   const [syncingAccess, setSyncingAccess] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
+  const [renewing, setRenewing] = useState(false)
+  const [renewError, setRenewError] = useState('')
   const syncAttemptedRef = useRef(false)
 
   const t = tenant as any
@@ -58,12 +60,18 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const tenantName = t?.nome ?? slug
   const initial = tenantName?.slice(0, 2).toUpperCase() || 'NB'
   const emailInitial = adminEmail?.slice(0, 1).toUpperCase() || 'A'
-  const periodEnd = t?.trial_ends_at ?? null
-  const periodStart = t?.created_at ?? null
+  const isTrial =
+    t?.subscription_status === 'trialing' ||
+    (!t?.subscription_status && t?.status === 'trial')
+  const periodEnd = isTrial
+    ? t?.trial_end ?? t?.trial_ends_at ?? null
+    : t?.trial_ends_at ?? null
+  const periodStart = isTrial
+    ? t?.trial_start ?? t?.created_at ?? null
+    : t?.created_at ?? null
   const remainingDays = daysLeft(periodEnd)
   const planProgress = progressPercent(periodStart, periodEnd)
   const isActive = t?.status === 'active'
-  const isTrial = t?.status === 'trial'
 
   const publicBookingUrl = useMemo(() => {
     if (typeof window === 'undefined') return `/${slug}`
@@ -201,6 +209,20 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           return
         }
 
+        if (accessReason === 'trial-expired') {
+          await fetch('/api/tenant/expire-trial', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ slug }),
+          })
+
+          setSyncMessage('Seu teste terminou. Renove a assinatura para continuar.')
+          return
+        }
+
         setSyncMessage(result.message || 'Pagamento ainda nao confirmado no Asaas.')
       } catch {
         if (active) setSyncMessage('Nao foi possivel verificar o pagamento agora.')
@@ -214,11 +236,46 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     return () => {
       active = false
     }
-  }, [loading, checking, hasAccess, tenant?.slug, syncingAccess, slug])
+  }, [loading, checking, hasAccess, tenant?.slug, syncingAccess, slug, accessReason, router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push(`/${slug}/login`)
+  }
+
+  const handleRenewSubscription = async () => {
+    setRenewing(true)
+    setRenewError('')
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) {
+        router.replace(`/${slug}/login`)
+        return
+      }
+
+      const response = await fetch('/api/asaas/renew', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+        body: JSON.stringify({ slug }),
+      })
+      const result = await response.json().catch(() => ({}))
+
+      if (!response.ok || !result.url) {
+        throw new Error(result.error || 'Nao foi possivel iniciar a renovacao.')
+      }
+
+      window.location.assign(result.url)
+    } catch (error: any) {
+      setRenewError(error?.message || 'Nao foi possivel iniciar a renovacao.')
+      setRenewing(false)
+    }
   }
 
   if (loading || checking) {
@@ -250,9 +307,19 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             Para continuar usando o painel e a página de agendamento da sua barbearia, regularize sua assinatura.
           </p>
-          <Link href="/pricing" style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', textDecoration: 'none', fontWeight: 900 }}>
-            Ver planos
-          </Link>
+          {(renewError || syncMessage) && (
+            <p style={{ color: renewError ? '#fca5a5' : '#93c5fd', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
+              {renewError || syncMessage}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleRenewSubscription}
+            disabled={renewing}
+            style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, border: 0, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', fontWeight: 900, cursor: renewing ? 'wait' : 'pointer', opacity: renewing ? .7 : 1 }}
+          >
+            {renewing ? 'Abrindo renovacao...' : `Renovar assinatura ${planName}`}
+          </button>
           <button onClick={handleLogout} style={{ marginTop: 12, width: '100%', padding: '12px 18px', borderRadius: 14, border: '1px solid rgba(239,68,68,.28)', background: 'transparent', color: '#f87171', fontWeight: 800, cursor: 'pointer' }}>
             Sair
           </button>
@@ -323,10 +390,17 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
       {isTrialing && (
         <div className="trial-card">
           <div>
-            <strong>Teste ativo</strong>
-            <span>{trialDaysLeft} dias restantes</span>
+            <strong>{trialDaysLeft <= 1 ? 'Seu teste termina amanhã' : 'Teste gratuito'}</strong>
+            <span>
+              {trialDaysLeft <= 1
+                ? 'Escolha um plano para continuar usando.'
+                : `Você está no teste gratuito. Restam ${trialDaysLeft} dias.`}
+            </span>
           </div>
-          <Link href="/pricing">Assinar</Link>
+          <div className="trial-actions">
+            <Link href="/pricing">Escolher plano</Link>
+            <Link href="/pricing" className="trial-pay-now">Pagar agora</Link>
+          </div>
         </div>
       )}
 
@@ -451,7 +525,25 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
       )}
 
       <main className="admin-main">
-        <div className="admin-main-inner">{children}</div>
+        <div className="admin-main-inner">
+          {isTrialing && (
+            <div className={`trial-notice ${trialDaysLeft <= 1 ? 'urgent' : ''}`}>
+              <div>
+                <strong>
+                  {trialDaysLeft <= 1
+                    ? 'Seu teste termina amanhã. Escolha um plano para continuar usando.'
+                    : `Você está no teste gratuito. Restam ${trialDaysLeft} dias.`}
+                </strong>
+                <span>Todos os recursos do seu plano continuam disponíveis durante o período de teste.</span>
+              </div>
+              <div>
+                <Link href="/pricing">Escolher plano</Link>
+                <Link href="/pricing" className="primary">Pagar agora</Link>
+              </div>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
 
       <style>{`
@@ -476,10 +568,12 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .copy-link-btn{margin-top:9px;border:1px solid rgba(59,130,246,.25);background:rgba(37,99,235,.12);color:#93c5fd;border-radius:10px;padding:7px 9px;font-size:11px;font-weight:900;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
         .tenant-status{width:9px;height:9px;border-radius:99px;background:#10b981;box-shadow:0 0 18px rgba(16,185,129,.9);flex-shrink:0}
         .tenant-chevron{color:#94a3b8;flex-shrink:0}
-        .trial-card{padding:14px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.22)}
+        .trial-card{padding:14px;border-radius:16px;display:grid;gap:10px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.22)}
         .trial-card strong{display:block;color:#fbbf24;font-size:13px;font-weight:950}
         .trial-card span{display:block;margin-top:2px;color:#fcd34d;font-size:11px}
-        .trial-card a{color:#fff;background:#f59e0b;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:950;text-decoration:none}
+        .trial-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+        .trial-card a{color:#fbbf24;border:1px solid rgba(245,158,11,.30);border-radius:10px;padding:8px 9px;font-size:10px;font-weight:950;text-align:center;text-decoration:none}
+        .trial-card a.trial-pay-now{color:#111827;background:#f59e0b;border-color:#f59e0b}
         .unit-selector-card{padding:13px;border-radius:16px;background:rgba(15,23,42,.62);border:1px solid rgba(148,163,184,.10);display:grid;gap:9px}
         .unit-selector-head{display:flex;align-items:center;gap:7px;color:#93c5fd;font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}
         .unit-selector-card select{width:100%;min-height:39px;border-radius:12px;border:1px solid rgba(148,163,184,.14);background:rgba(2,6,23,.58);color:#f8fafc;padding:0 10px;font-size:12px;font-weight:900;outline:none}
@@ -509,6 +603,14 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .logout-btn:hover{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.50)}
         .admin-main{flex:1;min-width:0;min-height:100vh}
         .admin-main-inner{max-width:1680px;margin:0 auto;padding:36px 42px}
+        .trial-notice{margin-bottom:18px;padding:14px 16px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:18px;background:rgba(37,99,235,.10);border:1px solid rgba(59,130,246,.24)}
+        .trial-notice.urgent{background:rgba(245,158,11,.11);border-color:rgba(245,158,11,.30)}
+        .trial-notice strong{display:block;color:#dbeafe;font-size:13px;font-weight:950}
+        .trial-notice.urgent strong{color:#fde68a}
+        .trial-notice span{display:block;margin-top:3px;color:#94a3b8;font-size:12px}
+        .trial-notice>div:last-child{display:flex;gap:8px;flex-shrink:0}
+        .trial-notice a{min-height:38px;padding:0 13px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:#93c5fd;border:1px solid rgba(59,130,246,.28);font-size:11px;font-weight:950;text-decoration:none}
+        .trial-notice a.primary{background:#2563eb;border-color:#2563eb;color:#fff}
         .admin-mobile-header{display:none;position:fixed;top:0;left:0;right:0;height:64px;z-index:40;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(8,15,30,.96);border-bottom:1px solid rgba(148,163,184,.10);backdrop-filter:blur(20px)}
         .mobile-brand{display:flex;align-items:center;gap:10px}
         .mobile-brand img{width:34px;height:34px;border-radius:12px}
@@ -522,7 +624,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .mobile-sidebar{position:relative;z-index:1;height:100vh;width:min(88vw,310px);min-width:unset;animation:slideIn .18s ease}
         @keyframes slideIn{from{transform:translateX(-20px);opacity:.6}to{transform:translateX(0);opacity:1}}
         @media(max-width:1280px){.admin-sidebar{width:270px;min-width:270px}.admin-main-inner{padding:30px 32px}}
-        @media(max-width:768px){.admin-shell{display:block}.admin-sidebar-desktop{display:none!important}.admin-mobile-header{display:flex}.admin-main{padding-top:64px;background:#020617}.admin-main-inner{padding:16px 14px 86px!important}.sidebar-content{padding:22px 16px}.brand-text strong{font-size:20px}.sidebar-link{min-height:48px;font-size:14px}}
+        @media(max-width:768px){.admin-shell{display:block}.admin-sidebar-desktop{display:none!important}.admin-mobile-header{display:flex}.admin-main{padding-top:64px;background:#020617}.admin-main-inner{padding:16px 14px 86px!important}.sidebar-content{padding:22px 16px}.brand-text strong{font-size:20px}.sidebar-link{min-height:48px;font-size:14px}.trial-notice{align-items:stretch;flex-direction:column}.trial-notice>div:last-child{display:grid;grid-template-columns:1fr 1fr}.trial-notice a{width:100%}}
         @media(max-height:760px) and (min-width:769px){.sidebar-content{gap:12px;padding-top:16px;padding-bottom:16px}.sidebar-link{min-height:40px;padding-top:9px;padding-bottom:9px}.tenant-card{padding:12px}.plan-card{padding:13px}}
         .upgrade-plan-btn {
   margin-top: 12px;

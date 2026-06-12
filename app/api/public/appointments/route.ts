@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getTenantAccess } from '@/lib/subscription-access'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,7 +38,7 @@ async function getUnit(tenantId: string, unitId: string) {
 async function getTenantPlan(tenantId: string) {
   return supabaseAdmin
     .from('tenants')
-    .select('id,plano,status,trial_ends_at')
+    .select('id,plano,status,subscription_status,trial_start,trial_end,trial_ends_at')
     .eq('id', tenantId)
     .maybeSingle()
 }
@@ -64,6 +65,9 @@ export async function GET(req: NextRequest) {
     if (tenantError) return jsonError(tenantError.message, 400)
     if (barberError) return jsonError(barberError.message, 400)
     if (!tenant) return jsonError('Barbearia nao encontrada.', 404)
+    if (!getTenantAccess(tenant).allowed) {
+      return jsonError('A agenda desta barbearia esta temporariamente indisponivel.', 403)
+    }
     if (!barber || !barber.ativo) return jsonError('Barbeiro nao encontrado.', 404)
 
     const unitId = tenant.plano === 'premium' ? requestedUnitId : ''
@@ -140,7 +144,7 @@ export async function POST(req: NextRequest) {
     ] = await Promise.all([
       supabaseAdmin
         .from('tenants')
-        .select('id,plano,status,trial_ends_at')
+        .select('id,plano,status,subscription_status,trial_start,trial_end,trial_ends_at')
         .eq('id', tenantId)
         .maybeSingle(),
 
@@ -162,6 +166,9 @@ export async function POST(req: NextRequest) {
     if (unitError) return jsonError(unitError.message, 400)
 
     if (!tenant) return jsonError('Barbearia nao encontrada.', 404)
+    if (!getTenantAccess(tenant).allowed) {
+      return jsonError('A agenda desta barbearia esta temporariamente indisponivel.', 403)
+    }
     if (!service) return jsonError('Servico nao encontrado.', 404)
     if (!barber || !barber.ativo) return jsonError('Barbeiro nao encontrado.', 404)
 

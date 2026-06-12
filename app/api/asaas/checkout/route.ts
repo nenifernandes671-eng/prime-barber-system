@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
 
     const { data: existingTenant } = await supabaseAdmin
       .from('tenants')
-      .select('id, email, asaas_customer_id')
+      .select('id, email, asaas_customer_id, status, subscription_status, trial_start, trial_end, trial_ends_at')
       .eq('slug', normalizedSlug)
       .maybeSingle()
 
@@ -262,7 +262,8 @@ export async function POST(req: NextRequest) {
     }
 
     const appUrl = resolveAsaasCallbackBaseUrl(req)
-    const trialStart = addDays(new Date(), 7)
+    const trialStart = new Date()
+    const trialEnd = addDays(trialStart, 7)
     let asaasCustomerId = existingTenant?.asaas_customer_id || null
 
     if (!asaasCustomerId) {
@@ -313,14 +314,14 @@ export async function POST(req: NextRequest) {
 
     checkoutPayload.subscription = {
       cycle: 'MONTHLY',
-      nextDueDate: formatDate(trialStart),
+      nextDueDate: formatDate(trialEnd),
     }
 
     const manualPaymentPayload = {
       customer: asaasCustomerId,
       billingType: 'UNDEFINED',
       value: planValue,
-      dueDate: formatDate(new Date()),
+      dueDate: formatDate(trialEnd),
       description: `Mensalidade manual do plano ${planKey} - KorteBarber`,
       externalReference: normalizedSlug,
     }
@@ -357,9 +358,15 @@ export async function POST(req: NextRequest) {
       email: emailClean,
       slug: normalizedSlug,
       plano: planKey,
-      status: 'suspended',
-      trial_ends_at: trialStart.toISOString(),
       asaas_customer_id: asaasCustomerId,
+    }
+
+    if (!existingTenant) {
+      tenantPayload.status = 'trial'
+      tenantPayload.subscription_status = 'trialing'
+      tenantPayload.trial_start = trialStart.toISOString()
+      tenantPayload.trial_end = trialEnd.toISOString()
+      tenantPayload.trial_ends_at = trialEnd.toISOString()
     }
 
     if (asaasSubscriptionId) {

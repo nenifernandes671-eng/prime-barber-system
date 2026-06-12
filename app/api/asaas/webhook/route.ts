@@ -271,7 +271,16 @@ async function processSaasBillingEvent({
   const status = statusFromAsaasEvent(event)
   if (!status) return false
 
-  const updatePayload: Record<string, any> = { status }
+  const subscriptionStatus =
+    status === 'active'
+      ? 'active'
+      : status === 'suspended'
+        ? 'blocked'
+        : status
+  const updatePayload: Record<string, any> = {
+    status,
+    subscription_status: subscriptionStatus,
+  }
 
   if (subscriptionId) {
     updatePayload.asaas_subscription_id = subscriptionId

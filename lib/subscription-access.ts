@@ -1,6 +1,9 @@
 export interface TenantAccessInput {
   status?: string | null
   trial_ends_at?: string | null
+  trial_start?: string | null
+  trial_end?: string | null
+  subscription_status?: string | null
 }
 
 export function getTenantAccess(tenant?: TenantAccessInput | null) {
@@ -12,28 +15,46 @@ export function getTenantAccess(tenant?: TenantAccessInput | null) {
     }
   }
 
+  const normalizedStatus = String(tenant.subscription_status || tenant.status || '').toLowerCase()
+  const isTrial = normalizedStatus === 'trialing' || normalizedStatus === 'trial'
+  const isActive = normalizedStatus === 'active'
+  const accessEnd = isTrial
+    ? tenant.trial_end || tenant.trial_ends_at
+    : tenant.trial_ends_at
   const now = Date.now()
-  const endMs = tenant.trial_ends_at ? new Date(tenant.trial_ends_at).getTime() : null
+  const endMs = accessEnd ? new Date(accessEnd).getTime() : null
   const daysLeft = endMs ? Math.max(0, Math.ceil((endMs - now) / 86400000)) : 0
 
-  if (tenant.status === 'cancelled' || tenant.status === 'suspended') {
+  if (
+    ['cancelled', 'suspended', 'blocked', 'trial_expired'].includes(normalizedStatus) ||
+    tenant.status === 'cancelled' ||
+    tenant.status === 'suspended'
+  ) {
     return {
       allowed: false,
-      reason: tenant.status,
+      reason: normalizedStatus || tenant.status || 'blocked',
       daysLeft: 0,
     }
   }
 
-  if ((tenant.status === 'trial' || tenant.status === 'active') && endMs && endMs <= now) {
+  if (tenant.subscription_status === 'active') {
+    return {
+      allowed: true,
+      reason: 'ok' as const,
+      daysLeft,
+    }
+  }
+
+  if ((isTrial || isActive) && endMs && endMs <= now) {
     return {
       allowed: false,
-      reason: tenant.status === 'trial' ? 'trial-expired' as const : 'subscription-expired' as const,
+      reason: isTrial ? 'trial-expired' as const : 'subscription-expired' as const,
       daysLeft: 0,
     }
   }
 
   return {
-    allowed: tenant.status === 'trial' || tenant.status === 'active',
+    allowed: isTrial || isActive,
     reason: 'ok' as const,
     daysLeft,
   }

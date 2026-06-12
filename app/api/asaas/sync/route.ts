@@ -57,6 +57,10 @@ function isPaid(payment: any) {
   return ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(status)
 }
 
+function paymentStillGrantsAccess(payment: any) {
+  return new Date(nextAccessDate(payment)).getTime() > Date.now()
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
       paidPayment = payments.find((payment: any) => {
         const reference = String(payment?.externalReference || '')
         const sameReference = !reference || reference === normalizedSlug
-        return sameReference && isPaid(payment)
+        return sameReference && isPaid(payment) && paymentStillGrantsAccess(payment)
       })
 
       if (paidPayment) break
@@ -127,6 +131,7 @@ export async function POST(req: NextRequest) {
 
     const updatePayload: Record<string, any> = {
       status: 'active',
+      subscription_status: 'active',
       trial_ends_at: nextAccessDate(paidPayment),
     }
 
