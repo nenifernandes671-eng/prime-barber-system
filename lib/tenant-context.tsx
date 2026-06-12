@@ -16,7 +16,7 @@ interface Tenant {
   trial_ends_at: string | null
   trial_start?: string | null
   trial_end?: string | null
-  subscription_status?: 'trialing' | 'active' | 'trial_expired' | 'blocked' | 'cancelled' | null
+  subscription_status?: 'trialing' | 'pending' | 'active' | 'overdue' | 'trial_expired' | 'blocked' | 'cancelled' | null
 }
 
 interface TenantContextType {

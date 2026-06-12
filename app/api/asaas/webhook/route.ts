@@ -10,17 +10,23 @@ function unauthorized() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 }
 
-function statusFromAsaasEvent(event: string) {
+function saasSubscriptionStatusFromEvent(event: string) {
   if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event)) {
     return 'active'
   }
 
   if (event === 'PAYMENT_OVERDUE') {
-    return 'suspended'
+    return 'overdue'
+  }
+
+  if (event === 'PAYMENT_CREATED') {
+    return 'pending'
   }
 
   if (
     [
+      'SUBSCRIPTION_DELETED',
+      'SUBSCRIPTION_INACTIVATED',
       'PAYMENT_DELETED',
       'PAYMENT_REFUNDED',
       'PAYMENT_CHARGEBACK_REQUESTED',
@@ -62,6 +68,10 @@ function membershipIdFromReference(reference?: string | null) {
   return match?.[1] ?? null
 }
 
+function isMembershipReference(reference?: string | null) {
+  return /^membership(?:-customer)?:/i.test(String(reference ?? ''))
+}
+
 function isMissingMembershipAutomationTable(error: any) {
   const message = String(error?.message ?? '').toLowerCase()
   return (
@@ -74,7 +84,6 @@ function isMissingMembershipAutomationTable(error: any) {
 
 async function findMembershipSubscription(
   subscriptionId?: string | null,
-  customerId?: string | null,
   externalReference?: string | null,
 ) {
   const referenceId = membershipIdFromReference(externalReference)
@@ -105,19 +114,34 @@ async function findMembershipSubscription(
     if (data) return data
   }
 
-  if (customerId) {
+  return null
+}
+
+async function findSaasTenant(
+  subscriptionId?: string | null,
+  externalReference?: string | null,
+) {
+  if (isMembershipReference(externalReference)) return null
+
+  if (externalReference) {
     const { data, error } = await supabaseAdmin
-      .from('membership_subscriptions')
-      .select('*')
-      .eq('asaas_customer_id', customerId)
-      .neq('status', 'cancelled')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .from('tenants')
+      .select('id, asaas_customer_id, asaas_subscription_id')
+      .eq('slug', externalReference)
       .maybeSingle()
-    if (error) {
-      if (isMissingMembershipAutomationTable(error)) return null
-      throw error
-    }
+
+    if (error) throw error
+    if (data) return data
+  }
+
+  if (subscriptionId) {
+    const { data, error } = await supabaseAdmin
+      .from('tenants')
+      .select('id, asaas_customer_id, asaas_subscription_id')
+      .eq('asaas_subscription_id', subscriptionId)
+      .maybeSingle()
+
+    if (error) throw error
     if (data) return data
   }
 
@@ -141,7 +165,6 @@ async function processMembershipEvent({
   try {
     membershipSubscription = await findMembershipSubscription(
       subscriptionId,
-      customerId,
       externalReference,
     )
   } catch (error: any) {
@@ -268,19 +291,13 @@ async function processSaasBillingEvent({
   customerId?: string | null
   externalReference?: string | null
 }) {
-  const status = statusFromAsaasEvent(event)
-  if (!status) return false
+  const subscriptionStatus = saasSubscriptionStatusFromEvent(event)
+  if (!subscriptionStatus) return false
 
-  const subscriptionStatus =
-    status === 'active'
-      ? 'active'
-      : status === 'suspended'
-        ? 'blocked'
-        : status
-  const updatePayload: Record<string, any> = {
-    status,
-    subscription_status: subscriptionStatus,
-  }
+  const tenant = await findSaasTenant(subscriptionId, externalReference)
+  if (!tenant) return false
+
+  const updatePayload: Record<string, any> = { subscription_status: subscriptionStatus }
 
   if (subscriptionId) {
     updatePayload.asaas_subscription_id = subscriptionId
@@ -290,23 +307,20 @@ async function processSaasBillingEvent({
     updatePayload.asaas_customer_id = customerId
   }
 
-  if (status === 'active') {
+  if (subscriptionStatus === 'active') {
+    updatePayload.status = 'active'
     updatePayload.trial_ends_at = nextAccessDate(payment)
+  } else if (subscriptionStatus === 'overdue') {
+    updatePayload.status = 'suspended'
+  } else if (subscriptionStatus === 'cancelled') {
+    updatePayload.status = 'cancelled'
   }
 
-  let query = supabaseAdmin.from('tenants').update(updatePayload)
-
-  if (customerId) {
-    query = query.eq('asaas_customer_id', customerId)
-  } else if (subscriptionId) {
-    query = query.eq('asaas_subscription_id', subscriptionId)
-  } else if (externalReference) {
-    query = query.eq('slug', externalReference)
-  } else {
-    return false
-  }
-
-  const { data, error } = await query.select('id')
+  const { data, error } = await supabaseAdmin
+    .from('tenants')
+    .update(updatePayload)
+    .eq('id', tenant.id)
+    .select('id')
 
   if (error) {
     throw error
@@ -344,18 +358,6 @@ export async function POST(req: NextRequest) {
       externalReference,
     })
 
-    const saasHandled = await processSaasBillingEvent({
-      event,
-      payment,
-      subscriptionId,
-      customerId,
-      externalReference,
-    })
-
-    if (saasHandled) {
-      return NextResponse.json({ received: true, saas: true })
-    }
-
     const membershipHandled = await processMembershipEvent({
       event,
       payment,
@@ -366,6 +368,18 @@ export async function POST(req: NextRequest) {
 
     if (membershipHandled) {
       return NextResponse.json({ received: true, membership: true })
+    }
+
+    const saasHandled = await processSaasBillingEvent({
+      event,
+      payment,
+      subscriptionId,
+      customerId,
+      externalReference,
+    })
+
+    if (saasHandled) {
+      return NextResponse.json({ received: true, saas: true })
     }
 
     return NextResponse.json({ received: true, ignored: true })
