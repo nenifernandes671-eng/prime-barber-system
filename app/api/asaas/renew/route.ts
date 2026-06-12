@@ -107,6 +107,23 @@ async function resolveCustomer(tenant: any) {
   return customer.id
 }
 
+async function resolveFirstPayment(subscriptionId: string) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const payments = await asaasRequest(
+      `/subscriptions/${encodeURIComponent(subscriptionId)}/payments?limit=1`,
+    )
+    const payment = Array.isArray(payments?.data) ? payments.data[0] : null
+
+    if (payment) {
+      return payment
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+
+  return null
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -176,58 +193,38 @@ export async function POST(req: NextRequest) {
 
     const customerId = await resolveCustomer(tenant)
     const appUrl = appBaseUrl(req)
-    const checkout = await asaasRequest('/checkouts', {
+    const subscription = await asaasRequest('/subscriptions', {
       method: 'POST',
       body: JSON.stringify({
-        billingTypes: ['CREDIT_CARD'],
-        chargeTypes: ['RECURRENT'],
-        minutesToExpire: 60,
+        customer: customerId,
+        billingType: 'UNDEFINED',
+        value,
+        cycle: 'MONTHLY',
+        nextDueDate: new Date().toISOString().slice(0, 10),
+        description: `Renovacao mensal do plano KorteBarber ${plan.toUpperCase()}`,
         externalReference: tenant.slug,
         callback: {
-          cancelUrl: `${appUrl}/${tenant.slug}/admin`,
-          expiredUrl: `${appUrl}/${tenant.slug}/admin`,
           successUrl: `${appUrl}/register/success?slug=${encodeURIComponent(tenant.slug)}`,
-        },
-        items: [
-          {
-            name: `Renovacao KorteBarber ${plan.toUpperCase()}`,
-            description: `Renovacao mensal do plano ${plan}`,
-            quantity: 1,
-            value,
-          },
-        ],
-        customer: customerId,
-        subscription: {
-          cycle: 'MONTHLY',
-          nextDueDate: new Date().toISOString().slice(0, 10),
+          autoRedirect: true,
         },
       }),
     })
 
-    const checkoutUrl = checkout?.url || checkout?.link || checkout?.invoiceUrl || null
-    const subscriptionId =
-      typeof checkout?.subscription === 'string'
-        ? checkout.subscription
-        : checkout?.subscription?.id || null
+    const subscriptionId = subscription?.id || null
 
-    if (!checkoutUrl) {
+    if (!subscriptionId) {
       return NextResponse.json(
-        { error: 'Asaas nao retornou a URL de renovacao.' },
+        { error: 'Asaas nao retornou a assinatura da renovacao.' },
         { status: 502, headers: noStoreHeaders },
       )
     }
 
-    const updatePayload: Record<string, string> = {
-      asaas_customer_id: customerId,
-    }
-
-    if (subscriptionId) {
-      updatePayload.asaas_subscription_id = subscriptionId
-    }
-
     const { error: updateError } = await supabaseAdmin
       .from('tenants')
-      .update(updatePayload)
+      .update({
+        asaas_customer_id: customerId,
+        asaas_subscription_id: subscriptionId,
+      })
       .eq('id', tenant.id)
 
     if (updateError) {
@@ -237,8 +234,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const payment = await resolveFirstPayment(subscriptionId)
+    const paymentUrl =
+      payment?.invoiceUrl ||
+      payment?.bankSlipUrl ||
+      payment?.transactionReceiptUrl ||
+      null
+
+    if (!paymentUrl) {
+      return NextResponse.json(
+        { error: 'Asaas criou a assinatura, mas nao retornou a URL da primeira cobranca.' },
+        { status: 502, headers: noStoreHeaders },
+      )
+    }
+
     return NextResponse.json(
-      { url: checkoutUrl, plan, value },
+      { url: paymentUrl, plan, value },
       { headers: noStoreHeaders },
     )
   } catch (error: any) {
