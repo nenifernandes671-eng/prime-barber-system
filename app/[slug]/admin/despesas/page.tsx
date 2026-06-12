@@ -287,6 +287,16 @@ export default function DespesasPage() {
         '--kb-muted': isLight ? '#64748b' : '#94a3b8',
         '--kb-input-bg': isLight ? '#ffffff' : 'rgba(2,6,23,.54)',
         '--kb-shadow': isLight ? '0 18px 45px rgba(15,23,42,0.08)' : '0 24px 60px rgba(0,0,0,.22)',
+        '--kb-header-bg': isLight
+          ? 'linear-gradient(135deg, #ffffff 0%, #f8fbff 62%, #eef4ff 100%)'
+          : 'radial-gradient(circle at top right, rgba(245,158,11,.16), transparent 34%), linear-gradient(135deg, rgba(15,23,42,.96), rgba(8,13,28,.88))',
+        '--kb-header-border': isLight ? 'rgba(37,99,235,0.11)' : 'rgba(148,163,184,.11)',
+        '--kb-header-title': isLight ? '#0f172a' : '#f8fafc',
+        '--kb-header-muted': isLight ? '#52647f' : '#94a3b8',
+        '--kb-table-head': isLight ? '#f6f8fc' : 'rgba(2,6,23,.50)',
+        '--kb-row-hover': isLight ? '#f8fbff' : 'rgba(2,6,23,.50)',
+        '--kb-category-text': isLight ? '#b45309' : '#fbbf24',
+        '--kb-expense-value': isLight ? '#dc2626' : '#f87171',
       } as CSSProperties}
     >
       <style>{css}</style>
@@ -508,6 +518,9 @@ function paymentLabel(method?: string | null) {
 const css=`
 .expenses-page {
   min-height: 100vh;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
   background: var(--kb-page-bg);
   color: var(--kb-text);
   font-family: 'Inter', 'DM Sans', 'Segoe UI', sans-serif;
@@ -518,13 +531,13 @@ const css=`
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 22px;
-  padding: 24px;
-  border-radius: 24px;
-  background:
-    radial-gradient(circle at top right, rgba(245,158,11,.16), transparent 34%),
-    linear-gradient(135deg, rgba(15,23,42,.96), rgba(8,13,28,.88));
-  border: 1px solid rgba(148,163,184,.11);
+  min-height: 132px;
+  margin-bottom: 18px;
+  padding: 24px 28px;
+  border-radius: 20px;
+  background: var(--kb-header-bg);
+  border: 1px solid var(--kb-header-border);
+  box-shadow: var(--kb-shadow);
 }
 
 .eyebrow {
@@ -538,17 +551,18 @@ const css=`
 
 .expenses-header h1 {
   margin: 0;
-  font-size: 38px;
-  font-weight: 950;
-  letter-spacing: -.06em;
-  color: var(--kb-title);
+  font-size: clamp(30px, 3vw, 36px);
+  font-weight: 900;
+  letter-spacing: -.045em;
+  color: var(--kb-header-title);
 }
 
 .expenses-header span {
   display: block;
   margin-top: 7px;
-  color: var(--kb-muted);
+  color: var(--kb-header-muted);
   font-size: 14px;
+  line-height: 1.55;
 }
 
 .primary-btn {
@@ -564,6 +578,15 @@ const css=`
   font-weight: 900;
   cursor: pointer;
   box-shadow: 0 18px 34px rgba(37,99,235,.24);
+  flex-shrink: 0;
+  align-self: center;
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 20px 40px rgba(37,99,235,.28);
 }
 
 .feedback {
@@ -605,7 +628,7 @@ const css=`
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .periods button {
@@ -629,7 +652,7 @@ const css=`
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .stat-card {
@@ -668,8 +691,8 @@ const css=`
 }
 
 .content-card {
-  border-radius: 24px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 18px;
   background: var(--kb-card-bg);
   border: 1px solid var(--kb-border);
   box-shadow: var(--kb-shadow);
@@ -680,7 +703,8 @@ const css=`
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  padding: 2px 2px 0;
 }
 
 .table-head h2 {
@@ -714,12 +738,15 @@ const css=`
 
 .table-wrap {
   overflow-x: auto;
+  border: 1px solid var(--kb-border);
+  border-radius: 14px;
 }
 
 table {
   width: 100%;
   min-width: 760px;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 th {
@@ -729,34 +756,47 @@ th {
   font-weight: 950;
   letter-spacing: .08em;
   text-transform: uppercase;
-  padding: 12px;
-  background: var(--kb-soft-bg);
+  padding: 13px 14px;
+  background: var(--kb-table-head);
   border-bottom: 1px solid var(--kb-border);
 }
 
 td {
-  padding: 14px 12px;
+  padding: 15px 14px;
   border-bottom: 1px solid var(--kb-border);
   color: var(--kb-text);
   font-size: 13px;
+  background: var(--kb-card-bg);
+  transition: background .16s ease;
 }
 
 tr:hover td {
-  background: var(--kb-soft-bg);
+  background: var(--kb-row-hover);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+td strong:not(.expense-value) {
+  color: var(--kb-title);
+  font-weight: 800;
 }
 
 .category-pill {
   display: inline-flex;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(245,158,11,.12);
-  color: #fbbf24;
+  background: rgba(245,158,11,.13);
+  color: var(--kb-category-text);
+  border: 1px solid rgba(245,158,11,.18);
   font-size: 11px;
   font-weight: 950;
 }
 
 .expense-value {
-  color: #f87171;
+  color: var(--kb-expense-value);
+  font-weight: 900;
 }
 
 .delete-btn {
@@ -772,6 +812,13 @@ tr:hover td {
   font-size: 12px;
   font-weight: 850;
   cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.delete-btn:hover {
+  background: rgba(239,68,68,.11);
+  border-color: rgba(239,68,68,.38);
+  transform: translateY(-1px);
 }
 
 .empty {
@@ -921,6 +968,7 @@ tr:hover td {
   .expenses-header {
     flex-direction: column;
     align-items: flex-start;
+    min-height: 0;
   }
 
   .primary-btn {

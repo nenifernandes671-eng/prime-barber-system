@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { normalizeCompensationType } from '@/lib/barber-compensation'
+import { getPlanFlags } from '@/lib/permissions'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,6 +30,10 @@ export async function POST(req: NextRequest) {
       senha,
       telefone,
       tenant_id,
+      compensation_type,
+      commission_percentage,
+      fixed_salary_amount,
+      chair_rental_amount,
     } = body
 
     if (!nome || !email || !senha || !tenant_id) {
@@ -52,6 +58,20 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       )
     }
+
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('plano')
+      .eq('id', tenant_id)
+      .maybeSingle()
+
+    const { isProOrPremium } = getPlanFlags(tenant?.plano)
+    const compensationType = isProOrPremium
+      ? normalizeCompensationType(compensation_type)
+      : 'commission'
+    const commissionPercentage = Math.max(0, Math.min(100, Number(commission_percentage || 0)))
+    const fixedSalaryAmount = Math.max(0, Number(fixed_salary_amount || 0))
+    const chairRentalAmount = Math.max(0, Number(chair_rental_amount || 0))
 
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
@@ -80,6 +100,10 @@ export async function POST(req: NextRequest) {
         telefone,
         tenant_id,
         ativo: true,
+        compensation_type: compensationType,
+        commission_percentage: commissionPercentage,
+        fixed_salary_amount: fixedSalaryAmount,
+        chair_rental_amount: chairRentalAmount,
       })
 
     if (dbError) {

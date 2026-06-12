@@ -139,8 +139,9 @@ export default function AdminServicos() {
 
   return (
     <div className="kb-light-root kb-services-page" style={styles.root}>
-      <div style={styles.pageHeader}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <style>{servicesResponsiveCss}</style>
+      <div className="services-page-header" style={styles.pageHeader}>
+        <div className="services-header-main" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={styles.headerIcon}>🔧</div>
           <div>
             <p style={styles.kicker}>Catálogo</p>
@@ -150,12 +151,13 @@ export default function AdminServicos() {
             </p>
           </div>
         </div>
-        <button onClick={openCreate} style={styles.createBtn}>+ Novo Serviço</button>
+        <button className="services-create-btn" onClick={openCreate} style={styles.createBtn}>+ Novo Serviço</button>
       </div>
 
       {/* Busca */}
-      <div style={{ marginBottom: 20 }}>
+      <div className="services-search-wrap" style={{ marginBottom: 20 }}>
         <input
+          className="services-search-input"
           placeholder="🔍  Buscar serviço..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -172,17 +174,17 @@ export default function AdminServicos() {
           <p style={{ color: '#475569', marginTop: 12 }}>Nenhum serviço encontrado.</p>
         </div>
       ) : (
-        <div style={styles.grid}>
+        <div className="services-grid" style={styles.grid}>
           {filtered.map(s => (
-            <div key={s.id} style={styles.card}>
+            <div className="services-card" key={s.id} style={styles.card}>
               <div style={styles.serviceIcon} />
-              <div>
+              <div className="services-card-content">
                 <p style={styles.serviceName}>{s.name}</p>
                 <p style={styles.serviceDuration}>{s.duration} min</p>
                 {isPremium && <p style={styles.serviceUnit}>{getUnitName(s.unit_id)}</p>}
               </div>
               <p style={styles.servicePrice}>{formatCurrency(s.price)}</p>
-              <button onClick={() => openEdit(s)} style={styles.editBtn}>Editar</button>
+              <button className="services-edit-btn" onClick={() => openEdit(s)} style={styles.editBtn}>Editar</button>
             </div>
           ))}
         </div>
@@ -191,7 +193,7 @@ export default function AdminServicos() {
       {/* Modal */}
       {modal !== 'closed' && (
         <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) setModal('closed') }}>
-          <div style={styles.modal}>
+          <div className="services-modal" style={styles.modal}>
             <div style={styles.modalHeader}>
               <h2 style={styles.modalTitle}>{modal === 'create' ? 'Novo Serviço' : 'Editar Serviço'}</h2>
               <button onClick={() => setModal('closed')} style={styles.modalClose}>✕</button>
@@ -225,7 +227,7 @@ export default function AdminServicos() {
                 </div>
               )}
             </div>
-            <div style={styles.modalFooter}>
+            <div className="services-modal-footer" style={styles.modalFooter}>
               {modal === 'edit' && <button onClick={handleDelete} disabled={submitting} style={styles.deleteBtn}>Excluir</button>}
               <button onClick={() => setModal('closed')} style={styles.cancelBtn}>Cancelar</button>
               <button onClick={handleSubmit} disabled={submitting} style={{ ...styles.confirmBtn, opacity: submitting ? 0.7 : 1 }}>
@@ -513,3 +515,92 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 14px 30px rgba(37,99,235,0.22)',
   },
 }
+
+const servicesResponsiveCss = `
+  @media (max-width: 767px) {
+    .kb-services-page {
+      padding: 24px 16px 56px !important;
+    }
+
+    .services-page-header {
+      align-items: stretch !important;
+      flex-direction: column !important;
+      gap: 16px !important;
+      margin-bottom: 20px !important;
+    }
+
+    .services-header-main {
+      align-items: flex-start !important;
+      gap: 12px !important;
+      min-width: 0;
+    }
+
+    .services-header-main > div:last-child {
+      min-width: 0;
+    }
+
+    .services-header-main h1 {
+      font-size: 34px !important;
+      overflow-wrap: anywhere;
+    }
+
+    .services-header-main p {
+      overflow-wrap: anywhere;
+    }
+
+    .services-create-btn,
+    .services-edit-btn {
+      align-self: stretch !important;
+      min-height: 44px !important;
+      width: 100% !important;
+    }
+
+    .services-search-wrap {
+      margin-bottom: 16px !important;
+    }
+
+    .services-search-input {
+      max-width: none !important;
+      min-height: 48px;
+      width: 100% !important;
+    }
+
+    .services-grid {
+      grid-template-columns: minmax(0, 1fr) !important;
+      gap: 14px !important;
+    }
+
+    .services-card {
+      box-sizing: border-box;
+      gap: 12px !important;
+      min-height: auto !important;
+      min-width: 0;
+      padding: 20px !important;
+      width: 100% !important;
+    }
+
+    .services-card-content,
+    .services-card-content p {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .services-modal {
+      max-height: calc(100vh - 32px) !important;
+      max-width: calc(100vw - 32px) !important;
+      overflow-y: auto !important;
+    }
+
+    .services-modal-footer {
+      align-items: stretch !important;
+      flex-direction: column-reverse !important;
+      padding: 16px 20px 20px !important;
+    }
+
+    .services-modal-footer button {
+      margin: 0 !important;
+      min-height: 44px !important;
+      width: 100% !important;
+    }
+  }
+`

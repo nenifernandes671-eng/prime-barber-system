@@ -6,6 +6,10 @@ import { supabase } from '@/lib/supabase'
 import { exportFinancePdf } from "@/lib/exportFinancePdf"
 import { useTenant } from '@/lib/tenant-context'
 import {
+  calculateBarberCompensation,
+  getBarberCompensation,
+} from '@/lib/barber-compensation'
+import {
   Banknote,
   CalendarDays,
   CheckCircle2,
@@ -69,13 +73,17 @@ interface CommissionPayment {
 
 interface BarberCommissionSetting {
   id?: string
-  name: string
+  name?: string
+  nome?: string
   email?: string | null
   tenant_id?: string
   unit_id?: string | null
   commission_percent?: number | null
   commission_percentage?: number | null
   commission_type?: string | null
+  compensation_type?: string | null
+  fixed_salary_amount?: number | null
+  chair_rental_amount?: number | null
   ativo?: boolean | null
 }
 
@@ -295,8 +303,8 @@ export default function FinanceiroPage() {
           .order('paid_at', { ascending: false })
 
         const { data: commissionSettingRows } = await supabase
-          .from('barbers')
-          .select('id,name,email,tenant_id,unit_id,commission_percentage,commission_type,ativo')
+          .from('barbeiros')
+          .select('id,nome,email,tenant_id,unit_id,commission_percentage,compensation_type,fixed_salary_amount,chair_rental_amount,ativo')
           .eq('tenant_id', t.id)
 
         const { data: unitRows } = isPremium
@@ -590,6 +598,60 @@ export default function FinanceiroPage() {
 
   const rev = filtered.filter(isRevenue)
   const appointmentRevenue = rev.reduce((s, a) => s + (a.price || 0), 0)
+  const compensationDates = [
+    ...rev.map((item) => item.appointment_date),
+    ...filteredEntries.map((item) => item.entry_date),
+  ].filter(Boolean).sort()
+  const compensationToday = new Date()
+  const compensationEnd = localDateKey(compensationToday)
+  let compensationStart = compensationDates[0] || compensationEnd
+
+  if (period === 'hoje') {
+    compensationStart = compensationEnd
+  } else if (period === 'semana') {
+    const startOfWeek = new Date(compensationToday)
+    startOfWeek.setDate(compensationToday.getDate() - compensationToday.getDay())
+    compensationStart = localDateKey(startOfWeek)
+  } else if (period === 'mes') {
+    compensationStart = localDateKey(
+      new Date(compensationToday.getFullYear(), compensationToday.getMonth(), 1)
+    )
+  }
+
+  const effectiveCompensationEnd =
+    period === 'tudo'
+      ? compensationDates[compensationDates.length - 1] || compensationEnd
+      : compensationEnd
+  const compensationSummary = commissionSettings.map((barber) => {
+    const serviceRevenue = rev
+      .filter((appointment) => nameKey(appointment.barber) === nameKey(barber.nome || barber.name))
+      .reduce((sum, appointment) => sum + Number(appointment.price || 0), 0)
+
+    return calculateBarberCompensation({
+      settings: getBarberCompensation(barber),
+      serviceRevenue,
+      periodStart: compensationStart,
+      periodEnd: effectiveCompensationEnd,
+    })
+  })
+  const knownBarberNames = new Set(
+    commissionSettings.map((barber) => nameKey(barber.nome || barber.name))
+  )
+  const unassignedRevenue = rev
+    .filter((appointment) => !knownBarberNames.has(nameKey(appointment.barber)))
+    .reduce((sum, appointment) => sum + Number(appointment.price || 0), 0)
+  const recognizedServiceRevenue = compensationSummary.reduce(
+    (sum, item) => sum + item.barbershopServiceRevenue,
+    unassignedRevenue
+  )
+  const chairRentalRevenue = compensationSummary.reduce(
+    (sum, item) => sum + item.chairRentalRevenue,
+    0
+  )
+  const accruedLaborCost = compensationSummary.reduce(
+    (sum, item) => sum + item.laborCost,
+    0
+  )
   const manualIncome = filteredEntries
     .filter((entry) => entry.type === 'entrada')
     .reduce((s, entry) => s + Number(entry.amount || 0), 0)
@@ -597,14 +659,20 @@ export default function FinanceiroPage() {
     .filter((entry) => entry.type === 'despesa' && !isCommissionEntry(entry))
     .reduce((s, entry) => s + Number(entry.amount || 0), 0)
   const commissionPaidTotal = filteredCommissionPayments.reduce((s, p) => s + Number(p.amount || 0), 0)
-  const totalRev = appointmentRevenue + manualIncome
-  const totalPaid = filtered
+  const totalRev = recognizedServiceRevenue + chairRentalRevenue + manualIncome
+  const totalPaidService = filtered
     .filter((a) => a.payment_status === 'paid')
-    .reduce((s, a) => s + (a.price || 0), 0) + manualIncome
+    .reduce((s, a) => {
+      const barber = commissionSettings.find(
+        (item) => nameKey(item.nome || item.name) === nameKey(a.barber)
+      )
+      return s + (getBarberCompensation(barber).type === 'chair_rental' ? 0 : Number(a.price || 0))
+    }, 0)
+  const totalPaid = totalPaidService + chairRentalRevenue + manualIncome
   const totalPend = rev
     .filter((a) => a.payment_status !== 'paid')
     .reduce((s, a) => s + (a.price || 0), 0)
-  const netCash = totalPaid - manualExpenses - commissionPaidTotal
+  const netCash = totalRev - manualExpenses - accruedLaborCost
   const avgTicket = rev.length > 0 ? appointmentRevenue / rev.length : 0
   const cancelled = filtered.filter((a) => a.status === 'cancelled' || a.status === 'canceled').length
 
@@ -701,7 +769,9 @@ export default function FinanceiroPage() {
   }, [rev, barberPhotos])
 
   function getCommissionPercent(barberName: string) {
-    const match = commissionSettings.find((row) => nameKey(row.name) === nameKey(barberName))
+    const match = commissionSettings.find((row) => nameKey(row.nome || row.name) === nameKey(barberName))
+    const type = getBarberCompensation(match).type
+    if (type !== 'commission' && type !== 'salary_plus_commission') return 0
     return Number(match?.commission_percent ?? match?.commission_percentage ?? 0)
   }
 

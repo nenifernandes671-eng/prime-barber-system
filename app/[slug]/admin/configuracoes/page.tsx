@@ -8,13 +8,20 @@ import { useTenantId } from '@/lib/useTenantId'
 import {
   Camera,
   Check,
+  CircleAlert,
   Clock,
   Copy,
+  CreditCard,
   Crown,
+  Eye,
+  EyeOff,
   ExternalLink,
   GripVertical,
   Image as ImageIcon,
   Lock,
+  PlugZap,
+  RefreshCw,
+  ShieldCheck,
   Star,
   Trash2,
   Upload,
@@ -44,7 +51,30 @@ interface GalleryImage {
   created_at?: string
 }
 
-type Tab = 'barbearia' | 'landing' | 'barbeiros' | 'servicos'
+interface LandingTestimonial {
+  name: string
+  text: string
+  rating: number
+}
+
+interface LandingDifferential {
+  title: string
+  description: string
+  icon: string
+}
+
+type Tab = 'barbearia' | 'pagamentos' | 'landing' | 'barbeiros' | 'servicos'
+
+interface PaymentSettings {
+  configured: boolean
+  enabled: boolean
+  environment: 'sandbox' | 'production'
+  maskedKey: string | null
+  accountName: string | null
+  accountEmail: string | null
+  connectionStatus: 'not_tested' | 'active' | 'error'
+  lastTestedAt: string | null
+}
 
 const cardStyle: React.CSSProperties = {
   background:
@@ -105,6 +135,17 @@ export default function ConfiguracoesPage() {
   const [landingAddress, setLandingAddress] = useState('')
   const [landingPrimaryColor, setLandingPrimaryColor] = useState('#c9a84c')
   const [landingBannerUrl, setLandingBannerUrl] = useState('')
+  const [landingLogoUrl, setLandingLogoUrl] = useState('')
+  const [landingAboutTitle, setLandingAboutTitle] = useState('')
+  const [landingAboutText, setLandingAboutText] = useState('')
+  const [landingAboutImageUrl, setLandingAboutImageUrl] = useState('')
+  const [landingTestimonials, setLandingTestimonials] = useState<LandingTestimonial[]>([])
+  const [landingDifferentials, setLandingDifferentials] = useState<LandingDifferential[]>([])
+  const [landingYearsExperience, setLandingYearsExperience] = useState('')
+  const [landingAppointmentsCount, setLandingAppointmentsCount] = useState('')
+  const [landingClientsCount, setLandingClientsCount] = useState('')
+  const [landingAverageRating, setLandingAverageRating] = useState('')
+  const [savingPublicAsset, setSavingPublicAsset] = useState<'logo' | 'about' | null>(null)
   const [savingLandingBanner, setSavingLandingBanner] = useState(false)
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([])
   const [savingGallery, setSavingGallery] = useState(false)
@@ -120,6 +161,23 @@ export default function ConfiguracoesPage() {
   const [savingAccount, setSavingAccount] = useState(false)
   const [accountFeedback, setAccountFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentSaving, setPaymentSaving] = useState(false)
+  const [paymentTesting, setPaymentTesting] = useState(false)
+  const [paymentRemoving, setPaymentRemoving] = useState(false)
+  const [asaasEnvironment, setAsaasEnvironment] = useState<'sandbox' | 'production'>('production')
+  const [asaasApiKey, setAsaasApiKey] = useState('')
+  const [showAsaasApiKey, setShowAsaasApiKey] = useState(false)
+  const [asaasConfigured, setAsaasConfigured] = useState(false)
+  const [asaasMaskedKey, setAsaasMaskedKey] = useState<string | null>(null)
+  const [asaasAccountName, setAsaasAccountName] = useState<string | null>(null)
+  const [asaasAccountEmail, setAsaasAccountEmail] = useState<string | null>(null)
+  const [asaasConnectionStatus, setAsaasConnectionStatus] =
+    useState<PaymentSettings['connectionStatus']>('not_tested')
+  const [asaasLastTestedAt, setAsaasLastTestedAt] = useState<string | null>(null)
+  const [paymentFeedback, setPaymentFeedback] =
+    useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
   const appUrl = (
     process.env.NEXT_PUBLIC_APP_URL ||
     (typeof window !== 'undefined' ? window.location.origin : '')
@@ -129,7 +187,9 @@ export default function ConfiguracoesPage() {
   const barberLoginUrl = `${appUrl}/barber/login`
 
   const canUploadPhotos = !!hasFeature(tenant?.plano, 'uploads')
-  const isPremium = tenant?.plano?.toLowerCase() === 'premium'
+  const canCustomizePublicPage = ['pro', 'premium'].includes(
+    tenant?.plano?.toLowerCase() ?? ''
+  )
 
   useEffect(() => {
     if (tenant) {
@@ -146,12 +206,36 @@ export default function ConfiguracoesPage() {
       setLandingAddress((tenant as any).landing_address ?? (tenant as any).endereco ?? '')
       setLandingPrimaryColor((tenant as any).landing_primary_color ?? '#c9a84c')
       setLandingBannerUrl((tenant as any).landing_banner_url ?? (tenant as any).hero_url ?? '')
+      setLandingLogoUrl((tenant as any).landing_logo_url ?? '')
+      setLandingAboutTitle((tenant as any).landing_about_title ?? '')
+      setLandingAboutText((tenant as any).landing_about_text ?? '')
+      setLandingAboutImageUrl((tenant as any).landing_about_image_url ?? '')
+      setLandingTestimonials(
+        Array.isArray((tenant as any).landing_testimonials)
+          ? (tenant as any).landing_testimonials
+          : []
+      )
+      setLandingDifferentials(
+        Array.isArray((tenant as any).landing_differentials)
+          ? (tenant as any).landing_differentials
+          : []
+      )
+      setLandingYearsExperience((tenant as any).landing_years_experience ?? '')
+      setLandingAppointmentsCount((tenant as any).landing_appointments_count ?? '')
+      setLandingClientsCount((tenant as any).landing_clients_count ?? '')
+      setLandingAverageRating((tenant as any).landing_average_rating ?? '')
     }
   }, [tenant])
 
   useEffect(() => {
     if (currentTenantId) fetchData()
   }, [currentTenantId])
+
+  useEffect(() => {
+    if (tab === 'pagamentos' && currentTenantId) {
+      loadPaymentSettings()
+    }
+  }, [tab, currentTenantId])
 
   useEffect(() => {
     async function loadUser() {
@@ -168,6 +252,151 @@ export default function ConfiguracoesPage() {
   async function getAuthToken() {
     const { data } = await supabase.auth.getSession()
     return data.session?.access_token ?? null
+  }
+
+  function applyPaymentSettings(settings: PaymentSettings) {
+    setAsaasConfigured(settings.configured)
+    setAsaasEnvironment(settings.environment)
+    setAsaasMaskedKey(settings.maskedKey)
+    setAsaasAccountName(settings.accountName)
+    setAsaasAccountEmail(settings.accountEmail)
+    setAsaasConnectionStatus(settings.connectionStatus)
+    setAsaasLastTestedAt(settings.lastTestedAt)
+  }
+
+  async function paymentSettingsRequest(method: 'GET' | 'POST', payload?: Record<string, unknown>) {
+    const token = await getAuthToken()
+    if (!token || !currentTenantId) {
+      throw new Error('Sessão ou barbearia não encontrada. Entre novamente e tente de novo.')
+    }
+
+    const response = await fetch('/api/admin/payment-settings', {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'x-tenant-id': currentTenantId,
+      },
+      body: method === 'POST' ? JSON.stringify({ tenantId: currentTenantId, ...payload }) : undefined,
+    })
+
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(result.error || 'Não foi possível processar a integração ASAAS.')
+    }
+
+    return result
+  }
+
+  async function loadPaymentSettings() {
+    setPaymentLoading(true)
+    setPaymentFeedback(null)
+
+    try {
+      const result = await paymentSettingsRequest('GET')
+      applyPaymentSettings(result.settings)
+    } catch (error) {
+      setPaymentFeedback({
+        type: 'error',
+        msg: error instanceof Error ? error.message : 'Erro ao carregar a integração ASAAS.',
+      })
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
+  async function testPaymentConnection() {
+    if (!asaasApiKey.trim() && !asaasConfigured) {
+      setPaymentFeedback({ type: 'error', msg: 'Informe a chave API do ASAAS para testar a conexão.' })
+      return
+    }
+
+    setPaymentTesting(true)
+    setPaymentFeedback(null)
+
+    try {
+      const result = await paymentSettingsRequest('POST', {
+        action: 'test',
+        environment: asaasEnvironment,
+        apiKey: asaasApiKey.trim() || undefined,
+      })
+
+      setAsaasAccountName(result.account?.name ?? null)
+      setAsaasAccountEmail(result.account?.email ?? null)
+      setAsaasConnectionStatus('active')
+      setAsaasLastTestedAt(new Date().toISOString())
+      setPaymentFeedback({ type: 'success', msg: 'Conexão validada com sucesso. Agora você pode salvar.' })
+    } catch (error) {
+      setAsaasConnectionStatus('error')
+      setPaymentFeedback({
+        type: 'error',
+        msg: error instanceof Error ? error.message : 'Não foi possível conectar ao ASAAS.',
+      })
+    } finally {
+      setPaymentTesting(false)
+    }
+  }
+
+  async function savePaymentSettings() {
+    if (!asaasApiKey.trim() && !asaasConfigured) {
+      setPaymentFeedback({ type: 'error', msg: 'Informe a chave API do ASAAS antes de salvar.' })
+      return
+    }
+
+    setPaymentSaving(true)
+    setPaymentFeedback(null)
+
+    try {
+      const result = await paymentSettingsRequest('POST', {
+        action: 'save',
+        environment: asaasEnvironment,
+        apiKey: asaasApiKey.trim() || undefined,
+      })
+
+      applyPaymentSettings(result.settings)
+      setAsaasApiKey('')
+      setShowAsaasApiKey(false)
+      setPaymentFeedback({ type: 'success', msg: 'Integração ASAAS salva e ativada para esta barbearia.' })
+    } catch (error) {
+      setPaymentFeedback({
+        type: 'error',
+        msg: error instanceof Error ? error.message : 'Erro ao salvar a integração ASAAS.',
+      })
+    } finally {
+      setPaymentSaving(false)
+    }
+  }
+
+  async function removePaymentSettings() {
+    if (!confirm('Remover a integração ASAAS desta barbearia? As cobranças automáticas deixarão de ser criadas.')) {
+      return
+    }
+
+    setPaymentRemoving(true)
+    setPaymentFeedback(null)
+
+    try {
+      await paymentSettingsRequest('POST', { action: 'remove' })
+      applyPaymentSettings({
+        configured: false,
+        enabled: false,
+        environment: 'production',
+        maskedKey: null,
+        accountName: null,
+        accountEmail: null,
+        connectionStatus: 'not_tested',
+        lastTestedAt: null,
+      })
+      setAsaasApiKey('')
+      setPaymentFeedback({ type: 'success', msg: 'Integração ASAAS removida.' })
+    } catch (error) {
+      setPaymentFeedback({
+        type: 'error',
+        msg: error instanceof Error ? error.message : 'Erro ao remover a integração ASAAS.',
+      })
+    } finally {
+      setPaymentRemoving(false)
+    }
   }
 
   async function saveAssetChange(action: string, payload: Record<string, unknown>) {
@@ -268,6 +497,53 @@ export default function ConfiguracoesPage() {
 
     setSavedInfo(true)
     setTimeout(() => setSavedInfo(false), 2500)
+  }
+
+  async function savePublicPage() {
+    if (!currentTenantId || !canCustomizePublicPage) return
+
+    setSavingInfo(true)
+    const token = await getAuthToken()
+
+    try {
+      const response = await fetch('/api/admin/public-page-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          tenant_id: currentTenantId,
+          landing_headline: landingHeadline,
+          landing_description: landingDescription,
+          landing_whatsapp: landingWhatsapp,
+          landing_instagram: landingInstagram,
+          landing_address: landingAddress,
+          landing_primary_color: landingPrimaryColor,
+          landing_banner_url: landingBannerUrl,
+          landing_logo_url: landingLogoUrl,
+          landing_about_title: landingAboutTitle,
+          landing_about_text: landingAboutText,
+          landing_about_image_url: landingAboutImageUrl,
+          landing_testimonials: landingTestimonials,
+          landing_differentials: landingDifferentials,
+          landing_years_experience: landingYearsExperience,
+          landing_appointments_count: landingAppointmentsCount,
+          landing_clients_count: landingClientsCount,
+          landing_average_rating: landingAverageRating,
+        }),
+      })
+
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Erro ao salvar pagina publica.')
+
+      setSavedInfo(true)
+      setTimeout(() => setSavedInfo(false), 2500)
+    } catch (error: any) {
+      alert(error.message || 'Erro ao salvar pagina publica.')
+    } finally {
+      setSavingInfo(false)
+    }
   }
 
   async function copyLink(key: string, value: string) {
@@ -426,8 +702,38 @@ export default function ConfiguracoesPage() {
   }
 
 
+  async function uploadPublicPageAsset(file: File, kind: 'logo' | 'about') {
+    if (!currentTenantId || !canCustomizePublicPage) return
+
+    setSavingPublicAsset(kind)
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `landing/${currentTenantId}/${kind}.${extension}`
+
+    const { error } = await supabase.storage
+      .from('barbershop-media')
+      .upload(path, file, {
+        upsert: true,
+        cacheControl: '60',
+        contentType: file.type || 'image/jpeg',
+      })
+
+    if (error) {
+      alert('Erro no upload da imagem: ' + error.message)
+      setSavingPublicAsset(null)
+      return
+    }
+
+    const publicUrl = supabase.storage.from('barbershop-media').getPublicUrl(path).data.publicUrl
+    const displayUrl = `${publicUrl}?v=${Date.now()}`
+
+    if (kind === 'logo') setLandingLogoUrl(displayUrl)
+    else setLandingAboutImageUrl(displayUrl)
+
+    setSavingPublicAsset(null)
+  }
+
   async function uploadLandingBanner(file: File) {
-    if (!currentTenantId || !isPremium) return
+    if (!currentTenantId || !canCustomizePublicPage) return
 
     setSavingLandingBanner(true)
 
@@ -471,7 +777,7 @@ export default function ConfiguracoesPage() {
   }
 
   async function removeLandingBanner() {
-    if (!currentTenantId || !isPremium) return
+    if (!currentTenantId || !canCustomizePublicPage) return
 
     const { error } = await supabase
       .from('tenants')
@@ -709,7 +1015,7 @@ export default function ConfiguracoesPage() {
           width: 'fit-content',
         }}
       >
-        {(['barbearia', 'landing', 'barbeiros', 'servicos'] as const).map((item) => (
+        {(['barbearia', 'pagamentos', 'landing', 'barbeiros', 'servicos'] as const).map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
@@ -725,7 +1031,15 @@ export default function ConfiguracoesPage() {
               color: tab === item ? '#60a5fa' : '#64748b',
             }}
           >
-            {item === 'barbearia' ? '🏪 Barbearia' : item === 'landing' ? '🚀 Landing Premium' : item === 'barbeiros' ? '✂ Barbeiros' : '🛠 Serviços'}
+            {item === 'barbearia'
+              ? 'Barbearia'
+              : item === 'pagamentos'
+                ? 'Pagamentos'
+                : item === 'landing'
+                  ? 'Página Pública'
+                  : item === 'barbeiros'
+                    ? 'Barbeiros'
+                    : 'Serviços'}
           </button>
         ))}
       </div>
@@ -943,11 +1257,298 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
+      {tab === 'pagamentos' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <section style={cardStyle}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 18,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 15,
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: asaasConnectionStatus === 'active' ? 'rgba(16,185,129,0.14)' : 'rgba(59,130,246,0.14)',
+                    color: asaasConnectionStatus === 'active' ? '#34d399' : '#60a5fa',
+                  }}
+                >
+                  <CreditCard size={22} />
+                </div>
+
+                <div>
+                  <p style={{ margin: '0 0 4px', color: '#64748b', fontSize: 11, fontWeight: 900, letterSpacing: 1.2 }}>
+                    COBRANÇAS DOS SEUS CLIENTES
+                  </p>
+                  <h2 style={{ margin: 0, color: '#f1f5f9', fontSize: 19, fontWeight: 900 }}>
+                    Integração ASAAS
+                  </h2>
+                  <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 13, lineHeight: 1.5 }}>
+                    Receba assinaturas recorrentes diretamente na conta ASAAS da sua barbearia.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 12px',
+                  borderRadius: 999,
+                  border: `1px solid ${
+                    asaasConnectionStatus === 'active' ? 'rgba(16,185,129,0.28)' : 'rgba(245,158,11,0.28)'
+                  }`,
+                  background: asaasConnectionStatus === 'active' ? 'rgba(16,185,129,0.10)' : 'rgba(245,158,11,0.10)',
+                  color: asaasConnectionStatus === 'active' ? '#6ee7b7' : '#fbbf24',
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                {asaasConnectionStatus === 'active' ? <ShieldCheck size={15} /> : <CircleAlert size={15} />}
+                {asaasConnectionStatus === 'active' ? 'Conexão ativa' : 'Não configurado'}
+              </div>
+            </div>
+
+            {paymentLoading ? (
+              <div style={{ padding: '28px 0 4px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 9 }}>
+                <RefreshCw size={16} style={{ animation: 'spin 0.8s linear infinite' }} />
+                Carregando integração...
+              </div>
+            ) : (
+              <>
+                {asaasConfigured && (
+                  <div
+                    style={{
+                      marginTop: 22,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ padding: 15, borderRadius: 14, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <span style={{ display: 'block', color: '#64748b', fontSize: 11, fontWeight: 800, marginBottom: 6 }}>CONTA ASAAS</span>
+                      <strong style={{ display: 'block', color: '#f1f5f9', fontSize: 14 }}>{asaasAccountName || 'Conta conectada'}</strong>
+                      {asaasAccountEmail && <span style={{ display: 'block', color: '#94a3b8', fontSize: 12, marginTop: 4 }}>{asaasAccountEmail}</span>}
+                    </div>
+
+                    <div style={{ padding: 15, borderRadius: 14, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <span style={{ display: 'block', color: '#64748b', fontSize: 11, fontWeight: 800, marginBottom: 6 }}>CHAVE SALVA</span>
+                      <strong style={{ display: 'block', color: '#f1f5f9', fontSize: 14, fontFamily: 'monospace' }}>
+                        {asaasMaskedKey || '••••••••••••'}
+                      </strong>
+                      {asaasLastTestedAt && (
+                        <span style={{ display: 'block', color: '#94a3b8', fontSize: 12, marginTop: 4 }}>
+                          Testada em {new Date(asaasLastTestedAt).toLocaleString('pt-BR')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          <section style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 13,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'rgba(59,130,246,0.14)',
+                  color: '#60a5fa',
+                }}
+              >
+                <PlugZap size={18} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Configurar conexão</h2>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
+                  A chave é criptografada no servidor e nunca volta para o navegador.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 17 }}>
+              <Field label="Ambiente">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {(['sandbox', 'production'] as const).map((environment) => {
+                    const active = asaasEnvironment === environment
+                    return (
+                      <button
+                        key={environment}
+                        type="button"
+                        onClick={() => {
+                          setAsaasEnvironment(environment)
+                          setPaymentFeedback(null)
+                        }}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: 11,
+                          border: active ? '1px solid rgba(59,130,246,0.55)' : '1px solid rgba(255,255,255,0.08)',
+                          background: active ? 'rgba(59,130,246,0.18)' : 'rgba(0,0,0,0.20)',
+                          color: active ? '#93c5fd' : '#94a3b8',
+                          cursor: 'pointer',
+                          fontWeight: 800,
+                        }}
+                      >
+                        {environment === 'sandbox' ? 'Sandbox (testes)' : 'Produção'}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+
+              <Field label={asaasConfigured ? 'Nova chave API ASAAS (opcional)' : 'Chave API ASAAS'}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showAsaasApiKey ? 'text' : 'password'}
+                    value={asaasApiKey}
+                    onChange={(event) => {
+                      setAsaasApiKey(event.target.value)
+                      setPaymentFeedback(null)
+                    }}
+                    autoComplete="new-password"
+                    placeholder={asaasConfigured ? `Chave atual: ${asaasMaskedKey || 'configurada'}` : '$aact_...'}
+                    style={{ ...inputStyle, paddingRight: 48 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAsaasApiKey((current) => !current)}
+                    title={showAsaasApiKey ? 'Ocultar chave' : 'Mostrar chave'}
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      right: 9,
+                      transform: 'translateY(-50%)',
+                      width: 34,
+                      height: 34,
+                      border: 'none',
+                      borderRadius: 9,
+                      display: 'grid',
+                      placeItems: 'center',
+                      background: 'transparent',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showAsaasApiKey ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </Field>
+
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 13,
+                  border: '1px solid rgba(59,130,246,0.16)',
+                  background: 'rgba(59,130,246,0.07)',
+                  color: '#93c5fd',
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                }}
+              >
+                Use uma chave da conta ASAAS da própria barbearia. A conta global do KorteBarber continua separada e é usada somente para cobrar o plano SaaS.
+              </div>
+
+              {paymentFeedback && (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 11,
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    background: paymentFeedback.type === 'success' ? 'rgba(16,185,129,0.11)' : 'rgba(239,68,68,0.11)',
+                    border: `1px solid ${
+                      paymentFeedback.type === 'success' ? 'rgba(16,185,129,0.26)' : 'rgba(239,68,68,0.26)'
+                    }`,
+                    color: paymentFeedback.type === 'success' ? '#6ee7b7' : '#fca5a5',
+                  }}
+                >
+                  {paymentFeedback.msg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={testPaymentConnection}
+                  disabled={paymentTesting || paymentSaving || paymentRemoving || paymentLoading}
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: 11,
+                    border: '1px solid rgba(59,130,246,0.32)',
+                    background: 'rgba(59,130,246,0.10)',
+                    color: '#93c5fd',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <RefreshCw size={16} style={paymentTesting ? { animation: 'spin 0.8s linear infinite' } : undefined} />
+                  {paymentTesting ? 'Testando...' : 'Testar conexão'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={savePaymentSettings}
+                  disabled={paymentTesting || paymentSaving || paymentRemoving || paymentLoading}
+                  style={{
+                    padding: '12px 18px',
+                    borderRadius: 11,
+                    border: 'none',
+                    background: 'linear-gradient(135deg,#2563eb,#3b82f6)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {paymentSaving ? 'Validando e salvando...' : 'Salvar integração'}
+                </button>
+
+                {asaasConfigured && (
+                  <button
+                    type="button"
+                    onClick={removePaymentSettings}
+                    disabled={paymentTesting || paymentSaving || paymentRemoving || paymentLoading}
+                    style={{
+                      marginLeft: 'auto',
+                      padding: '12px 16px',
+                      borderRadius: 11,
+                      border: '1px solid rgba(239,68,68,0.30)',
+                      background: 'rgba(239,68,68,0.08)',
+                      color: '#fca5a5',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {paymentRemoving ? 'Removendo...' : 'Remover integração'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
 
       {tab === 'landing' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {!isPremium && (
-            <UpgradeBanner text="A Landing Page Premium personalizada é exclusiva do plano Premium." />
+          {!canCustomizePublicPage && (
+            <UpgradeBanner text="A personalização da Página Pública está disponível nos planos Pro e Premium." />
           )}
 
           <section style={cardStyle}>
@@ -968,10 +1569,10 @@ export default function ConfiguracoesPage() {
 
               <div>
                 <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>
-                  Landing Page Premium
+                  Página Pública
                 </h2>
                 <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
-                  Personalize a página pública da barbearia com texto, banner, cor, WhatsApp e Instagram.
+                  Personalize a página pública da barbearia sem alterar o fluxo de agendamento.
                 </p>
               </div>
             </div>
@@ -982,7 +1583,7 @@ export default function ConfiguracoesPage() {
                   value={landingHeadline}
                   onChange={(e) => setLandingHeadline(e.target.value)}
                   placeholder="Seu estilo,\nnosso cuidado."
-                  disabled={!isPremium}
+                  disabled={!canCustomizePublicPage}
                   rows={3}
                   style={{ ...inputStyle, resize: 'vertical', minHeight: 86 }}
                 />
@@ -993,7 +1594,7 @@ export default function ConfiguracoesPage() {
                   value={landingDescription}
                   onChange={(e) => setLandingDescription(e.target.value)}
                   placeholder="Agende seu horário e viva uma experiência premium."
-                  disabled={!isPremium}
+                  disabled={!canCustomizePublicPage}
                   rows={4}
                   style={{ ...inputStyle, resize: 'vertical', minHeight: 104 }}
                 />
@@ -1005,7 +1606,7 @@ export default function ConfiguracoesPage() {
                     value={landingWhatsapp}
                     onChange={(e) => setLandingWhatsapp(e.target.value)}
                     placeholder="(47) 99999-9999"
-                    disabled={!isPremium}
+                    disabled={!canCustomizePublicPage}
                     style={inputStyle}
                   />
                 </Field>
@@ -1015,7 +1616,7 @@ export default function ConfiguracoesPage() {
                     value={landingInstagram}
                     onChange={(e) => setLandingInstagram(e.target.value)}
                     placeholder="@barbearia ou link completo"
-                    disabled={!isPremium}
+                    disabled={!canCustomizePublicPage}
                     style={inputStyle}
                   />
                 </Field>
@@ -1026,7 +1627,7 @@ export default function ConfiguracoesPage() {
                   value={landingAddress}
                   onChange={(e) => setLandingAddress(e.target.value)}
                   placeholder="Rua, número, bairro, cidade"
-                  disabled={!isPremium}
+                  disabled={!canCustomizePublicPage}
                   style={inputStyle}
                 />
               </Field>
@@ -1037,14 +1638,14 @@ export default function ConfiguracoesPage() {
                     type="color"
                     value={landingPrimaryColor}
                     onChange={(e) => setLandingPrimaryColor(e.target.value)}
-                    disabled={!isPremium}
+                    disabled={!canCustomizePublicPage}
                     style={{ width: 54, height: 44, border: 'none', background: 'transparent', cursor: 'pointer' }}
                   />
 
                   <input
                     value={landingPrimaryColor}
                     onChange={(e) => setLandingPrimaryColor(e.target.value)}
-                    disabled={!isPremium}
+                    disabled={!canCustomizePublicPage}
                     placeholder="#c9a84c"
                     style={inputStyle}
                   />
@@ -1053,8 +1654,8 @@ export default function ConfiguracoesPage() {
             </div>
 
             <button
-              onClick={saveInfo}
-              disabled={savingInfo || !isPremium}
+              onClick={savePublicPage}
+              disabled={savingInfo || !canCustomizePublicPage}
               style={{
                 width: '100%',
                 marginTop: 18,
@@ -1065,13 +1666,196 @@ export default function ConfiguracoesPage() {
                 color: '#0a0a0a',
                 fontSize: 14,
                 fontWeight: 900,
-                cursor: isPremium ? 'pointer' : 'not-allowed',
-                opacity: isPremium ? 1 : 0.5,
+                cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed',
+                opacity: canCustomizePublicPage ? 1 : 0.5,
               }}
             >
-              {savedInfo ? 'Landing salva!' : savingInfo ? 'Salvando...' : 'Salvar Landing Premium'}
+              {savedInfo ? 'Página salva!' : savingInfo ? 'Salvando...' : 'Salvar Página Pública'}
             </button>
           </section>
+
+          <section style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 13, display: 'grid', placeItems: 'center', background: 'rgba(59,130,246,0.14)', color: '#60a5fa' }}>
+                <ImageIcon size={18} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>Identidade visual</h2>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>Logo exibida no cabeçalho e rodapé da página pública.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ width: 112, height: 112, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.24)', display: 'grid', placeItems: 'center' }}>
+                {landingLogoUrl ? (
+                  <img src={landingLogoUrl} alt="Logo da barbearia" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <ImageIcon size={30} color="#64748b" />
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <label style={{ padding: '11px 16px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.28)', background: 'rgba(59,130,246,0.10)', color: '#60a5fa', fontSize: 13, fontWeight: 800, cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed', opacity: canCustomizePublicPage ? 1 : 0.5, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                  <Upload size={14} />
+                  {savingPublicAsset === 'logo' ? 'Enviando...' : 'Enviar logo'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={!canCustomizePublicPage || savingPublicAsset !== null}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (file) uploadPublicPageAsset(file, 'logo')
+                      event.currentTarget.value = ''
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                {landingLogoUrl && (
+                  <button type="button" onClick={() => setLandingLogoUrl('')} disabled={!canCustomizePublicPage} style={{ padding: '11px 16px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontSize: 13, fontWeight: 800 }}>
+                    Remover logo
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section style={cardStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: '0 0 8px' }}>Sobre nós</h2>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Conte a história e a proposta da sua barbearia.</p>
+            <div style={{ display: 'grid', gap: 16 }}>
+              <Field label="Título">
+                <input value={landingAboutTitle} onChange={(event) => setLandingAboutTitle(event.target.value)} placeholder="Mais que uma barbearia, um estilo de vida." disabled={!canCustomizePublicPage} style={inputStyle} />
+              </Field>
+              <Field label="Texto">
+                <textarea value={landingAboutText} onChange={(event) => setLandingAboutText(event.target.value)} placeholder="Conte um pouco sobre a história e a experiência da sua barbearia." disabled={!canCustomizePublicPage} rows={5} style={{ ...inputStyle, resize: 'vertical', minHeight: 120 }} />
+              </Field>
+              <Field label="Foto principal">
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {landingAboutImageUrl && <img src={landingAboutImageUrl} alt="Foto da seção Sobre nós" style={{ width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 14 }} />}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <label style={{ padding: '11px 16px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.28)', background: 'rgba(59,130,246,0.10)', color: '#60a5fa', fontSize: 13, fontWeight: 800, cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed', opacity: canCustomizePublicPage ? 1 : 0.5, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                      <Upload size={14} />
+                      {savingPublicAsset === 'about' ? 'Enviando...' : 'Enviar foto'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        disabled={!canCustomizePublicPage || savingPublicAsset !== null}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          if (file) uploadPublicPageAsset(file, 'about')
+                          event.currentTarget.value = ''
+                        }}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    {landingAboutImageUrl && (
+                      <button type="button" onClick={() => setLandingAboutImageUrl('')} disabled={!canCustomizePublicPage} style={{ padding: '11px 16px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontSize: 13, fontWeight: 800 }}>
+                        Remover foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Field>
+            </div>
+          </section>
+
+          <section style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap' }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: '0 0 5px' }}>Depoimentos e avaliações</h2>
+                <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Adicione, edite ou remova avaliações exibidas na página.</p>
+              </div>
+              <button type="button" disabled={!canCustomizePublicPage || landingTestimonials.length >= 12} onClick={() => setLandingTestimonials((current) => [...current, { name: '', text: '', rating: 5 }])} style={{ padding: '10px 15px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.28)', background: 'rgba(59,130,246,0.12)', color: '#60a5fa', fontWeight: 800, cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed' }}>
+                Adicionar depoimento
+              </button>
+            </div>
+            <div style={{ display: 'grid', gap: 14 }}>
+              {landingTestimonials.length === 0 && <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Sem depoimentos personalizados. A página usará os exemplos padrão.</p>}
+              {landingTestimonials.map((testimonial, index) => (
+                <div key={`testimonial-${index}`} style={{ padding: 16, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.18)', display: 'grid', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 140px auto', gap: 10, alignItems: 'end' }}>
+                    <Field label="Nome do cliente">
+                      <input value={testimonial.name} disabled={!canCustomizePublicPage} onChange={(event) => setLandingTestimonials((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} style={inputStyle} />
+                    </Field>
+                    <Field label="Nota">
+                      <select value={testimonial.rating} disabled={!canCustomizePublicPage} onChange={(event) => setLandingTestimonials((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, rating: Number(event.target.value) } : item))} style={inputStyle}>
+                        {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} estrelas</option>)}
+                      </select>
+                    </Field>
+                    <button type="button" aria-label="Remover depoimento" disabled={!canCustomizePublicPage} onClick={() => setLandingTestimonials((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', display: 'grid', placeItems: 'center' }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <Field label="Depoimento">
+                    <textarea value={testimonial.text} disabled={!canCustomizePublicPage} onChange={(event) => setLandingTestimonials((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item))} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                  </Field>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap' }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: '0 0 5px' }}>Diferenciais</h2>
+                <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Destaque os principais motivos para escolher sua barbearia.</p>
+              </div>
+              <button type="button" disabled={!canCustomizePublicPage || landingDifferentials.length >= 12} onClick={() => setLandingDifferentials((current) => [...current, { title: '', description: '', icon: '✦' }])} style={{ padding: '10px 15px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.28)', background: 'rgba(59,130,246,0.12)', color: '#60a5fa', fontWeight: 800, cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed' }}>
+                Adicionar diferencial
+              </button>
+            </div>
+            <div style={{ display: 'grid', gap: 14 }}>
+              {landingDifferentials.length === 0 && <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Sem diferenciais personalizados. A página usará os itens padrão.</p>}
+              {landingDifferentials.map((differential, index) => (
+                <div key={`differential-${index}`} style={{ padding: 16, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.18)', display: 'grid', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '86px minmax(0,1fr) auto', gap: 10, alignItems: 'end' }}>
+                    <Field label="Ícone">
+                      <input value={differential.icon} disabled={!canCustomizePublicPage} maxLength={12} onChange={(event) => setLandingDifferentials((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, icon: event.target.value } : item))} style={inputStyle} />
+                    </Field>
+                    <Field label="Título">
+                      <input value={differential.title} disabled={!canCustomizePublicPage} onChange={(event) => setLandingDifferentials((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item))} style={inputStyle} />
+                    </Field>
+                    <button type="button" aria-label="Remover diferencial" disabled={!canCustomizePublicPage} onClick={() => setLandingDifferentials((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', display: 'grid', placeItems: 'center' }}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <Field label="Descrição curta">
+                    <input value={differential.description} disabled={!canCustomizePublicPage} onChange={(event) => setLandingDifferentials((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} style={inputStyle} />
+                  </Field>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section style={cardStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: '0 0 8px' }}>Estatísticas</h2>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Números exibidos para reforçar experiência e confiança.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14 }}>
+              <Field label="Anos de experiência"><input value={landingYearsExperience} onChange={(event) => setLandingYearsExperience(event.target.value)} placeholder="+5 anos" disabled={!canCustomizePublicPage} style={inputStyle} /></Field>
+              <Field label="Atendimentos realizados"><input value={landingAppointmentsCount} onChange={(event) => setLandingAppointmentsCount(event.target.value)} placeholder="+5.000" disabled={!canCustomizePublicPage} style={inputStyle} /></Field>
+              <Field label="Clientes satisfeitos"><input value={landingClientsCount} onChange={(event) => setLandingClientsCount(event.target.value)} placeholder="+1.200" disabled={!canCustomizePublicPage} style={inputStyle} /></Field>
+              <Field label="Avaliação média"><input value={landingAverageRating} onChange={(event) => setLandingAverageRating(event.target.value)} placeholder="4.9" disabled={!canCustomizePublicPage} style={inputStyle} /></Field>
+            </div>
+          </section>
+
+          <button
+            type="button"
+            onClick={savePublicPage}
+            disabled={savingInfo || !canCustomizePublicPage}
+            style={{
+              width: '100%',
+              padding: '14px',
+              borderRadius: 12,
+              border: 'none',
+              background: savedInfo ? 'linear-gradient(135deg,#059669,#10b981)' : 'linear-gradient(135deg,#c9a84c,#e8c96a)',
+              color: '#0a0a0a',
+              fontSize: 14,
+              fontWeight: 900,
+              cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed',
+              opacity: canCustomizePublicPage ? 1 : 0.5,
+            }}
+          >
+            {savedInfo ? 'Página salva!' : savingInfo ? 'Salvando...' : 'Salvar personalização'}
+          </button>
 
           <section style={cardStyle}>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9', margin: '0 0 8px' }}>
@@ -1114,8 +1898,8 @@ export default function ConfiguracoesPage() {
                   color: '#e8c96a',
                   fontSize: 13,
                   fontWeight: 800,
-                  cursor: isPremium ? 'pointer' : 'not-allowed',
-                  opacity: isPremium ? 1 : 0.5,
+                  cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed',
+                  opacity: canCustomizePublicPage ? 1 : 0.5,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 7,
@@ -1126,7 +1910,7 @@ export default function ConfiguracoesPage() {
                 <input
                   type="file"
                   accept="image/*"
-                  disabled={!isPremium || savingLandingBanner}
+                  disabled={!canCustomizePublicPage || savingLandingBanner}
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (file) uploadLandingBanner(file)
@@ -1139,7 +1923,7 @@ export default function ConfiguracoesPage() {
               {landingBannerUrl && (
                 <button
                   onClick={removeLandingBanner}
-                  disabled={!isPremium}
+                  disabled={!canCustomizePublicPage}
                   style={{
                     padding: '11px 16px',
                     borderRadius: 10,
@@ -1148,7 +1932,7 @@ export default function ConfiguracoesPage() {
                     color: '#f87171',
                     fontSize: 13,
                     fontWeight: 800,
-                    cursor: isPremium ? 'pointer' : 'not-allowed',
+                    cursor: canCustomizePublicPage ? 'pointer' : 'not-allowed',
                   }}
                 >
                   Remover banner

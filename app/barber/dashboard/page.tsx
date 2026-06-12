@@ -360,6 +360,11 @@ export default function BarberDashboard() {
           </button>
         </nav>
 
+        <button onClick={handleLogout} className="mobile-logout-btn">
+          <LogOut size={16} />
+          Sair
+        </button>
+
         <div className="sidebar-footer">
           <div className="mini-profile">
             <div>{barber?.nome?.slice(0, 2).toUpperCase() || 'BR'}</div>
@@ -724,6 +729,10 @@ const css = `
   gap: 8px;
   font-weight: 900;
   cursor: pointer;
+}
+
+.mobile-logout-btn {
+  display: none;
 }
 
 .barber-main {
@@ -1135,6 +1144,22 @@ const css = `
 
   .barber-nav button {
     min-width: 130px;
+  }
+
+  .mobile-logout-btn {
+    min-height: 44px;
+    margin-top: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(239,68,68,.30);
+    background: rgba(239,68,68,.06);
+    color: #f87171;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 900;
+    cursor: pointer;
+    width: 100%;
   }
 
   .barber-main {

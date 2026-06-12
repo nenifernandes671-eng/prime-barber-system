@@ -5,6 +5,10 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useIsMobile } from '@/lib/useIsMobile'
 import {
+  calculateBarberCompensation,
+  getBarberCompensation,
+} from '@/lib/barber-compensation'
+import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, AreaChart, Area,
 } from 'recharts'
@@ -121,7 +125,7 @@ setTenantPlan(tenant.plano || null)
   async function fetchAll(currentTenantId: string) {
     const [{ data: appts, error }, { data: barberData }, { data: commissionRows }] = await Promise.all([
       supabase.from('appointments').select('*').eq('tenant_id', currentTenantId).order('appointment_date', { ascending: false }),
-      supabase.from('barbeiros').select('nome, email, tenant_id').eq('tenant_id', currentTenantId).eq('ativo', true),
+      supabase.from('barbeiros').select('nome, email, tenant_id, compensation_type, commission_percentage, fixed_salary_amount, chair_rental_amount').eq('tenant_id', currentTenantId).eq('ativo', true),
       supabase.from('barbers').select('name, email, tenant_id, commission_percentage, commission_type').eq('tenant_id', currentTenantId),
     ])
     if (error) { console.log(error); return }
@@ -131,7 +135,10 @@ setTenantPlan(tenant.plano || null)
         const sameName = row.name && barber.nome && row.name.toLowerCase() === barber.nome.toLowerCase()
         return row.tenant_id === barber.tenant_id && (sameEmail || sameName)
       })
-      return { ...barber, commission_percentage: match?.commission_percentage ?? 0, commission_type: 'percentage' }
+      return {
+        ...barber,
+        compensation: getBarberCompensation(barber, match),
+      }
     })
     setAppointments(appts || [])
     setBarbers(mergedBarbers)
@@ -217,12 +224,30 @@ setTenantPlan(tenant.plano || null)
   const allActive = periodAppointments.filter(a => a.status !== 'cancelled')
   const finished = periodAppointments.filter(a => a.status === 'finished' || a.status === 'completed')
   const cancelled = periodAppointments.filter(a => a.status === 'cancelled')
-  const totalRevenue = allActive.reduce((s, a) => s + (a.price || 0), 0)
-  const totalCommissions = allActive.reduce((s, a) => {
-    const barber = barbers.find(b => b.nome === a.barber)
-    if (!barber) return s
-    return s + (a.price || 0) * ((barber.commission_percentage || 0) / 100)
-  }, 0)
+  const compensationPeriodStart = dateMode === 'month' ? `${selectedMonth}-01` : selectedDate
+  const compensationPeriodEnd = dateMode === 'month'
+    ? (() => {
+        const [year, month] = selectedMonth.split('-').map(Number)
+        return `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+      })()
+    : selectedDate
+  const compensationSummary = barbers.map((barber) => {
+    const serviceRevenue = allActive
+      .filter((appointment) => appointment.barber === barber.nome)
+      .reduce((sum, appointment) => sum + Number(appointment.price || 0), 0)
+    return calculateBarberCompensation({
+      settings: barber.compensation,
+      serviceRevenue,
+      periodStart: compensationPeriodStart,
+      periodEnd: compensationPeriodEnd,
+    })
+  })
+  const totalRevenue =
+    compensationSummary.reduce((sum, item) => sum + item.barbershopServiceRevenue + item.chairRentalRevenue, 0) +
+    allActive
+      .filter((appointment) => !barbers.some((barber) => barber.nome === appointment.barber))
+      .reduce((sum, appointment) => sum + Number(appointment.price || 0), 0)
+  const totalCommissions = compensationSummary.reduce((sum, item) => sum + item.laborCost, 0)
   const totalProfit = totalRevenue - totalCommissions
   const avgTicket = allActive.length > 0 ? totalRevenue / allActive.length : 0
   const cancelRate = periodAppointments.length > 0 ? ((cancelled.length / periodAppointments.length) * 100).toFixed(1) : '0.0'
@@ -461,7 +486,7 @@ setTenantPlan(tenant.plano || null)
 
       <div style={{ ...S.statsGrid, gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : S.statsGrid.gridTemplateColumns, gap: isMobile ? 10 : S.statsGrid.gap }} className="stats-grid">
         <StatCard icon="💵" label="Receita Total" value={fmt(totalRevenue)} color="#22c55e" sub={`${allActive.length} atendimentos`} percent="+12,5%" />
-        <StatCard icon="📈" label="Lucro Líquido" value={fmt(totalProfit)} color="#3b82f6" sub="após comissões" percent="+8,2%" />
+        <StatCard icon="📈" label="Lucro Líquido" value={fmt(totalProfit)} color="#3b82f6" sub="apos remuneracao" percent="+8,2%" />
         <StatCard icon="✂️" label="Agendamentos no período" value={String(todayCount)} color="#a855f7" sub="agendamentos" percent="+25%" />
         <StatCard icon="🎯" label="Ticket Médio" value={fmt(avgTicket)} color="#f59e0b" sub="por atendimento" percent="+5,7%" />
       </div>
@@ -521,7 +546,7 @@ setTenantPlan(tenant.plano || null)
             <SummaryItem label="Finalizados" value={String(finished.length)} color="#10b981" />
             <SummaryItem label="Cancelados" value={String(cancelled.length)} color="#ef4444" />
             <SummaryItem label="Taxa de cancelamento" value={`${cancelRate}%`} color="#f59e0b" />
-            <SummaryItem label="Comissões a pagar" value={fmt(totalCommissions)} color="#8b5cf6" />
+            <SummaryItem label="Custos da equipe" value={fmt(totalCommissions)} color="#8b5cf6" />
           </div>
         </div>
       </div>

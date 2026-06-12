@@ -7,7 +7,38 @@ import { getTenantAccess } from '@/lib/subscription-access'
 interface Service { id: string; name: string; price: number; duration: number; description?: string; photo_url?: string; unit_id?: string | null }
 interface Barber  { id: string; nome: string; avatar_url?: string; unit_id?: string | null }
 interface Unit { id: string; tenant_id: string; name: string; address?: string | null; phone?: string | null; active: boolean }
-interface Tenant  { id: string; nome: string; telefone?: string; plano?: string; hero_url?: string; status?: string; trial_ends_at?: string; opening_time?: string; closing_time?: string; slot_interval?: number; endereco?: string; landing_headline?: string; landing_description?: string; landing_whatsapp?: string; landing_instagram?: string; landing_address?: string; landing_primary_color?: string; landing_banner_url?: string }
+interface LandingTestimonial { name: string; text: string; rating: number }
+interface LandingDifferential { title: string; description: string; icon: string }
+interface Tenant {
+  id: string
+  nome: string
+  telefone?: string
+  plano?: string
+  hero_url?: string
+  status?: string
+  trial_ends_at?: string
+  opening_time?: string
+  closing_time?: string
+  slot_interval?: number
+  endereco?: string
+  landing_headline?: string
+  landing_description?: string
+  landing_whatsapp?: string
+  landing_instagram?: string
+  landing_address?: string
+  landing_primary_color?: string
+  landing_banner_url?: string
+  landing_logo_url?: string
+  landing_about_title?: string
+  landing_about_text?: string
+  landing_about_image_url?: string
+  landing_testimonials?: LandingTestimonial[]
+  landing_differentials?: LandingDifferential[]
+  landing_years_experience?: string
+  landing_appointments_count?: string
+  landing_clients_count?: string
+  landing_average_rating?: string
+}
 interface GalleryImage { id: string; image_url: string; position: number; is_cover?: boolean; created_at?: string }
 
 function timeToMinutes(time?: string) {
@@ -83,8 +114,9 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [error, setError]                     = useState('')
   const [lightboxIndex, setLightboxIndex]     = useState<number | null>(null)
 
-  const isPro = tenant?.plano === 'pro' || tenant?.plano === 'premium'
-  const isPremium = tenant?.plano === 'premium'
+  const normalizedPlan = tenant?.plano?.toLowerCase()
+  const isPro = normalizedPlan === 'pro' || normalizedPlan === 'premium'
+  const isPremium = normalizedPlan === 'premium'
   const allTimes = generateTimes(tenant?.opening_time, tenant?.closing_time, tenant?.slot_interval)
   const availableTimes = allTimes.filter(t => !bookedTimes.includes(t))
   const hasMultipleUnits = isPremium && units.length > 1
@@ -94,15 +126,16 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const filteredServices = isPremium && selectedUnit
     ? services.filter((service) => !service.unit_id || service.unit_id === selectedUnit.id)
     : services
-  const primaryColor = tenant?.landing_primary_color || GOLD
-  const heroImage = tenant?.landing_banner_url || tenant?.hero_url || DEFAULT_HERO
-  const landingHeadline = tenant?.landing_headline || 'Seu estilo,\nnosso cuidado.'
+  const primaryColor = (isPro && tenant?.landing_primary_color) || GOLD
+  const heroImage = (isPro && tenant?.landing_banner_url) || tenant?.hero_url || DEFAULT_HERO
+  const landingHeadline = (isPro && tenant?.landing_headline) || 'Seu estilo,\nnosso cuidado.'
   const landingDescription =
-    tenant?.landing_description ||
+    (isPro && tenant?.landing_description) ||
     `Agende seu horário e viva a experiência ${tenant?.nome ?? slug.toUpperCase()}. Profissionais especializados, ambiente premium.`
-  const landingWhatsapp = tenant?.landing_whatsapp || tenant?.telefone || ''
-  const landingInstagram = tenant?.landing_instagram || ''
-  const landingAddress = tenant?.landing_address || tenant?.endereco || ''
+  const landingWhatsapp = (isPro && tenant?.landing_whatsapp) || tenant?.telefone || ''
+  const landingInstagram = (isPro && tenant?.landing_instagram) || ''
+  const landingAddress = (isPro && tenant?.landing_address) || tenant?.endereco || ''
+  const landingLogoUrl = (isPro && tenant?.landing_logo_url) || ''
 
   useEffect(() => {
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
@@ -328,11 +361,33 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         ]
   ).slice(0, 12)
   const lightboxImage = lightboxIndex !== null ? galleryImages[lightboxIndex] : null
-  const reviews = [
-    ['Ambiente top, atendimento impecável e corte sempre fica do jeito que eu gosto.', 'Rafael Costa'],
-    ['Profissionais incríveis, atenção nos mínimos detalhes.', 'Lucas Almeida'],
-    ['Melhor barbearia da região, não abro mão.', 'João Victor'],
-    ['Agendamento fácil e pontualidade que faz diferença.', 'Matheus Silva'],
+  const defaultTestimonials: LandingTestimonial[] = [
+    { text: 'Ambiente top, atendimento impecável e corte sempre fica do jeito que eu gosto.', name: 'Rafael Costa', rating: 5 },
+    { text: 'Profissionais incríveis, atenção nos mínimos detalhes.', name: 'Lucas Almeida', rating: 5 },
+    { text: 'Melhor barbearia da região, não abro mão.', name: 'João Victor', rating: 5 },
+    { text: 'Agendamento fácil e pontualidade que faz diferença.', name: 'Matheus Silva', rating: 5 },
+  ]
+  const defaultDifferentials: LandingDifferential[] = [
+    { icon: '✂', title: 'Profissionais experientes', description: 'Especialistas preparados para cuidar do seu estilo.' },
+    { icon: '★', title: 'Produtos premium', description: 'Produtos selecionados para um acabamento superior.' },
+    { icon: '◆', title: 'Ambiente climatizado', description: 'Conforto e cuidado em cada detalhe.' },
+    { icon: '✦', title: 'Atendimento personalizado', description: 'Uma experiência pensada para você.' },
+  ]
+  const reviews = isPro && Array.isArray(tenant?.landing_testimonials) && tenant.landing_testimonials.length
+    ? tenant.landing_testimonials
+    : defaultTestimonials
+  const differentials = isPro && Array.isArray(tenant?.landing_differentials) && tenant.landing_differentials.length
+    ? tenant.landing_differentials
+    : defaultDifferentials
+  const aboutTitle = (isPro && tenant?.landing_about_title) || 'Mais que uma barbearia, um estilo de vida.'
+  const aboutText = (isPro && tenant?.landing_about_text) ||
+    `A ${tenantName} nasceu para entregar mais que cortes. Aqui, cada detalhe é pensado para proporcionar uma experiência única, unindo técnica, atendimento premium e um ambiente feito para você relaxar e sair ainda melhor.`
+  const aboutImage = (isPro && tenant?.landing_about_image_url) || galleryImages[0]?.src || fallbackImages[0]
+  const publicStats = [
+    ['✂', (isPro && tenant?.landing_years_experience) || '+5 anos', 'De experiência'],
+    ['◆', (isPro && tenant?.landing_appointments_count) || '+5.000', 'Atendimentos realizados'],
+    ['●', (isPro && tenant?.landing_clients_count) || '+1.200', 'Clientes satisfeitos'],
+    ['★', (isPro && tenant?.landing_average_rating) || '4.9', 'Avaliação média'],
   ]
 
   return (
@@ -422,7 +477,11 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 32px', height:68, display:'flex', alignItems:'center', justifyContent:'space-between', gap:20 }}>
           {/* Logo */}
           <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
-            <div style={{ width:38, height:38, borderRadius:10, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:DARK, fontWeight:900, boxShadow:`0 4px 16px rgba(201,168,76,0.3)` }}>✂</div>
+            {landingLogoUrl ? (
+              <img src={landingLogoUrl} alt={`Logo ${tenantName}`} style={{ width:42, height:42, borderRadius:10, objectFit:'contain' }} />
+            ) : (
+              <div style={{ width:38, height:38, borderRadius:10, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, color:DARK, fontWeight:900, boxShadow:`0 4px 16px rgba(201,168,76,0.3)` }}>✂</div>
+            )}
             <div>
               <p style={{ margin:0, fontSize:16, fontWeight:800, color:'#f1f5f9', letterSpacing:1.5, fontFamily:"'Playfair Display',serif", textTransform:'uppercase' }}>{tenantName}</p>
               <p style={{ margin:0, fontSize:9, color:primaryColor, letterSpacing:3, textTransform:'uppercase' }}>Barbearia</p>
@@ -495,12 +554,12 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
             {/* Stats */}
             <div className="hero-stat-row" style={{ display:'flex', gap:28, paddingTop:20, borderTop:'1px solid rgba(255,255,255,0.1)' }}>
-              {[['✂','Profissionais','Especializados'],['⭐','Produtos','Premium'],['🛡','Ambiente','Exclusivo']].map(([icon,t1,t2])=>(
-                <div key={t1} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:20 }}>{icon}</span>
+              {differentials.slice(0, 3).map((item) => (
+                <div key={item.title} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:20 }}>{item.icon || '✦'}</span>
                   <div>
-                    <p style={{ margin:0, fontSize:13, fontWeight:700, color:primaryColor, letterSpacing:0.3 }}>{t1}</p>
-                    <p style={{ margin:0, fontSize:11, color:'#8a7d68' }}>{t2}</p>
+                    <p style={{ margin:0, fontSize:13, fontWeight:700, color:primaryColor, letterSpacing:0.3 }}>{item.title}</p>
+                    <p style={{ margin:0, fontSize:11, color:'#8a7d68' }}>{item.description}</p>
                   </div>
                 </div>
               ))}
@@ -624,10 +683,10 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
       {/* ── TRUST BAR ── */}
       <div className="trust-bar" style={{ background:'#1a1a1a', padding:'20px 32px', display:'flex', justifyContent:'center', gap:40, flexWrap:'wrap', borderBottom:`3px solid ${primaryColor}` }}>
-        {[['✂','Profissionais Especializados'],['⭐','Produtos Premium'],['🛡','Ambiente Exclusivo'],['⚡','Atendimento Rápido']].map(([icon,text])=>(
-          <div key={text} style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:18 }}>{icon}</span>
-            <span style={{ color:'#94a3b8', fontSize:13, fontWeight:500 }}>{text}</span>
+        {differentials.slice(0, 4).map((item) => (
+          <div key={item.title} style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:18 }}>{item.icon || '✦'}</span>
+            <span style={{ color:'#94a3b8', fontSize:13, fontWeight:500 }}>{item.title}</span>
           </div>
         ))}
       </div>
@@ -734,11 +793,13 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           <p style={{ fontSize:11, fontWeight:800, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 8px' }}>AVALIAÇÕES</p>
           <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(26px,3.5vw,38px)', fontWeight:900, color:'#fff', margin:'0 0 24px' }}>O que nossos clientes dizem</h2>
           <div className="review-grid">
-            {reviews.map(([quote, name]) => (
-              <article key={name} className="premium-card" style={{ padding:'22px' }}>
-                <div style={{ color:primaryColor, letterSpacing:2, marginBottom:14 }}>★★★★★</div>
-                <p style={{ color:'#d7d0c3', fontSize:14, lineHeight:1.65, margin:'0 0 18px' }}>“{quote}”</p>
-                <p style={{ color:'#fff', fontWeight:800, margin:0 }}>— {name}</p>
+            {reviews.map((review, index) => (
+              <article key={`${review.name}-${index}`} className="premium-card" style={{ padding:'22px' }}>
+                <div style={{ color:primaryColor, letterSpacing:2, marginBottom:14 }}>
+                  {'★'.repeat(Math.max(1, Math.min(5, Number(review.rating) || 5)))}
+                </div>
+                <p style={{ color:'#d7d0c3', fontSize:14, lineHeight:1.65, margin:'0 0 18px' }}>“{review.text}”</p>
+                <p style={{ color:'#fff', fontWeight:800, margin:0 }}>— {review.name}</p>
               </article>
             ))}
           </div>
@@ -749,17 +810,18 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         <div className="about-grid-premium" style={{ maxWidth:1100, margin:'0 auto' }}>
           <div>
             <p style={{ fontSize:11, fontWeight:800, letterSpacing:3, color:primaryColor, textTransform:'uppercase', margin:'0 0 8px' }}>SOBRE NÓS</p>
-            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(28px,3.5vw,42px)', fontWeight:900, color:'#fff', margin:'0 0 18px', lineHeight:1.05 }}>Mais que uma barbearia, um estilo de vida.</h2>
-            <p style={{ color:'#d7d0c3', fontSize:15, lineHeight:1.75, margin:0 }}>
-              A {tenantName} nasceu para entregar mais que cortes. Aqui, cada detalhe é pensado para proporcionar uma experiência única, unindo técnica, atendimento premium e um ambiente feito para você relaxar e sair ainda melhor.
-            </p>
+            <h2 style={{ fontFamily:"'Playfair Display',serif", fontSize:'clamp(28px,3.5vw,42px)', fontWeight:900, color:'#fff', margin:'0 0 18px', lineHeight:1.05 }}>{aboutTitle}</h2>
+            <p style={{ color:'#d7d0c3', fontSize:15, lineHeight:1.75, margin:0 }}>{aboutText}</p>
           </div>
-          <img src={galleryImages[0]?.src || fallbackImages[0]} alt={`Ambiente ${tenantName}`} style={{ width:'100%', height:250, objectFit:'cover', borderRadius:14, border:'1px solid rgba(232,201,106,0.24)', filter:'brightness(0.82)' }} />
+          <img src={aboutImage} alt={`Ambiente ${tenantName}`} style={{ width:'100%', height:250, objectFit:'cover', borderRadius:14, border:'1px solid rgba(232,201,106,0.24)', filter:'brightness(0.82)' }} />
           <div style={{ display:'grid', gap:14 }}>
-            {['Profissionais experientes','Produtos premium','Ambiente climatizado','Atendimento personalizado'].map((item) => (
-              <div key={item} className="premium-card" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', color:'#f8f1df', fontWeight:700 }}>
-                <span style={{ width:32, height:32, borderRadius:10, display:'grid', placeItems:'center', background:'rgba(201,168,76,0.12)', color:primaryColor }}>✦</span>
-                {item}
+            {differentials.slice(0, 4).map((item) => (
+              <div key={item.title} className="premium-card" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', color:'#f8f1df' }}>
+                <span style={{ width:32, height:32, borderRadius:10, display:'grid', placeItems:'center', background:'rgba(201,168,76,0.12)', color:primaryColor }}>{item.icon || '✦'}</span>
+                <div>
+                  <strong style={{ display:'block' }}>{item.title}</strong>
+                  {item.description && <small style={{ color:'#9f9789' }}>{item.description}</small>}
+                </div>
               </div>
             ))}
           </div>
@@ -768,12 +830,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
 
       <section style={{ padding:'28px 32px 72px', background:'#060503' }}>
         <div className="stat-grid" style={{ maxWidth:1100, margin:'0 auto' }}>
-          {[
-            ['✂','+5 anos','De experiência'],
-            ['⬟','+5.000','Atendimentos realizados'],
-            ['●','+1.200','Clientes satisfeitos'],
-            ['★','4.9','Avaliação média'],
-          ].map(([icon, value, label]) => (
+          {publicStats.map(([icon, value, label]) => (
             <div key={label} className="premium-card" style={{ padding:'22px', display:'flex', alignItems:'center', gap:16 }}>
               <span style={{ width:42, height:42, borderRadius:12, display:'grid', placeItems:'center', border:'1px solid rgba(232,201,106,0.28)', background:'rgba(201,168,76,0.1)', color:primaryColor }}>{icon}</span>
               <div>
@@ -808,7 +865,11 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       <footer id="contato" style={{ background:'#111', borderTop:`3px solid ${primaryColor}`, padding:'36px 32px 20px' }}>
         <div style={{ maxWidth:1100, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:20, marginBottom:20 }}>
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <div style={{ width:36, height:36, borderRadius:9, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:DARK, fontWeight:900 }}>✂</div>
+            {landingLogoUrl ? (
+              <img src={landingLogoUrl} alt={`Logo ${tenantName}`} style={{ width:40, height:40, borderRadius:9, objectFit:'contain' }} />
+            ) : (
+              <div style={{ width:36, height:36, borderRadius:9, background:`linear-gradient(135deg,${primaryColor},${GOLD2})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:DARK, fontWeight:900 }}>✂</div>
+            )}
             <div>
               <p style={{ margin:0, fontSize:15, fontWeight:800, color:'#f1f5f9', fontFamily:"'Playfair Display',serif", letterSpacing:1, textTransform:'uppercase' }}>{tenantName}</p>
               <p style={{ margin:0, fontSize:9, color:primaryColor, letterSpacing:2.5, textTransform:'uppercase' }}>Barbearia</p>

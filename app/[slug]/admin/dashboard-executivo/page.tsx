@@ -5,6 +5,11 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUnit } from '@/lib/unit-context'
 import {
+  calculateBarberCompensation,
+  getBarberCompensation,
+  type BarberCompensationSource,
+} from '@/lib/barber-compensation'
+import {
   BarChart3,
   CalendarDays,
   DollarSign,
@@ -52,6 +57,12 @@ type Tenant = {
 type BarberAsset = {
   nome: string
   avatar_url?: string | null
+}
+
+type BarberCompensation = BarberCompensationSource & {
+  id: string
+  nome: string
+  unit_id?: string | null
 }
 
 type FinancialEntry = {
@@ -107,6 +118,7 @@ export default function DashboardExecutivoPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [financialEntries, setFinancialEntries] = useState<FinancialEntry[]>([])
+  const [barberCompensations, setBarberCompensations] = useState<BarberCompensation[]>([])
   const [barberPhotos, setBarberPhotos] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>('30days')
@@ -129,6 +141,7 @@ export default function DashboardExecutivoPage() {
       setTenant(null)
       setAppointments([])
       setFinancialEntries([])
+      setBarberCompensations([])
       setBarberPhotos({})
       setLoading(false)
       return
@@ -153,6 +166,24 @@ export default function DashboardExecutivoPage() {
       setAppointments([])
     } else {
       setAppointments((appointmentsData || []) as Appointment[])
+    }
+
+    let barbersQuery = supabase
+      .from('barbeiros')
+      .select('id,nome,unit_id,compensation_type,commission_percentage,fixed_salary_amount,chair_rental_amount')
+      .eq('tenant_id', tenantData.id)
+      .eq('ativo', true)
+
+    if (selectedUnitId !== 'all') {
+      barbersQuery = barbersQuery.eq('unit_id', selectedUnitId)
+    }
+
+    const { data: compensationData, error: compensationError } = await barbersQuery
+    if (compensationError) {
+      console.error('Erro ao buscar remuneracoes:', compensationError)
+      setBarberCompensations([])
+    } else {
+      setBarberCompensations((compensationData || []) as BarberCompensation[])
     }
 
     let entriesQuery = supabase
@@ -274,8 +305,63 @@ export default function DashboardExecutivoPage() {
   const finished = filtered.filter((item) => isFinished(item.status))
   const previousFinished = previousPeriod.filter((item) => isFinished(item.status))
 
-  const revenue = finished.reduce((sum, item) => sum + Number(item.price || 0), 0)
-  const previousRevenue = previousFinished.reduce((sum, item) => sum + Number(item.price || 0), 0)
+  function selectedPeriodRange() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const end = localDate(today)
+    const start = new Date(today)
+
+    if (period === '7days') {
+      start.setDate(today.getDate() - 6)
+    } else if (period === '30days') {
+      start.setDate(today.getDate() - 29)
+    } else if (period === 'month') {
+      start.setDate(1)
+    }
+
+    return { start: localDate(start), end }
+  }
+
+  function summarizeCompensation(
+    items: Appointment[],
+    explicitRange?: { start: string; end: string }
+  ) {
+    const dates = items.map((item) => item.appointment_date).filter(Boolean).sort()
+    const start = explicitRange?.start || dates[0] || localDate()
+    const end = explicitRange?.end || dates[dates.length - 1] || localDate()
+    const knownNames = new Set(barberCompensations.map((barber) => nameKey(barber.nome)))
+    const summaries = barberCompensations.map((barber) => {
+      const serviceRevenue = items
+        .filter((item) => nameKey(item.barber) === nameKey(barber.nome))
+        .reduce((sum, item) => sum + Number(item.price || 0), 0)
+
+      return calculateBarberCompensation({
+        settings: getBarberCompensation(barber),
+        serviceRevenue,
+        periodStart: start,
+        periodEnd: end,
+      })
+    })
+    const unassignedRevenue = items
+      .filter((item) => !knownNames.has(nameKey(item.barber)))
+      .reduce((sum, item) => sum + Number(item.price || 0), 0)
+
+    return {
+      revenue: summaries.reduce(
+        (sum, item) => sum + item.barbershopServiceRevenue + item.chairRentalRevenue,
+        unassignedRevenue
+      ),
+      laborCost: summaries.reduce((sum, item) => sum + item.laborCost, 0),
+    }
+  }
+
+  const currentCompensation = summarizeCompensation(
+    finished,
+    period === 'all' ? undefined : selectedPeriodRange()
+  )
+  const previousCompensation = summarizeCompensation(previousFinished)
+  const revenue = currentCompensation.revenue
+  const previousRevenue = previousCompensation.revenue
   const growth = previousRevenue > 0 ? Math.round(((revenue - previousRevenue) / previousRevenue) * 100) : revenue > 0 ? 100 : 0
 
   const averageTicket = finished.length > 0 ? revenue / finished.length : 0
@@ -352,8 +438,13 @@ export default function DashboardExecutivoPage() {
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
 
   const expenses = filteredEntries
-    .filter((entry) => entry.type === 'despesa')
+    .filter(
+      (entry) =>
+        entry.type === 'despesa' &&
+        !String(entry.description || '').toLowerCase().includes('comiss')
+    )
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
+    + currentCompensation.laborCost
 
   const totalIncome = revenue + manualIncome
   const netProfit = totalIncome - expenses
@@ -1009,14 +1100,22 @@ function Empty() {
 const css = `
 .executive-page {
   min-height: 100vh;
-  color: #f8fafc;
+  color: #0f172a;
   font-family: Inter, DM Sans, Segoe UI, sans-serif;
+}
+
+.executive-header h1 {
+  color: #0f172a !important;
+}
+
+.executive-header p {
+  color: #475569 !important;
 }
 
 .executive-wrap {
   max-width: 1480px;
   margin: 0 auto;
-  padding: 22px;
+  padding: 20px 22px 28px;
 }
 
 .executive-header {
@@ -1029,9 +1128,9 @@ const css = `
 
 .executive-header h1 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 950;
-  letter-spacing: -0.04em;
+  font-size: 27px;
+  font-weight: 850;
+  letter-spacing: -0.025em;
 }
 
 .executive-header p {
@@ -1190,10 +1289,10 @@ const css = `
 }
 
 .period-tabs {
-  background: rgba(15,23,42,.76);
+  background: rgba(24,34,53,.78);
   border: 1px solid rgba(148,163,184,.12);
-  border-radius: 17px;
-  padding: 6px;
+  border-radius: 14px;
+  padding: 5px;
   width: max-content;
   margin: -48px 0 24px auto;
   display: flex;
@@ -1203,38 +1302,39 @@ const css = `
 .period-btn {
   border: 0;
   border-radius: 12px;
-  padding: 11px 18px;
-  color: #94a3b8;
+  padding: 9px 16px;
+  color: #b5c1d1;
   background: transparent;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
 }
 
 .period-btn.active {
   background: linear-gradient(135deg,#2563eb,#1d4ed8);
   color: white;
-  box-shadow: 0 16px 30px rgba(37,99,235,.25);
+  box-shadow: 0 8px 20px rgba(37,99,235,.20);
 }
 
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .metric-card,
 .panel,
 .locked-card {
-  background: radial-gradient(circle at top right, rgba(37,99,235,.12), transparent 34%), linear-gradient(145deg, rgba(15,23,42,.94), rgba(8,13,28,.98));
-  border: 1px solid rgba(148,163,184,.12);
-  box-shadow: 0 24px 70px rgba(0,0,0,.22);
+  background: radial-gradient(circle at top right, rgba(59,130,246,.08), transparent 38%), linear-gradient(145deg, rgba(27,38,59,.97), rgba(17,25,40,.98));
+  border: 1px solid rgba(148,163,184,.11);
+  box-shadow: 0 12px 30px rgba(15,23,42,.13);
+  color: #f8fafc;
 }
 
 .metric-card {
-  min-height: 135px;
-  border-radius: 22px;
-  padding: 20px;
+  min-height: 108px;
+  border-radius: 18px;
+  padding: 16px 17px;
 }
 
 .metric-top {
@@ -1245,29 +1345,30 @@ const css = `
 
 .metric-top span {
   color: #cbd5e1;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .metric-top div {
-  width: 50px;
-  height: 50px;
-  border-radius: 19px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
 }
 
 .metric-card strong {
   display: block;
-  margin-top: 18px;
-  font-size: 27px;
-  letter-spacing: -.04em;
-  font-weight: 950;
+  margin-top: 11px;
+  font-size: 23px;
+  letter-spacing: -.025em;
+  font-weight: 850;
 }
 
 .metric-card p {
-  margin: 8px 0 0;
-  font-size: 13px;
-  font-weight: 900;
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .metric-card p.positive {
@@ -1286,46 +1387,47 @@ const css = `
 .main-grid {
   display: grid;
   grid-template-columns: 1.28fr 1.12fr .9fr;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .lower-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1.2fr;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .footer-grid {
   display: grid;
   grid-template-columns: .9fr 1.2fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 .panel {
-  border-radius: 22px;
-  padding: 20px;
-  min-height: 245px;
+  border-radius: 19px;
+  padding: 18px;
+  min-height: 220px;
 }
 
 .panel h2 {
-  margin: 0 0 18px;
-  font-size: 17px;
-  font-weight: 950;
-  letter-spacing: -.03em;
+  margin: 0 0 15px;
+  font-size: 15px;
+  font-weight: 820;
+  letter-spacing: -.015em;
+  color: #f8fafc;
 }
 
-.chart-panel { min-height: 310px; }
+.chart-panel { min-height: 280px; }
 
 .chart-legend {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin: -4px 0 12px;
+  margin: -2px 0 10px;
   color: #94a3b8;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   flex-wrap: wrap;
 }
 
@@ -1356,10 +1458,10 @@ const css = `
 }
 
 .chart-box {
-  height: 230px;
+  height: 205px;
   display: grid;
-  grid-template-columns: 55px 1fr;
-  gap: 10px;
+  grid-template-columns: 50px 1fr;
+  gap: 8px;
 }
 
 .chart-scale {
@@ -1374,14 +1476,14 @@ const css = `
 .line-chart {
   display: flex;
   align-items: stretch;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
-  padding: 8px 8px 0;
+  padding: 7px 7px 0;
   background:
     linear-gradient(rgba(148,163,184,.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148,163,184,.04) 1px, transparent 1px);
   background-size: 100% 20%, 10% 100%;
-  border-radius: 16px;
+  border-radius: 13px;
   overflow: hidden;
 }
 
@@ -1394,13 +1496,13 @@ const css = `
   justify-content: flex-end;
 }
 
-.line-column { position: relative; height: 190px; }
+.line-column { position: relative; height: 166px; }
 
 .line-bar {
   position: absolute;
   bottom: 0;
-  width: 45%;
-  max-width: 16px;
+  width: 34%;
+  max-width: 11px;
   border-radius: 999px 999px 3px 3px;
   transition: .18s ease;
 }
@@ -1409,14 +1511,14 @@ const css = `
   left: 50%;
   transform: translateX(-80%);
   background: linear-gradient(180deg,#93c5fd,#2563eb);
-  box-shadow: 0 0 22px rgba(37,99,235,.42);
+  box-shadow: 0 4px 12px rgba(37,99,235,.20);
 }
 
 .line-bar.expense {
   left: 50%;
   transform: translateX(15%);
   background: linear-gradient(180deg,#fb7185,#dc2626);
-  box-shadow: 0 0 18px rgba(220,38,38,.32);
+  box-shadow: 0 4px 10px rgba(220,38,38,.16);
 }
 
 .line-column:hover .line-bar {
@@ -1426,12 +1528,12 @@ const css = `
 .line-dot {
   position: absolute;
   left: 50%;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   transform: translate(-80%, 50%);
   border-radius: 999px;
   background: #bfdbfe;
-  box-shadow: 0 0 18px #2563eb;
+  box-shadow: 0 0 8px rgba(37,99,235,.55);
 }
 
 .line-point-wrap small {
@@ -1444,14 +1546,14 @@ const css = `
 
 .payment-layout {
   display: grid;
-  grid-template-columns: 145px 1fr;
-  gap: 22px;
+  grid-template-columns: 130px 1fr;
+  gap: 18px;
   align-items: center;
 }
 
 .donut {
-  width: 145px;
-  height: 145px;
+  width: 130px;
+  height: 130px;
   border-radius: 999px;
   background: conic-gradient(#3b82f6 0 45%, #10b981 45% 80%, #f59e0b 80% 95%, #8b5cf6 95% 100%);
   display: grid;
@@ -1459,8 +1561,8 @@ const css = `
 }
 
 .donut > div {
-  width: 88px;
-  height: 88px;
+  width: 80px;
+  height: 80px;
   border-radius: 999px;
   background: #071020;
   display: grid;
@@ -1469,7 +1571,7 @@ const css = `
 }
 
 .donut strong,
-.goal-ring strong { font-size: 20px; font-weight: 950; }
+.goal-ring strong { font-size: 18px; font-weight: 850; }
 .donut span,
 .goal-ring span,
 .goal-ring small { display: block; color: #94a3b8; font-size: 11px; }
@@ -1492,16 +1594,16 @@ const css = `
 .goal-box { display: grid; place-items: center; gap: 18px; }
 
 .goal-ring {
-  width: 185px;
-  height: 185px;
+  width: 160px;
+  height: 160px;
   border-radius: 999px;
   display: grid;
   place-items: center;
 }
 
 .goal-ring div {
-  width: 130px;
-  height: 130px;
+  width: 112px;
+  height: 112px;
   border-radius: 999px;
   background: #071020;
   display: grid;
@@ -1607,8 +1709,8 @@ const css = `
 }
 
 .cash-grid > div {
-  padding: 18px;
-  border-radius: 18px;
+  padding: 15px;
+  border-radius: 15px;
   background: rgba(15,23,42,.55);
   border: 1px solid rgba(148,163,184,.09);
 }
@@ -1621,9 +1723,9 @@ const css = `
 }
 
 .cash-grid strong {
-  font-size: 25px;
-  font-weight: 950;
-  letter-spacing: -.04em;
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: -.025em;
 }
 
 .growth-grid {
@@ -1635,16 +1737,16 @@ const css = `
 .growth-item {
   display: grid;
   gap: 7px;
-  padding: 14px;
-  border-radius: 18px;
+  padding: 13px;
+  border-radius: 15px;
   background: rgba(15,23,42,.55);
   border: 1px solid rgba(148,163,184,.09);
 }
 
 .growth-item div {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
+  width: 39px;
+  height: 39px;
+  border-radius: 13px;
   display: grid;
   place-items: center;
   background: rgba(37,99,235,.16);
@@ -1657,8 +1759,8 @@ const css = `
 }
 
 .growth-item strong {
-  font-size: 22px;
-  font-weight: 950;
+  font-size: 20px;
+  font-weight: 850;
 }
 
 .growth-item strong.positive {
@@ -1685,6 +1787,165 @@ const css = `
 .locked-card p { color: #94a3b8; line-height: 1.6; }
 .locked-card button { border: 0; border-radius: 14px; padding: 13px 18px; background: #2563eb; color: white; font-weight: 900; }
 .muted { color: #94a3b8; }
+
+/*
+ * Executive cards intentionally remain dark in both admin themes.
+ * Keep their content explicit so light-theme rules cannot reduce contrast.
+ */
+.executive-page .metric-card,
+.executive-page .panel,
+.executive-page .locked-card,
+.executive-page .notification-menu,
+.executive-page .notification-item {
+  color: #f8fafc !important;
+}
+
+.executive-page .metric-card strong,
+.executive-page .panel h2,
+.executive-page .panel strong,
+.executive-page .panel b,
+.executive-page .notification-head strong,
+.executive-page .notification-item strong,
+.executive-page .locked-card h1 {
+  color: #f8fafc;
+}
+
+.executive-page .metric-top span,
+.executive-page .chart-legend,
+.executive-page .chart-scale,
+.executive-page .line-point-wrap small,
+.executive-page .donut span,
+.executive-page .goal-ring span,
+.executive-page .goal-ring small,
+.executive-page .payment-row small,
+.executive-page .ranking-row small,
+.executive-page .inactive-row small,
+.executive-page .cash-grid span,
+.executive-page .growth-item small,
+.executive-page .notification-item p,
+.executive-page .locked-card p,
+.executive-page .muted {
+  color: #aebdd0 !important;
+}
+
+.executive-page .metric-card p span {
+  color: #b8c5d6 !important;
+}
+
+.executive-page .payment-row,
+.executive-page .goal-box p,
+.executive-page .service-head span,
+.executive-page .rank-number,
+.executive-page .growth-item span {
+  color: #dbe5f1 !important;
+}
+
+.executive-page .growth-item small b {
+  color: #f1f5f9 !important;
+}
+
+.executive-page .donut > div,
+.executive-page .goal-ring div {
+  color: #f8fafc;
+}
+
+.executive-page .metric-card p.positive,
+.executive-page .growth-item strong.positive,
+.executive-page .ranking-row b,
+.executive-page .chart-legend strong {
+  color: #4ade80 !important;
+}
+
+.executive-page .metric-card p.negative,
+.executive-page .growth-item strong.negative {
+  color: #fb7185 !important;
+}
+
+
+
+/* Superfícies executivas locais: suaves, legíveis e independentes do tema global. */
+.executive-page .metric-card,
+.executive-page .panel,
+.executive-page .locked-card {
+  background: radial-gradient(circle at top right, rgba(59,130,246,.08), transparent 38%), linear-gradient(145deg, rgba(27,38,59,.97), rgba(17,25,40,.98)) !important;
+  border: 1px solid rgba(148,163,184,.11) !important;
+  box-shadow: 0 12px 30px rgba(15,23,42,.13) !important;
+  color: #f8fafc !important;
+}
+
+.executive-page .panel *,
+.executive-page .metric-card *,
+.executive-page .locked-card * {
+  text-shadow: none;
+}
+
+.executive-page .panel h2,
+.executive-page .metric-card strong,
+.executive-page .panel strong,
+.executive-page .panel b,
+.executive-page .locked-card h1 {
+  color: #f8fafc !important;
+}
+
+.executive-page .metric-top span,
+.executive-page .chart-legend,
+.executive-page .chart-scale,
+.executive-page .line-point-wrap small,
+.executive-page .donut span,
+.executive-page .goal-ring span,
+.executive-page .goal-ring small,
+.executive-page .payment-row small,
+.executive-page .ranking-row small,
+.executive-page .inactive-row small,
+.executive-page .cash-grid span,
+.executive-page .growth-item small,
+.executive-page .notification-item p,
+.executive-page .locked-card p,
+.executive-page .muted {
+  color: #cbd5e1 !important;
+}
+
+.executive-page .payment-row,
+.executive-page .goal-box p,
+.executive-page .service-head,
+.executive-page .service-head span,
+.executive-page .rank-number,
+.executive-page .growth-item span,
+.executive-page .cash-grid strong,
+.executive-page .growth-item small b {
+  color: #e2e8f0 !important;
+}
+
+.executive-page .donut > div,
+.executive-page .goal-ring div {
+  background: #071020 !important;
+  color: #f8fafc !important;
+}
+
+.executive-page .cash-grid > div,
+.executive-page .growth-item {
+  background: rgba(35,47,68,.64) !important;
+  border: 1px solid rgba(148,163,184,.10) !important;
+}
+
+.executive-page .line-chart {
+  background:
+    linear-gradient(rgba(148,163,184,.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,.045) 1px, transparent 1px) !important;
+  background-size: 100% 20%, 10% 100% !important;
+}
+
+.executive-page .metric-card p.positive,
+.executive-page .growth-item strong.positive,
+.executive-page .ranking-row b,
+.executive-page .chart-legend strong {
+  color: #4ade80 !important;
+}
+
+.executive-page .metric-card p.negative,
+.executive-page .growth-item strong.negative {
+  color: #fb7185 !important;
+}
 
 @media (max-width: 1300px) {
   .metric-grid { grid-template-columns: repeat(2, 1fr); }

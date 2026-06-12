@@ -7,6 +7,11 @@ import { useUnit } from '@/lib/unit-context'
 import { useTenant } from '@/lib/tenant-context'
 import { useTheme } from '@/components/theme-provider'
 import {
+  calculateBarberCompensation,
+  getBarberCompensation,
+  type BarberCompensationSource,
+} from '@/lib/barber-compensation'
+import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
@@ -61,6 +66,7 @@ export default function RelatoriosPage() {
 
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [barbers, setBarbers] = useState<Barber[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<PeriodFilter>('30days')
 
@@ -99,6 +105,7 @@ export default function RelatoriosPage() {
     if (!tenantId && !barbershopId) {
       setAppointments([])
       setServices([])
+      setBarbers([])
       setLoading(false)
       return
     }
@@ -120,17 +127,25 @@ export default function RelatoriosPage() {
       .select('*')
       .or(tenantFilter)
 
+    let barbersQuery = supabase
+      .from('barbeiros')
+      .select('id,nome,unit_id,compensation_type,commission_percentage,fixed_salary_amount,chair_rental_amount')
+      .eq('tenant_id', tenantId || '')
+      .eq('ativo', true)
+
     if (activeUnitId !== 'all') {
       appointmentsQuery = appointmentsQuery.eq('unit_id', activeUnitId)
       servicesQuery = servicesQuery.or(`unit_id.eq.${activeUnitId},unit_id.is.null`)
+      barbersQuery = barbersQuery.eq('unit_id', activeUnitId)
     }
 
-    const [appointmentsResponse, servicesResponse] = await Promise.all([
+    const [appointmentsResponse, servicesResponse, barbersResponse] = await Promise.all([
       appointmentsQuery
         .order('appointment_date', { ascending: false })
         .order('appointment_time', { ascending: false }),
 
       servicesQuery,
+      barbersQuery,
     ])
 
     if (appointmentsResponse.error) {
@@ -145,6 +160,13 @@ export default function RelatoriosPage() {
       setServices([])
     } else {
       setServices(servicesResponse.data || [])
+    }
+
+    if (barbersResponse.error) {
+      console.error('Erro ao buscar remuneracoes:', barbersResponse.error)
+      setBarbers([])
+    } else {
+      setBarbers((barbersResponse.data || []) as Barber[])
     }
 
     setLoading(false)
@@ -255,9 +277,58 @@ export default function RelatoriosPage() {
     (item) => !isFinished(item.status)
   )
 
-  const faturamentoTotal = concluidos.reduce((total, item) => {
-    return total + getAppointmentPrice(item)
-  }, 0)
+  const reportDates = filteredAppointments
+    .map((item) => item.appointment_date)
+    .filter(Boolean)
+    .sort()
+  const reportToday = new Date()
+  reportToday.setHours(0, 0, 0, 0)
+  const reportEnd = reportToday.toISOString().slice(0, 10)
+  let reportStart = reportDates[0] || reportEnd
+
+  if (period === 'today') {
+    reportStart = reportEnd
+  } else if (period === '7days' || period === '30days') {
+    const startDate = new Date(reportToday)
+    startDate.setDate(reportToday.getDate() - (period === '7days' ? 6 : 29))
+    reportStart = startDate.toISOString().slice(0, 10)
+  } else if (period === 'month') {
+    reportStart = new Date(
+      reportToday.getFullYear(),
+      reportToday.getMonth(),
+      1
+    ).toISOString().slice(0, 10)
+  }
+
+  const effectiveReportEnd =
+    period === 'all'
+      ? reportDates[reportDates.length - 1] || reportEnd
+      : reportEnd
+  const knownBarbers = new Set(barbers.map((barber) => normalizeText(barber.nome)))
+  const compensationSummary = barbers.map((barber) => {
+    const serviceRevenue = concluidos
+      .filter((item) => normalizeText(item.barber) === normalizeText(barber.nome))
+      .reduce((total, item) => total + getAppointmentPrice(item), 0)
+
+    return calculateBarberCompensation({
+      settings: getBarberCompensation(barber),
+      serviceRevenue,
+      periodStart: reportStart,
+      periodEnd: effectiveReportEnd,
+    })
+  })
+  const unassignedRevenue = concluidos
+    .filter((item) => !knownBarbers.has(normalizeText(item.barber)))
+    .reduce((total, item) => total + getAppointmentPrice(item), 0)
+  const faturamentoTotal = compensationSummary.reduce(
+    (total, item) => total + item.barbershopServiceRevenue + item.chairRentalRevenue,
+    unassignedRevenue
+  )
+  const custoEquipe = compensationSummary.reduce(
+    (total, item) => total + item.laborCost,
+    0
+  )
+  const lucroEstimado = faturamentoTotal - custoEquipe
 
   const ticketMedio =
     concluidos.length > 0 ? faturamentoTotal / concluidos.length : 0
@@ -345,8 +416,10 @@ export default function RelatoriosPage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <MetricCard title="Faturamento" value={formatCurrency(faturamentoTotal)} icon={DollarSign} />
+          <MetricCard title="Custo da equipe" value={formatCurrency(custoEquipe)} icon={Users} />
+          <MetricCard title="Lucro estimado" value={formatCurrency(lucroEstimado)} icon={BarChart3} />
           <MetricCard title="Agendamentos" value={filteredAppointments.length} icon={CalendarDays} />
           <MetricCard title="Concluídos" value={concluidos.length} icon={CheckCircle2} />
           <MetricCard title="Pendentes" value={pendentes.length} icon={Clock} />
@@ -549,4 +622,10 @@ function EmptyText({ children }: { children: React.ReactNode }) {
   const { isLight } = useTheme()
 
   return <p className={isLight ? 'text-slate-500' : 'text-zinc-500'}>{children}</p>
+}
+
+type Barber = BarberCompensationSource & {
+  id: string
+  nome: string
+  unit_id?: string | null
 }

@@ -6,6 +6,12 @@ import { useTenantId } from '@/lib/useTenantId'
 import { useTenant } from '@/lib/tenant-context'
 import { getMaxBarbers } from '@/lib/permissions'
 import {
+  calculateBarberCompensation,
+  COMPENSATION_LABELS,
+  getBarberCompensation,
+  type BarberCompensationType,
+} from '@/lib/barber-compensation'
+import {
   Plus,
   Search,
   Scissors,
@@ -39,6 +45,10 @@ interface Barber {
   avatar_url?: string | null
   image_url?: string | null
   foto_url?: string | null
+  compensation_type?: BarberCompensationType | null
+  commission_percentage?: number | null
+  fixed_salary_amount?: number | null
+  chair_rental_amount?: number | null
 }
 
 interface BarberAsset {
@@ -76,11 +86,16 @@ interface CommissionRow {
 }
 
 interface BarberPerformance {
+  compensationType: BarberCompensationType
   commissionPercent: number
+  fixedSalaryAmount: number
+  chairRentalAmount: number
   monthlyGoal: number
   revenue: number
   appointments: number
   commissionValue: number
+  remunerationValue: number
+  chairRentalRevenue: number
   progress: number
 }
 
@@ -104,7 +119,7 @@ export default function AdminBarbeiros() {
   const [units, setUnits] = useState<Unit[]>([])
 
   const tenantId = useTenantId()
-  const { tenant, isPremium } = useTenant()
+  const { tenant, isPremium, isProOrPremium } = useTenant()
   const maxBarbers = getMaxBarbers(tenant?.plano)
   const reachedLimit = barbers.length >= maxBarbers
 
@@ -114,12 +129,20 @@ export default function AdminBarbeiros() {
   const [senha, setSenha] = useState('')
   const [showSenha, setShowSenha] = useState(false)
   const [selectedUnitId, setSelectedUnitId] = useState('')
+  const [compensationType, setCompensationType] = useState<BarberCompensationType>('commission')
+  const [commissionPercentage, setCommissionPercentage] = useState(50)
+  const [fixedSalaryAmount, setFixedSalaryAmount] = useState(0)
+  const [chairRentalAmount, setChairRentalAmount] = useState(0)
 
   const [accessEmail, setAccessEmail] = useState('')
   const [accessPassword, setAccessPassword] = useState('')
   const [showAccessPassword, setShowAccessPassword] = useState(false)
 
   const [editCommissionPercent, setEditCommissionPercent] = useState(50)
+  const [editCompensationType, setEditCompensationType] =
+    useState<BarberCompensationType>('commission')
+  const [editFixedSalaryAmount, setEditFixedSalaryAmount] = useState(0)
+  const [editChairRentalAmount, setEditChairRentalAmount] = useState(0)
   const [editMonthlyGoal, setEditMonthlyGoal] = useState(3000)
   const [editUnitId, setEditUnitId] = useState('')
 
@@ -279,6 +302,10 @@ export default function AdminBarbeiros() {
           telefone: telefone.trim(),
           tenant_id: tenantId,
           unit_id: isPremium ? selectedUnitId || null : null,
+          compensation_type: isProOrPremium ? compensationType : 'commission',
+          commission_percentage: isProOrPremium ? commissionPercentage : 50,
+          fixed_salary_amount: isProOrPremium ? fixedSalaryAmount : 0,
+          chair_rental_amount: isProOrPremium ? chairRentalAmount : 0,
         }),
       })
 
@@ -452,14 +479,22 @@ export default function AdminBarbeiros() {
       return item.tenant_id === tenantId && (sameEmail || sameName)
     })
 
+    const compensation = getBarberCompensation(barber, row)
     const commissionPercent = Number(
-      row?.commission_percent ?? row?.commission_percentage ?? 50
+      compensation.commissionPercentage ||
+      row?.commission_percent ||
+      row?.commission_percentage ||
+      50
     )
 
     const monthlyGoal = Number(row?.monthly_goal ?? 3000)
 
     return {
       row,
+      compensation: {
+        ...compensation,
+        commissionPercentage: commissionPercent,
+      },
       commissionPercent,
       monthlyGoal,
     }
@@ -485,17 +520,27 @@ export default function AdminBarbeiros() {
       0
     )
 
-    const commissionValue = revenue * (settings.commissionPercent / 100)
+    const compensation = calculateBarberCompensation({
+      settings: settings.compensation,
+      serviceRevenue: revenue,
+      periodStart: start,
+      periodEnd: end,
+    })
     const progress = settings.monthlyGoal > 0
       ? Math.min(Math.round((revenue / settings.monthlyGoal) * 100), 100)
       : 0
 
     return {
+      compensationType: settings.compensation.type,
       commissionPercent: settings.commissionPercent,
+      fixedSalaryAmount: settings.compensation.fixedSalaryAmount,
+      chairRentalAmount: settings.compensation.chairRentalAmount,
       monthlyGoal: settings.monthlyGoal,
       revenue,
       appointments: barberAppointments.length,
-      commissionValue,
+      commissionValue: compensation.commissionCost,
+      remunerationValue: compensation.barberRemuneration,
+      chairRentalRevenue: compensation.chairRentalRevenue,
       progress,
     }
   }
@@ -505,7 +550,10 @@ export default function AdminBarbeiros() {
 
     setFeedback(null)
     setSelectedBarber(barber)
+    setEditCompensationType(settings.compensation.type)
     setEditCommissionPercent(settings.commissionPercent)
+    setEditFixedSalaryAmount(settings.compensation.fixedSalaryAmount)
+    setEditChairRentalAmount(settings.compensation.chairRentalAmount)
     setEditMonthlyGoal(settings.monthlyGoal)
     setModal('edit-performance')
   }
@@ -551,6 +599,8 @@ export default function AdminBarbeiros() {
     if (!selectedBarber || !tenantId) return
 
     const commission = Number(editCommissionPercent)
+    const fixedSalary = Math.max(0, Number(editFixedSalaryAmount))
+    const chairRental = Math.max(0, Number(editChairRentalAmount))
     const goal = Number(editMonthlyGoal)
 
     if (commission < 0 || commission > 100) {
@@ -588,14 +638,30 @@ export default function AdminBarbeiros() {
           .from('barbers')
           .insert(payload)
 
+    const canonicalResult = await supabase
+      .from('barbeiros')
+      .update({
+        compensation_type: isProOrPremium ? editCompensationType : 'commission',
+        commission_percentage: commission,
+        fixed_salary_amount: isProOrPremium ? fixedSalary : 0,
+        chair_rental_amount: isProOrPremium ? chairRental : 0,
+      })
+      .eq('id', selectedBarber.id)
+      .eq('tenant_id', tenantId)
+
     setSubmitting(false)
 
-    if (result.error) {
-      setFeedback({ type: 'error', msg: `Erro ao salvar comissão/meta: ${result.error.message}` })
+    if (result.error || canonicalResult.error) {
+      setFeedback({
+        type: 'error',
+        msg: `Erro ao salvar remuneração/meta: ${
+          canonicalResult.error?.message || result.error?.message || 'erro desconhecido'
+        }`,
+      })
       return
     }
 
-    setFeedback({ type: 'success', msg: `Comissão e meta de ${selectedBarber.nome} atualizadas.` })
+    setFeedback({ type: 'success', msg: `Remuneração e meta de ${selectedBarber.nome} atualizadas.` })
     setModal('closed')
     setSelectedBarber(null)
     await fetchBarbers()
@@ -608,6 +674,10 @@ export default function AdminBarbeiros() {
     setTelefone('')
     setShowSenha(false)
     setSelectedUnitId('')
+    setCompensationType('commission')
+    setCommissionPercentage(50)
+    setFixedSalaryAmount(0)
+    setChairRentalAmount(0)
     setFeedback(null)
   }
 
@@ -637,7 +707,7 @@ export default function AdminBarbeiros() {
   )
 
   const totalTeamCommission = barbers.reduce(
-    (sum, barber) => sum + getBarberPerformance(barber).commissionValue,
+    (sum, barber) => sum + getBarberPerformance(barber).remunerationValue,
     0
   )
 
@@ -785,6 +855,60 @@ export default function AdminBarbeiros() {
                 </Field>
               )}
 
+              {isProOrPremium && (
+                <>
+                  <Field label="Tipo de remuneracao" icon="R$">
+                    <select
+                      value={compensationType}
+                      onChange={(e) => setCompensationType(e.target.value as BarberCompensationType)}
+                    >
+                      {Object.entries(COMPENSATION_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  {(compensationType === 'commission' ||
+                    compensationType === 'salary_plus_commission') && (
+                    <Field label="Comissao sobre receita (%)" icon="%">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                        value={commissionPercentage}
+                        onChange={(e) => setCommissionPercentage(Number(e.target.value))}
+                      />
+                    </Field>
+                  )}
+
+                  {(compensationType === 'fixed_salary' ||
+                    compensationType === 'salary_plus_commission') && (
+                    <Field label="Salario fixo mensal (R$)" icon="R$">
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={fixedSalaryAmount}
+                        onChange={(e) => setFixedSalaryAmount(Number(e.target.value))}
+                      />
+                    </Field>
+                  )}
+
+                  {compensationType === 'chair_rental' && (
+                    <Field label="Aluguel mensal da cadeira (R$)" icon="R$">
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={chairRentalAmount}
+                        onChange={(e) => setChairRentalAmount(Number(e.target.value))}
+                      />
+                    </Field>
+                  )}
+                </>
+              )}
+
               <Field label="Senha de acesso" icon="🔒">
                 <div className="password-wrap">
                   <input
@@ -913,6 +1037,18 @@ export default function AdminBarbeiros() {
             </div>
 
             <div className="modal-body">
+              {isProOrPremium && (
+                <Field label="Tipo de remuneracao" icon="R$">
+                  <select
+                    value={editCompensationType}
+                    onChange={(e) => setEditCompensationType(e.target.value as BarberCompensationType)}
+                  >
+                    {Object.entries(COMPENSATION_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               <p className="confirm-text">
                 Configure a comissão individual e a meta mensal de <strong>{selectedBarber.nome}</strong>.
               </p>
@@ -927,6 +1063,32 @@ export default function AdminBarbeiros() {
                   onChange={(e) => setEditCommissionPercent(Number(e.target.value))}
                 />
               </Field>
+
+              {isProOrPremium &&
+                (editCompensationType === 'fixed_salary' ||
+                  editCompensationType === 'salary_plus_commission') && (
+                  <Field label="Salario fixo mensal (R$)" icon="R$">
+                    <input
+                      type="number"
+                      min={0}
+                      step={50}
+                      value={editFixedSalaryAmount}
+                      onChange={(e) => setEditFixedSalaryAmount(Number(e.target.value))}
+                    />
+                  </Field>
+                )}
+
+              {isProOrPremium && editCompensationType === 'chair_rental' && (
+                <Field label="Aluguel mensal da cadeira (R$)" icon="R$">
+                  <input
+                    type="number"
+                    min={0}
+                    step={50}
+                    value={editChairRentalAmount}
+                    onChange={(e) => setEditChairRentalAmount(Number(e.target.value))}
+                  />
+                </Field>
+              )}
 
               <Field label="Meta mensal de receita (R$)" icon="🎯">
                 <input
@@ -1067,6 +1229,9 @@ function BarberCard({
 
       <div className="barber-info">
         <h3>{barber.nome}</h3>
+        <span className="compensation-badge">
+          {COMPENSATION_LABELS[performance.compensationType]}
+        </span>
 
         <p>
           <Mail size={14} />
@@ -1121,7 +1286,13 @@ function BarberCard({
 
           <div>
             <small>Ganhos</small>
-            <b>{formatMoney(performance.commissionValue)}</b>
+            <b>
+              {formatMoney(
+                performance.compensationType === 'chair_rental'
+                  ? performance.chairRentalRevenue
+                  : performance.remunerationValue
+              )}
+            </b>
           </div>
         </div>
       </div>
@@ -1841,6 +2012,95 @@ const css = `
   border: 0;
   background: linear-gradient(135deg,#dc2626,#ef4444);
   color: white;
+}
+
+.compensation-badge {
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #93c5fd;
+  background: rgba(37,99,235,.12);
+  border: 1px solid rgba(59,130,246,.22);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+[data-theme="light"] .barbers-page .search-box {
+  background: #ffffff;
+  border-color: #dbe4f0;
+  color: #64748b;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
+}
+
+[data-theme="light"] .barbers-page .search-box input {
+  color: #0f172a;
+}
+
+[data-theme="light"] .barbers-page .search-box input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+[data-theme="light"] .barbers-page .performance-box {
+  background: #f8fafc;
+  border-color: #dbe4f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+[data-theme="light"] .barbers-page .performance-head span,
+[data-theme="light"] .barbers-page .performance-grid small {
+  color: #64748b;
+}
+
+[data-theme="light"] .barbers-page .performance-head strong,
+[data-theme="light"] .barbers-page .performance-grid b {
+  color: #0f172a;
+}
+
+[data-theme="light"] .barbers-page .progress-track {
+  background: #dbe4f0;
+}
+
+[data-theme="light"] .barbers-page .card-actions button {
+  background: #ffffff;
+  border-color: #dbe4f0;
+  color: #334155;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, .05);
+}
+
+[data-theme="light"] .barbers-page .card-actions button:hover {
+  background: #f8fafc;
+  border-color: #bfdbfe;
+}
+
+[data-theme="light"] .barbers-page .card-actions .unit-btn {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+[data-theme="light"] .barbers-page .card-actions .performance-btn {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+[data-theme="light"] .barbers-page .card-actions .access-btn {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .barbers-page .card-actions .deactivate-btn {
+  background: #fff7f7;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+[data-theme="light"] .barbers-page .card-actions .activate-btn {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
 }
 
 @keyframes spin {

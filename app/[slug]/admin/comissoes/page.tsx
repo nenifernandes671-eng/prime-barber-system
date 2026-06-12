@@ -8,6 +8,12 @@ import { useUnit } from '@/lib/unit-context'
 import { useTenant } from '@/lib/tenant-context'
 import { useTheme } from '@/components/theme-provider'
 import {
+  calculateBarberCompensation,
+  COMPENSATION_LABELS,
+  getBarberCompensation,
+  type BarberCompensationType,
+} from '@/lib/barber-compensation'
+import {
   DollarSign,
   Scissors,
   Wallet,
@@ -25,6 +31,9 @@ interface Barber {
   email: string
   tenant_id?: string | null
   commission_percentage?: number | null
+  compensation_type?: BarberCompensationType | null
+  fixed_salary_amount?: number | null
+  chair_rental_amount?: number | null
   commission_type?: 'percentage' | null
   commissionSourceId?: string | null
   ativo: boolean
@@ -76,13 +85,24 @@ function calcCommission(
   const totalRevenue = filtered.reduce((s, a) => s + (a.price || 0), 0)
   const totalServices = filtered.length
 
-  let commission = 0
-
-  commission = totalRevenue * ((barber.commission_percentage || 0) / 100)
+  const rangeStart =
+    period === 'mes' ? startOfMonth :
+    period === 'semana' ? startOfWeek :
+    filtered.length ? new Date(`${filtered.map((item) => item.appointment_date).sort()[0]}T00:00:00`) : now
+  const compensation = calculateBarberCompensation({
+    settings: getBarberCompensation(barber),
+    serviceRevenue: totalRevenue,
+    periodStart: rangeStart,
+    periodEnd: now,
+  })
 
   return {
-    commission,
-    totalRevenue,
+    commission: compensation.barberRemuneration,
+    commissionCost: compensation.commissionCost,
+    fixedSalaryCost: compensation.fixedSalaryCost,
+    chairRentalRevenue: compensation.chairRentalRevenue,
+    totalRevenue: compensation.barbershopServiceRevenue + compensation.chairRentalRevenue,
+    grossServiceRevenue: totalRevenue,
     totalServices,
   }
 }
@@ -116,7 +136,7 @@ export default function AdminComissoes() {
 
     let barbersQuery = supabase
       .from('barbeiros')
-      .select('id,nome,email,telefone,ativo,tenant_id,unit_id')
+      .select('id,nome,email,telefone,ativo,tenant_id,unit_id,compensation_type,commission_percentage,fixed_salary_amount,chair_rental_amount')
       .eq('tenant_id', tenantId)
       .eq('ativo', true)
 
@@ -159,7 +179,10 @@ export default function AdminComissoes() {
 
       return {
         ...barber,
-        commission_percentage: match?.commission_percentage ?? 0,
+        commission_percentage:
+          barber.commission_percentage ??
+          match?.commission_percentage ??
+          0,
         commission_type: 'percentage',
         commissionSourceId: match?.id ?? null,
       }
@@ -225,11 +248,21 @@ export default function AdminComissoes() {
 
     const { data, error } = await query
     const savedRow = Array.isArray(data) ? data[0] : data
+    const { error: canonicalError } = await supabase
+      .from('barbeiros')
+      .update({ commission_percentage: percentage })
+      .eq('id', barberId)
+      .eq('tenant_id', tenantId)
 
     setSavingId(null)
 
-    if (error) {
-      setFeedback({ type: 'error', message: `Não consegui salvar a comissão: ${error.message}` })
+    if (error || canonicalError) {
+      setFeedback({
+        type: 'error',
+        message: `Não consegui salvar a comissão: ${
+          canonicalError?.message || error?.message || 'erro desconhecido'
+        }`,
+      })
       return
     }
 
@@ -396,6 +429,7 @@ export default function AdminComissoes() {
                 } = calcCommission(b, appointments, period)
 
                 const isEditing = editingId === b.id
+                const compensation = getBarberCompensation(b)
                 const commissionPercentage = b.commission_percentage ?? 0
 
                 return (
@@ -421,7 +455,10 @@ export default function AdminComissoes() {
                       </div>
 
                       <div style={{ ...styles.badge, maxWidth: isMobile ? '100%' : undefined, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {commissionPercentage}%
+                        {COMPENSATION_LABELS[compensation.type]}
+                        {(compensation.type === 'commission' ||
+                          compensation.type === 'salary_plus_commission') &&
+                          ` · ${commissionPercentage}%`}
                       </div>
                     </div>
 
