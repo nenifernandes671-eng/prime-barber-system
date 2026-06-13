@@ -95,7 +95,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     ...(isProOrPremium
       ? [
           { name: 'Despesas', path: `/${slug}/admin/despesas`, icon: ReceiptText },
-          { name: 'Memberships', path: `/${slug}/admin/memberships`, icon: Crown },
+          { name: 'Assinaturas', path: `/${slug}/admin/memberships`, icon: Crown },
           { name: 'Comissoes', path: `/${slug}/admin/comissoes`, icon: HandCoins },
           { name: 'WhatsApp', path: `/${slug}/admin/whatsapp`, icon: MessageCircle },
           { name: 'Relatorios', path: `/${slug}/admin/relatorios`, icon: BarChart3 },

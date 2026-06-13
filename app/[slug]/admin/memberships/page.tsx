@@ -177,7 +177,7 @@ export default function AdminMemberships() {
       body: JSON.stringify({ action, tenant_id: tenantId, ...payload }),
     })
     const data = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(data.error ?? 'Erro ao salvar memberships.')
+    if (!response.ok) throw new Error(data.error ?? 'Erro ao salvar assinaturas.')
     return data
   }
 
@@ -193,7 +193,7 @@ export default function AdminMemberships() {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? 'Erro ao carregar memberships.')
+      if (!response.ok) throw new Error(data.error ?? 'Erro ao carregar assinaturas.')
 
       setPlans(data.plans ?? [])
       setMembros(data.membros ?? [])
@@ -205,7 +205,7 @@ export default function AdminMemberships() {
       setMembros([])
       setSubscriptions([])
       setTenantAsaasConfigured(false)
-      setFeedback({ type: 'error', msg: error.message ?? 'Erro ao carregar memberships.' })
+      setFeedback({ type: 'error', msg: error.message ?? 'Erro ao carregar assinaturas.' })
     } finally {
       setLoadingPlans(false)
       setLoadingMembros(false)
@@ -487,7 +487,7 @@ export default function AdminMemberships() {
         lineHeight: 1.7,
         marginBottom: 24,
       }}>
-        O sistema de memberships está disponível apenas
+        O sistema de assinaturas está disponível apenas
         nos planos Pro e Premium.
       </p>
 
@@ -518,7 +518,7 @@ export default function AdminMemberships() {
         <div className="memberships-header-left" style={s.headerLeft}>
           <button onClick={() => router.back()} style={s.backBtn}>← Voltar</button>
           <div>
-            <h1 style={s.title}>💎 Memberships</h1>
+            <h1 style={s.title}>💎 Assinaturas</h1>
             <p style={s.subtitle}>Gerencie planos e assinantes da barbearia</p>
           </div>
         </div>
