@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 const PLANS = [
   {
@@ -67,6 +68,7 @@ const PLANS = [
 
 export default function PricingPage() {
   const [modal, setModal] = useState(false)
+  const [existingTenantSlug, setExistingTenantSlug] = useState('')
   const [form, setForm] = useState({
     nome: '',
     email: '',
@@ -85,10 +87,60 @@ export default function PricingPage() {
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const isExistingTenant = params.get('mode') === 'existing'
+    const slug = String(params.get('slug') || '').trim().toLowerCase()
+
+    if (isExistingTenant && slug) {
+      setExistingTenantSlug(slug)
+    }
+  }, [])
+
   function openModal(planKey: string) {
+    if (existingTenantSlug) {
+      void handleExistingTenantCheckout(planKey)
+      return
+    }
+
     setForm((current) => ({ ...current, plano: planKey }))
     setModal(true)
     setFormError('')
+  }
+
+  async function handleExistingTenantCheckout(planKey: string) {
+    setSubmitting(true)
+    setFormError('')
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (!token) {
+        window.location.href = `/${existingTenantSlug}/login`
+        return
+      }
+
+      const response = await fetch('/api/asaas/renew', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+        body: JSON.stringify({ slug: existingTenantSlug, plan: planKey }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || 'Nao foi possivel iniciar o pagamento.')
+      }
+
+      window.location.href = data.url
+    } catch (error: any) {
+      setFormError(error?.message || 'Erro de conexao. Tente novamente.')
+      setSubmitting(false)
+    }
   }
 
   async function handleCheckout() {
@@ -185,13 +237,20 @@ export default function PricingPage() {
           <a href="/pricing">Planos</a>
           <a href="/#depoimentos">Depoimentos</a>
         </div>
-        <button className="nav-cta" onClick={() => openModal('pro')}>Comecar gratis</button>
+        <button className="nav-cta" onClick={() => openModal('pro')} disabled={submitting}>
+          {existingTenantSlug ? 'Assinar Pro' : 'Comecar gratis'}
+        </button>
       </nav>
 
       <section className="pricing-hero">
         <div className="section-label">Planos</div>
         <h1>Escolha o seu plano</h1>
-        <p>7 dias de teste gratis em qualquer plano. Cancele quando quiser.</p>
+        <p>
+          {existingTenantSlug
+            ? 'Escolha o plano da sua barbearia. Sua conta e seus dados serao mantidos.'
+            : '7 dias de teste gratis em qualquer plano. Cancele quando quiser.'}
+        </p>
+        {formError && existingTenantSlug && <div className="existing-checkout-error">{formError}</div>}
       </section>
 
       <section className="plans-wrap">
@@ -215,8 +274,8 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <button className="plan-button" onClick={() => openModal(plan.key)}>
-                Comecar gratis
+              <button className="plan-button" onClick={() => openModal(plan.key)} disabled={submitting}>
+                {submitting && existingTenantSlug ? 'Abrindo checkout...' : existingTenantSlug ? 'Escolher plano' : 'Comecar gratis'}
               </button>
             </article>
           ))}
@@ -497,6 +556,17 @@ export default function PricingPage() {
           color: #8e8e8e;
           font-size: 16px;
           line-height: 1.7;
+        }
+
+        .existing-checkout-error {
+          max-width: 620px;
+          margin: 18px auto 0;
+          padding: 12px 16px;
+          border: 1px solid rgba(248,113,113,.35);
+          background: rgba(127,29,29,.22);
+          color: #fecaca;
+          font-size: 13px;
+          line-height: 1.5;
         }
 
         .plans-wrap {

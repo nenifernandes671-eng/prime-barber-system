@@ -70,6 +70,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     if (typeof window === 'undefined') return `/${slug}`
     return `${window.location.origin}/${slug}`
   }, [slug])
+  const existingTenantPricingUrl = `/pricing?mode=existing&slug=${encodeURIComponent(slug)}`
 
   async function copyBookingLink() {
     await navigator.clipboard.writeText(publicBookingUrl)
@@ -306,8 +307,15 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
             </span>
           </div>
           <div className="trial-actions">
-            <Link href="/pricing">Escolher plano</Link>
-            <Link href="/pricing" className="trial-pay-now">Pagar agora</Link>
+            <Link href={existingTenantPricingUrl}>Escolher plano</Link>
+            <button
+              type="button"
+              className="trial-pay-now"
+              onClick={handleRenewSubscription}
+              disabled={renewing}
+            >
+              {renewing ? 'Abrindo...' : 'Pagar agora'}
+            </button>
           </div>
         </div>
       )}
@@ -447,8 +455,15 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
                 <span>Todos os recursos do seu plano continuam disponíveis durante o período de teste.</span>
               </div>
               <div>
-                <Link href="/pricing">Escolher plano</Link>
-                <Link href="/pricing" className="primary">Pagar agora</Link>
+                <Link href={existingTenantPricingUrl}>Escolher plano</Link>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={handleRenewSubscription}
+                  disabled={renewing}
+                >
+                  {renewing ? 'Abrindo...' : 'Pagar agora'}
+                </button>
               </div>
             </div>
           )}
@@ -482,8 +497,14 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .trial-card strong{display:block;color:#fbbf24;font-size:13px;font-weight:950}
         .trial-card span{display:block;margin-top:2px;color:#fcd34d;font-size:11px}
         .trial-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-        .trial-card a{color:#fbbf24;border:1px solid rgba(245,158,11,.30);border-radius:10px;padding:8px 9px;font-size:10px;font-weight:950;text-align:center;text-decoration:none}
-        .trial-card a.trial-pay-now{color:#111827;background:#f59e0b;border-color:#f59e0b}
+        .trial-card a,.trial-card button{min-width:0;color:#fbbf24;border:1px solid rgba(245,158,11,.30);border-radius:10px;padding:8px 9px;font-size:10px;font-weight:950;text-align:center;text-decoration:none;background:transparent;cursor:pointer}
+        .trial-card .trial-pay-now{color:#111827;background:#f59e0b;border-color:#f59e0b}
+        .trial-card button:disabled{cursor:wait;opacity:.7}
+        [data-theme="light"] .trial-card{background:#eff6ff;border-color:#bfdbfe;box-shadow:0 10px 28px rgba(37,99,235,.08)}
+        [data-theme="light"] .trial-card strong{color:#1e3a8a}
+        [data-theme="light"] .trial-card span{color:#475569}
+        [data-theme="light"] .trial-card a{color:#1d4ed8;background:#fff;border-color:#93c5fd}
+        [data-theme="light"] .trial-card .trial-pay-now{color:#fff;background:#2563eb;border-color:#2563eb}
         .unit-selector-card{padding:13px;border-radius:16px;background:rgba(15,23,42,.62);border:1px solid rgba(148,163,184,.10);display:grid;gap:9px}
         .unit-selector-head{display:flex;align-items:center;gap:7px;color:#93c5fd;font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}
         .unit-selector-card select{width:100%;min-height:39px;border-radius:12px;border:1px solid rgba(148,163,184,.14);background:rgba(2,6,23,.58);color:#f8fafc;padding:0 10px;font-size:12px;font-weight:900;outline:none}
@@ -519,8 +540,9 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .trial-notice.urgent strong{color:#fde68a}
         .trial-notice span{display:block;margin-top:3px;color:#94a3b8;font-size:12px}
         .trial-notice>div:last-child{display:flex;gap:8px;flex-shrink:0}
-        .trial-notice a{min-height:38px;padding:0 13px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:#93c5fd;border:1px solid rgba(59,130,246,.28);font-size:11px;font-weight:950;text-decoration:none}
-        .trial-notice a.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+        .trial-notice a,.trial-notice button{min-height:38px;padding:0 13px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:#93c5fd;border:1px solid rgba(59,130,246,.28);font-size:11px;font-weight:950;text-decoration:none;background:transparent;cursor:pointer}
+        .trial-notice .primary{background:#2563eb;border-color:#2563eb;color:#fff}
+        .trial-notice button:disabled{cursor:wait;opacity:.7}
         .admin-mobile-header{display:none;position:fixed;top:0;left:0;right:0;height:64px;z-index:40;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(8,15,30,.96);border-bottom:1px solid rgba(148,163,184,.10);backdrop-filter:blur(20px)}
         .mobile-brand{display:flex;align-items:center;gap:10px}
         .mobile-brand img{width:34px;height:34px;border-radius:12px}

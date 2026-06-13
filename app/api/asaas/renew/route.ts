@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getSaasAsaasConfig } from '@/lib/server/saas-asaas'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,7 +8,6 @@ const supabaseAdmin = createClient(
 )
 
 const DEFAULT_APP_URL = 'https://kortebarber.com.br'
-const DEFAULT_ASAAS_BASE_URL = 'https://api.asaas.com/v3'
 const noStoreHeaders = {
   'Cache-Control': 'private, no-store, no-cache, must-revalidate, max-age=0',
   Pragma: 'no-cache',
@@ -22,10 +22,6 @@ function planPrices() {
     pro: Number(process.env.ASAAS_PLAN_PRO || 69),
     premium: Number(process.env.ASAAS_PLAN_PREMIUM || 189),
   }
-}
-
-function asaasBaseUrl() {
-  return (process.env.ASAAS_BASE_URL || DEFAULT_ASAAS_BASE_URL).replace(/\/$/, '')
 }
 
 function appBaseUrl(req: NextRequest) {
@@ -47,18 +43,14 @@ function appBaseUrl(req: NextRequest) {
 }
 
 async function asaasRequest(path: string, init: RequestInit = {}) {
-  const apiKey = process.env.ASAAS_API_KEY
+  const config = await getSaasAsaasConfig()
 
-  if (!apiKey) {
-    throw new Error('ASAAS_API_KEY nao configurada.')
-  }
-
-  const response = await fetch(`${asaasBaseUrl()}${path}`, {
+  const response = await fetch(`${config.baseUrl}${path}`, {
     ...init,
     cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
-      access_token: apiKey,
+      access_token: config.apiKey,
       ...(init.headers || {}),
     },
   })
@@ -146,6 +138,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}))
     const slug = String(body.slug || '').trim().toLowerCase()
+    const requestedPlan = String(body.plan || '').trim().toLowerCase()
 
     if (!slug) {
       return NextResponse.json(
@@ -181,7 +174,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plan = String(tenant.plano || '').toLowerCase() as keyof ReturnType<typeof planPrices>
+    const plan = (requestedPlan || String(tenant.plano || '').toLowerCase()) as keyof ReturnType<typeof planPrices>
     const value = planPrices()[plan]
 
     if (!value || !['basic', 'pro', 'premium'].includes(plan)) {
@@ -190,6 +183,16 @@ export async function POST(req: NextRequest) {
         { status: 400, headers: noStoreHeaders },
       )
     }
+
+    const asaasConfig = await getSaasAsaasConfig()
+    console.info('[ASAAS SaaS] Upgrade solicitado', {
+      slug: tenant.slug,
+      plan,
+      value,
+      environment: asaasConfig.environment,
+      baseUrl: asaasConfig.baseUrl,
+      reusingCustomer: Boolean(tenant.asaas_customer_id),
+    })
 
     const customerId = await resolveCustomer(tenant)
     const appUrl = appBaseUrl(req)
@@ -202,7 +205,7 @@ export async function POST(req: NextRequest) {
         cycle: 'MONTHLY',
         nextDueDate: new Date().toISOString().slice(0, 10),
         description: `Renovacao mensal do plano KorteBarber ${plan.toUpperCase()}`,
-        externalReference: tenant.slug,
+        externalReference: `saas-plan:${tenant.slug}:${plan}`,
         callback: {
           successUrl: `${appUrl}/register/success?slug=${encodeURIComponent(tenant.slug)}`,
           autoRedirect: true,

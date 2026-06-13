@@ -1,13 +1,14 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+import { getSaasAsaasConfig } from '@/lib/server/saas-asaas'
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
 
 const DEFAULT_APP_URL = 'https://kortebarber.com.br'
-const DEFAULT_ASAAS_BASE_URL = 'https://api.asaas.com/v3'
 
 function planPrices() {
   return {
@@ -52,10 +53,6 @@ function formatDate(date: Date) {
   return date.toISOString().slice(0, 10)
 }
 
-function asaasBaseUrl() {
-  return (process.env.ASAAS_BASE_URL || DEFAULT_ASAAS_BASE_URL).replace(/\/$/, '')
-}
-
 function isPublicHttpsUrl(value?: string | null) {
   if (!value) return false
 
@@ -83,17 +80,13 @@ function resolveAsaasCallbackBaseUrl(req: NextRequest) {
 }
 
 async function asaasRequest(path: string, init: RequestInit) {
-  const apiKey = process.env.ASAAS_API_KEY
+  const config = await getSaasAsaasConfig()
 
-  if (!apiKey) {
-    throw new Error('ASAAS_API_KEY nao configurada.')
-  }
-
-  const response = await fetch(`${asaasBaseUrl()}${path}`, {
+  const response = await fetch(`${config.baseUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      access_token: apiKey,
+      access_token: config.apiKey,
       ...(init.headers || {}),
     },
   })
@@ -250,6 +243,16 @@ export async function POST(req: NextRequest) {
     if (!planValue) {
       return NextResponse.json({ error: 'Plano invalido ou preco nao configurado.' }, { status: 400 })
     }
+
+    const asaasConfig = await getSaasAsaasConfig()
+    console.info('[ASAAS SaaS] Novo checkout solicitado', {
+      slug: normalizedSlug,
+      plan: planKey,
+      value: planValue,
+      environment: asaasConfig.environment,
+      baseUrl: asaasConfig.baseUrl,
+      paymentMode: mode,
+    })
 
     const { data: existingTenant } = await supabaseAdmin
       .from('tenants')

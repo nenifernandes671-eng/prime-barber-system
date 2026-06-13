@@ -72,6 +72,16 @@ function isMembershipReference(reference?: string | null) {
   return /^membership(?:-customer)?:/i.test(String(reference ?? ''))
 }
 
+function parseSaasPlanReference(reference?: string | null) {
+  const match = String(reference ?? '').match(
+    /^saas-plan:([a-z0-9-]+):(basic|pro|premium)$/i,
+  )
+
+  return match
+    ? { slug: match[1].toLowerCase(), plan: match[2].toLowerCase() }
+    : null
+}
+
 function isMissingMembershipAutomationTable(error: any) {
   const message = String(error?.message ?? '').toLowerCase()
   return (
@@ -122,16 +132,18 @@ async function findSaasTenant(
   externalReference?: string | null,
 ) {
   if (isMembershipReference(externalReference)) return null
+  const planReference = parseSaasPlanReference(externalReference)
+  const tenantSlug = planReference?.slug || externalReference
 
-  if (externalReference) {
+  if (tenantSlug) {
     const { data, error } = await supabaseAdmin
       .from('tenants')
       .select('id, asaas_customer_id, asaas_subscription_id')
-      .eq('slug', externalReference)
+      .eq('slug', tenantSlug)
       .maybeSingle()
 
     if (error) throw error
-    if (data) return data
+    if (data) return { ...data, pendingPlan: planReference?.plan || null }
   }
 
   if (subscriptionId) {
@@ -142,7 +154,7 @@ async function findSaasTenant(
       .maybeSingle()
 
     if (error) throw error
-    if (data) return data
+    if (data) return { ...data, pendingPlan: planReference?.plan || null }
   }
 
   return null
@@ -310,6 +322,9 @@ async function processSaasBillingEvent({
   if (subscriptionStatus === 'active') {
     updatePayload.status = 'active'
     updatePayload.trial_ends_at = nextAccessDate(payment)
+    if (tenant.pendingPlan) {
+      updatePayload.plano = tenant.pendingPlan
+    }
   } else if (subscriptionStatus === 'overdue') {
     updatePayload.status = 'suspended'
   } else if (subscriptionStatus === 'cancelled') {
