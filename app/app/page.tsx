@@ -41,30 +41,30 @@ const FEATURE_ITEMS = [
   {
     icon: CalendarDays,
     title: 'Agenda Inteligente',
-    text: 'Gerencie agendamentos de forma pratica e evite conflitos de horario.',
+    text: 'Gerencie agendamentos de forma prática e evite conflitos de horário.',
   },
   {
     icon: Users,
-    title: 'Clientes na Mao',
-    text: 'Historico completo dos clientes para um atendimento unico.',
+    title: 'Clientes na Mão',
+    text: 'Histórico completo dos clientes para um atendimento único.',
   },
   {
     icon: DollarSign,
-    title: 'Comissoes Justas',
-    text: 'Controle comissoes e desempenho da equipe com facilidade.',
+    title: 'Comissões Justas',
+    text: 'Controle comissões e desempenho da equipe com facilidade.',
   },
   {
     icon: BarChart3,
-    title: 'Relatorios Reais',
-    text: 'Acompanhe numeros e tome decisoes com base em dados.',
+    title: 'Relatórios Reais',
+    text: 'Acompanhe números e tome decisões com base em dados.',
   },
 ]
 
 const CHECK_ITEMS = [
   'Interface simples e moderna',
-  'Suporte rapido e humanizado',
+  'Suporte rápido e humanizado',
   'Acesso de onde estiver',
-  'Atualizacoes constantes',
+  'Atualizações constantes',
 ]
 
 function cleanSlug(value: string) {
@@ -368,8 +368,8 @@ export default function AppStartPage() {
         </a>
         <nav className="topnav" aria-label="Navegacao principal">
           <a href="/#funcionalidades">Recursos</a>
-          <a href="/#como-funciona">Para quem e</a>
-          <a href="/pricing">Precos</a>
+          <a href="/#como-funciona">Para quem é</a>
+          <a href="/pricing">Preços</a>
           <a href="/suporte">Suporte</a>
         </nav>
         <a className="top-login" href="#acesso"><UserRound size={18} /> Entrar</a>
@@ -378,12 +378,12 @@ export default function AppStartPage() {
       <section className="hero-shell" id="acesso">
         <div className="hero-content">
           <div className="eyebrow">Sistema completo para barbearias</div>
-          <h1>Menos gestao.<span>Mais crescimento.</span></h1>
+          <h1>Menos gestão.<span>Mais crescimento.</span></h1>
           <p className="lead">
-            Agendamentos, clientes, financeiro e relatorios. Tudo que sua barbearia precisa, em um so lugar.
+            Agendamentos, clientes, financeiro e relatórios. Tudo que sua barbearia precisa, em um só lugar.
           </p>
           <a className="primary-cta" href="#acesso"><Download size={28} /> Acessar o sistema</a>
-          <div className="safe-note"><ShieldCheck size={18} /> Seguro, rapido e sempre atualizado</div>
+          <div className="safe-note"><ShieldCheck size={18} /> Seguro, rápido e sempre atualizado</div>
 
           <div className="feature-row">
             {FEATURE_ITEMS.map((item) => {

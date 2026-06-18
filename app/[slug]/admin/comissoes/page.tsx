@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -97,10 +97,12 @@ function calcCommission(
   })
 
   return {
-    commission: compensation.barberRemuneration,
+    commission: compensation.commissionCost,
     commissionCost: compensation.commissionCost,
     fixedSalaryCost: compensation.fixedSalaryCost,
     chairRentalRevenue: compensation.chairRentalRevenue,
+    remuneration: compensation.barberRemuneration,
+    totalToPay: compensation.barberRemuneration,
     totalRevenue: compensation.barbershopServiceRevenue + compensation.chairRentalRevenue,
     grossServiceRevenue: totalRevenue,
     totalServices,
@@ -163,7 +165,7 @@ export default function AdminComissoes() {
     ])
 
     if (barbsError || apptsError || commissionsError) {
-      setFeedback({ type: 'error', message: barbsError?.message || apptsError?.message || commissionsError?.message || 'Erro ao carregar comissões.' })
+      setFeedback({ type: 'error', message: barbsError?.message || apptsError?.message || commissionsError?.message || 'Erro ao carregar comissÃµes.' })
     }
 
     const merged = (barbs ?? []).map((barber: any) => {
@@ -211,7 +213,7 @@ export default function AdminComissoes() {
 
   const saveCommission = async (barberId: string) => {
     if (!tenantId) {
-      setFeedback({ type: 'error', message: 'Tenant não carregado. Recarregue a página e tente novamente.' })
+      setFeedback({ type: 'error', message: 'Tenant nÃ£o carregado. Recarregue a pÃ¡gina e tente novamente.' })
       return
     }
 
@@ -280,6 +282,14 @@ export default function AdminComissoes() {
     return s + calcCommission(b, appointments, period).commission
   }, 0)
 
+  const totalFixedSalaryCost = barbers.reduce((s, b) => {
+    return s + calcCommission(b, appointments, period).fixedSalaryCost
+  }, 0)
+
+  const totalRemuneration = barbers.reduce((s, b) => {
+    return s + calcCommission(b, appointments, period).remuneration
+  }, 0)
+
   const totalRevenue = barbers.reduce((s, b) => {
     return s + calcCommission(b, appointments, period).totalRevenue
   }, 0)
@@ -328,7 +338,7 @@ export default function AdminComissoes() {
 
           <p style={styles.subtitle}>
             Gerencie pagamentos e comissões dos barbeiros
-            {isPremium && activeUnitId !== 'all' ? ` · ${selectedUnit?.name || 'Unidade selecionada'}` : ''}
+            {isPremium && activeUnitId !== 'all' ? ` Â· ${selectedUnit?.name || 'Unidade selecionada'}` : ''}
           </p>
         </div>
 
@@ -372,28 +382,28 @@ export default function AdminComissoes() {
           icon={<DollarSign size={18} />}
           color="#22c55e"
           value={formatCurrency(totalRevenue)}
-          label="Receita Total"
+          label="Receita"
         />
 
         <StatCard
           icon={<Wallet size={18} />}
           color="#f59e0b"
           value={formatCurrency(totalCommissions)}
-          label="Total Comissões"
+          label="Comissão"
         />
 
         <StatCard
           icon={<Scissors size={18} />}
           color="#8b5cf6"
-          value={String(totalServices)}
-          label="Atendimentos"
+          value={formatCurrency(totalFixedSalaryCost)}
+          label="Salário Fixo Proporcional"
         />
 
         <StatCard
           icon={<TrendingUp size={18} />}
           color="#3b82f6"
-          value={String(barbers.length)}
-          label="Barbeiros"
+          value={formatCurrency(totalRemuneration)}
+          label="Total a Pagar"
         />
       </div>
 
@@ -424,6 +434,8 @@ export default function AdminComissoes() {
               {barbers.map((b) => {
                 const {
                   commission,
+                  fixedSalaryCost,
+                  remuneration,
                   totalRevenue: rev,
                   totalServices,
                 } = calcCommission(b, appointments, period)
@@ -458,11 +470,11 @@ export default function AdminComissoes() {
                         {COMPENSATION_LABELS[compensation.type]}
                         {(compensation.type === 'commission' ||
                           compensation.type === 'salary_plus_commission') &&
-                          ` · ${commissionPercentage}%`}
+                          ` Â· ${commissionPercentage}%`}
                       </div>
                     </div>
 
-                    <div style={{ ...styles.metrics, gridTemplateColumns: isMobile ? '1fr' : styles.metrics.gridTemplateColumns }}>
+                    <div style={{ ...styles.metrics, gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))' }}>
 
                       <div style={styles.metric}>
                         <span style={styles.metricLabel}>
@@ -473,17 +485,6 @@ export default function AdminComissoes() {
                           {formatCurrency(rev)}
                         </strong>
                       </div>
-
-                      <div style={styles.metric}>
-                        <span style={styles.metricLabel}>
-                          Serviços
-                        </span>
-
-                        <strong style={styles.metricValue}>
-                          {totalServices}
-                        </strong>
-                      </div>
-
                       <div style={styles.metric}>
                         <span style={styles.metricLabel}>
                           Comissão
@@ -498,11 +499,40 @@ export default function AdminComissoes() {
                           {formatCurrency(commission)}
                         </strong>
                       </div>
+
+                      <div style={styles.metric}>
+                        <span style={styles.metricLabel}>
+                          Salário Fixo Proporcional
+                        </span>
+
+                        <strong
+                          style={{
+                            ...styles.metricValue,
+                            color: '#8b5cf6',
+                          }}
+                        >
+                          {formatCurrency(fixedSalaryCost)}
+                        </strong>
+                      </div>
+
+                      <div style={styles.metric}>
+                        <span style={styles.metricLabel}>
+                          Total a Pagar
+                        </span>
+
+                        <strong
+                          style={{
+                            ...styles.metricValue,
+                            color: '#22c55e',
+                          }}
+                        >
+                          {formatCurrency(remuneration)}
+                        </strong>
+                      </div>
                     </div>
 
                     {isEditing ? (
                       <div style={{ ...styles.editBox, flexDirection: isMobile ? 'column' : 'row' }}>
-
                         <div style={{ ...styles.input, display: 'flex', alignItems: 'center', color: '#94a3b8' }}>
                           Percentual
                         </div>
@@ -601,9 +631,21 @@ export default function AdminComissoes() {
                 />
 
               <SummaryRow
-                label="Comissões"
+                label="Comissão"
                 value={formatCurrency(totalCommissions)}
                 color="#f59e0b"
+              />
+
+              <SummaryRow
+                label="Salário Fixo Proporcional"
+                value={formatCurrency(totalFixedSalaryCost)}
+                color="#8b5cf6"
+              />
+
+              <SummaryRow
+                label="Total a Pagar"
+                value={formatCurrency(totalRemuneration)}
+                color="#22c55e"
               />
             </div>
           </div>

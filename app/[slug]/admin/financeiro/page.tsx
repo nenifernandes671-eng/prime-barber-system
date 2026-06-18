@@ -672,7 +672,7 @@ export default function FinanceiroPage() {
   const totalPend = rev
     .filter((a) => a.payment_status !== 'paid')
     .reduce((s, a) => s + (a.price || 0), 0)
-  const netCash = totalRev - manualExpenses - accruedLaborCost
+  const netCash = totalPaid - manualExpenses - commissionPaidTotal
   const avgTicket = rev.length > 0 ? appointmentRevenue / rev.length : 0
   const cancelled = filtered.filter((a) => a.status === 'cancelled' || a.status === 'canceled').length
 
