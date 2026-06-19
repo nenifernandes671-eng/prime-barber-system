@@ -157,9 +157,8 @@ export default function AdminPage() {
   }
 
   async function fetchDashboard(currentTenantId: string, periodStart: string, periodEnd: string) {
-    const [{ data: appts, error }, { data: recentRows }, { data: barberData }, { data: commissionRows }] = await Promise.all([
+    const [{ data: appts, error }, { data: barberData }, { data: commissionRows }] = await Promise.all([
       appointmentsQuery(currentTenantId, periodStart, periodEnd),
-      recentAppointmentsQuery(currentTenantId),
       supabase.from('barbeiros').select('nome, email, tenant_id, compensation_type, commission_percentage, fixed_salary_amount, chair_rental_amount').eq('tenant_id', currentTenantId).eq('ativo', true),
       supabase.from('barbers').select('name, email, tenant_id, commission_percentage, commission_type').eq('tenant_id', currentTenantId),
     ])
@@ -181,9 +180,10 @@ export default function AdminPage() {
     })
     setAppointments(appts || [])
     setBarbers(mergedBarbers)
-    setRecentAppointments(recentRows || [])
+    setRecentAppointments((appts || []).slice(0, 5))
     loadedDashboardRef.current = true
     setLoading(false)
+    fetchRecentAppointments(currentTenantId)
   }
 
   async function fetchAppointments(currentTenantId: string, periodStart: string, periodEnd: string) {
@@ -221,10 +221,8 @@ export default function AdminPage() {
     }
     if (tenantId) {
       const { start, end } = getSelectedRange(dateMode, selectedDate, selectedMonth)
-      await Promise.all([
-        fetchAppointments(tenantId, start, end),
-        fetchRecentAppointments(tenantId),
-      ])
+      await fetchAppointments(tenantId, start, end)
+      fetchRecentAppointments(tenantId)
     }
   }
 
@@ -232,10 +230,8 @@ export default function AdminPage() {
     await supabase.from('appointments').update({ status: 'cancelled', canceled_at: new Date() }).eq('id', id).eq('tenant_id', tenantId)
     if (tenantId) {
       const { start, end } = getSelectedRange(dateMode, selectedDate, selectedMonth)
-      await Promise.all([
-        fetchAppointments(tenantId, start, end),
-        fetchRecentAppointments(tenantId),
-      ])
+      await fetchAppointments(tenantId, start, end)
+      fetchRecentAppointments(tenantId)
     }
   }
 
