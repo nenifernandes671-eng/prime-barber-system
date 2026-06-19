@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -14,10 +14,9 @@ import {
 } from 'recharts'
 import {
   Bell, Settings, Calendar, Eye, XCircle,
-  User, Lock, LogOut, Palette, ChevronRight, Check,
+  User, Lock, LogOut, Palette, ChevronRight,
 } from 'lucide-react'
 
-type ChartPeriod = 'este-ano' | 'este-mes' | 'esta-semana'
 type DateMode = 'day' | 'month'
 
 const AVATAR_COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#f97316']
@@ -67,6 +66,19 @@ function formatSelectedMonth(month: string) {
   })
 }
 
+function getSelectedRange(dateMode: DateMode, selectedDate: string, selectedMonth: string) {
+  if (dateMode === 'month') {
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const lastDay = new Date(year, month, 0).getDate()
+    return {
+      start: `${selectedMonth}-01`,
+      end: `${selectedMonth}-${String(lastDay).padStart(2, '0')}`,
+    }
+  }
+
+  return { start: selectedDate, end: selectedDate }
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -76,42 +88,43 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [appointments, setAppointments] = useState<any[]>([])
   const [barbers, setBarbers] = useState<any[]>([])
-  const [monthlyData, setMonthlyData] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [dateMode, setDateMode] = useState<DateMode>('day')
   const [selectedDate, setSelectedDate] = useState(localDateKey())
   const [selectedMonth, setSelectedMonth] = useState(localMonthKey())
-  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('este-ano')
-  const [chartDropdown, setChartDropdown] = useState(false)
   const [tenantId, setTenantId] = useState<string | null>(null)
-const [tenantPlan, setTenantPlan] = useState<string | null>(null)
   const [notifOpen, setNotifOpen] = useState(false)
   const [recentAppointments, setRecentAppointments] = useState<any[]>([])
   const notifRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
+  const loadedDashboardRef = useRef(false)
 
   const itemsPerPage = 8
 
   useEffect(() => {
     async function init() {
-      const { data: tenant } = await supabase.from('tenants').select('id, plano').eq('slug', slug).maybeSingle()
+      const { data: tenant } = await supabase.from('tenants').select('id').eq('slug', slug).maybeSingle()
       if (!tenant) return
 
-setTenantId(tenant.id)
-setTenantPlan(tenant.plano || null)
+      setTenantId(tenant.id)
       
     }
     if (slug) init()
   }, [slug])
 
   useEffect(() => {
-  if (tenantId) {
-    fetchAll(tenantId)
-  }
-}, [tenantId])
+    if (!tenantId) return
+
+    const { start, end } = getSelectedRange(dateMode, selectedDate, selectedMonth)
+    if (loadedDashboardRef.current) {
+      fetchAppointments(tenantId, start, end)
+    } else {
+      fetchDashboard(tenantId, start, end)
+    }
+  }, [tenantId, dateMode, selectedDate, selectedMonth])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -122,13 +135,39 @@ setTenantPlan(tenant.plano || null)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  async function fetchAll(currentTenantId: string) {
-    const [{ data: appts, error }, { data: barberData }, { data: commissionRows }] = await Promise.all([
-      supabase.from('appointments').select('*').eq('tenant_id', currentTenantId).order('appointment_date', { ascending: false }),
+  function appointmentsQuery(currentTenantId: string, periodStart: string, periodEnd: string) {
+    return supabase
+      .from('appointments')
+      .select('id, tenant_id, client_name, service, barber, price, status, payment_status, appointment_date, appointment_time, created_at')
+      .eq('tenant_id', currentTenantId)
+      .gte('appointment_date', periodStart)
+      .lte('appointment_date', periodEnd)
+      .order('appointment_date', { ascending: false })
+      .order('appointment_time', { ascending: false })
+  }
+
+  function recentAppointmentsQuery(currentTenantId: string) {
+    return supabase
+      .from('appointments')
+      .select('id, tenant_id, client_name, service, barber, price, status, payment_status, appointment_date, appointment_time, created_at')
+      .eq('tenant_id', currentTenantId)
+      .order('appointment_date', { ascending: false })
+      .order('appointment_time', { ascending: false })
+      .limit(5)
+  }
+
+  async function fetchDashboard(currentTenantId: string, periodStart: string, periodEnd: string) {
+    const [{ data: appts, error }, { data: recentRows }, { data: barberData }, { data: commissionRows }] = await Promise.all([
+      appointmentsQuery(currentTenantId, periodStart, periodEnd),
+      recentAppointmentsQuery(currentTenantId),
       supabase.from('barbeiros').select('nome, email, tenant_id, compensation_type, commission_percentage, fixed_salary_amount, chair_rental_amount').eq('tenant_id', currentTenantId).eq('ativo', true),
       supabase.from('barbers').select('name, email, tenant_id, commission_percentage, commission_type').eq('tenant_id', currentTenantId),
     ])
-    if (error) { console.log(error); return }
+    if (error) {
+      console.log(error)
+      setLoading(false)
+      return
+    }
     const mergedBarbers = (barberData || []).map((barber: any) => {
       const match = (commissionRows || []).find((row: any) => {
         const sameEmail = row.email && barber.email && row.email.toLowerCase() === barber.email.toLowerCase()
@@ -142,55 +181,31 @@ setTenantPlan(tenant.plano || null)
     })
     setAppointments(appts || [])
     setBarbers(mergedBarbers)
-    generateMonthlyData(appts || [], 'este-ano')
-    setRecentAppointments((appts || []).slice(0, 5))
+    setRecentAppointments(recentRows || [])
+    loadedDashboardRef.current = true
     setLoading(false)
   }
 
-  // âœ… CORRIGIDO: este-mes agora prÃ©-popula os dias do mÃªs atual
-  function generateMonthlyData(data: any[], period: ChartPeriod) {
-    const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-    const now = new Date()
-    const grouped: any = {}
-
-    if (period === 'este-ano') {
-      months.forEach(m => { grouped[m] = { month: m, revenue: 0 } })
-    } else if (period === 'esta-semana') {
-      const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
-      days.forEach(d => { grouped[d] = { month: d, revenue: 0 } })
-    } else if (period === 'este-mes') {
-      // âœ… prÃ©-popula todos os dias do mÃªs atual
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-      for (let d = 1; d <= daysInMonth; d++) {
-        const key = `${String(d).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}`
-        grouped[key] = { month: key, revenue: 0 }
-      }
+  async function fetchAppointments(currentTenantId: string, periodStart: string, periodEnd: string) {
+    const { data: appts, error } = await appointmentsQuery(currentTenantId, periodStart, periodEnd)
+    if (error) {
+      console.log(error)
+      setLoading(false)
+      return
     }
 
-    data.forEach((item) => {
-      if (!item.appointment_date || item.status === 'cancelled') return
-      const d = new Date(item.appointment_date)
+    setAppointments(appts || [])
+    setLoading(false)
+  }
 
-      if (period === 'este-ano' && d.getFullYear() !== now.getFullYear()) return
-      if (period === 'este-mes' && (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear())) return
-      if (period === 'esta-semana') {
-        const startOfWeek = new Date(now)
-        startOfWeek.setDate(now.getDate() - now.getDay())
-        startOfWeek.setHours(0, 0, 0, 0)
-        if (d < startOfWeek) return
-      }
+  async function fetchRecentAppointments(currentTenantId: string) {
+    const { data: recentRows, error } = await recentAppointmentsQuery(currentTenantId)
+    if (error) {
+      console.log(error)
+      return
+    }
 
-      const key = period === 'este-ano'
-        ? months[d.getMonth()]
-        : period === 'este-mes'
-          ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
-          : ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()]
-
-      if (!grouped[key]) grouped[key] = { month: key, revenue: 0 }
-      grouped[key].revenue += item.price || 0
-    })
-
-    setMonthlyData(Object.values(grouped))
+    setRecentAppointments(recentRows || [])
   }
 
   async function finishAppointment(appointment: any) {
@@ -204,12 +219,24 @@ setTenantPlan(tenant.plano || null)
       alert(`Erro ao finalizar: ${error.message}`)
       return
     }
-    if (tenantId) fetchAll(tenantId)
+    if (tenantId) {
+      const { start, end } = getSelectedRange(dateMode, selectedDate, selectedMonth)
+      await Promise.all([
+        fetchAppointments(tenantId, start, end),
+        fetchRecentAppointments(tenantId),
+      ])
+    }
   }
 
   async function cancelAppointment(id: number) {
     await supabase.from('appointments').update({ status: 'cancelled', canceled_at: new Date() }).eq('id', id).eq('tenant_id', tenantId)
-    if (tenantId) fetchAll(tenantId)
+    if (tenantId) {
+      const { start, end } = getSelectedRange(dateMode, selectedDate, selectedMonth)
+      await Promise.all([
+        fetchAppointments(tenantId, start, end),
+        fetchRecentAppointments(tenantId),
+      ])
+    }
   }
 
   async function handleLogout() {
@@ -217,13 +244,10 @@ setTenantPlan(tenant.plano || null)
     router.push(`/${slug}/login`)
   }
 
-  const periodAppointments = appointments.filter(a => {
-    if (dateMode === 'month') return String(a.appointment_date ?? '').startsWith(selectedMonth)
-    return a.appointment_date === selectedDate
-  })
-  const allActive = periodAppointments.filter(a => a.status !== 'cancelled')
-  const finished = periodAppointments.filter(a => a.status === 'finished' || a.status === 'completed')
-  const cancelled = periodAppointments.filter(a => a.status === 'cancelled')
+  const periodAppointments = appointments
+  const allActive = useMemo(() => periodAppointments.filter(a => a.status !== 'cancelled'), [periodAppointments])
+  const finished = useMemo(() => periodAppointments.filter(a => a.status === 'finished' || a.status === 'completed'), [periodAppointments])
+  const cancelled = useMemo(() => periodAppointments.filter(a => a.status === 'cancelled'), [periodAppointments])
   const compensationPeriodStart = dateMode === 'month' ? `${selectedMonth}-01` : selectedDate
   const compensationPeriodEnd = dateMode === 'month'
     ? (() => {
@@ -231,38 +255,45 @@ setTenantPlan(tenant.plano || null)
         return `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
       })()
     : selectedDate
-  const compensationSummary = barbers.map((barber) => {
-    const serviceRevenue = allActive
-      .filter((appointment) => appointment.barber === barber.nome)
-      .reduce((sum, appointment) => sum + Number(appointment.price || 0), 0)
+  const serviceRevenueByBarber = useMemo(() => {
+    const revenue = new Map<string, number>()
+    allActive.forEach((appointment) => {
+      if (!appointment.barber) return
+      revenue.set(appointment.barber, (revenue.get(appointment.barber) || 0) + Number(appointment.price || 0))
+    })
+    return revenue
+  }, [allActive])
+  const compensationSummary = useMemo(() => barbers.map((barber) => {
     return calculateBarberCompensation({
       settings: barber.compensation,
-      serviceRevenue,
+      serviceRevenue: serviceRevenueByBarber.get(barber.nome) || 0,
       periodStart: compensationPeriodStart,
       periodEnd: compensationPeriodEnd,
     })
-  })
-  const totalRevenue =
+  }), [barbers, compensationPeriodEnd, compensationPeriodStart, serviceRevenueByBarber])
+  const barberNames = useMemo(() => new Set(barbers.map((barber) => barber.nome)), [barbers])
+  const totalRevenue = useMemo(() =>
     compensationSummary.reduce((sum, item) => sum + item.barbershopServiceRevenue + item.chairRentalRevenue, 0) +
     allActive
-      .filter((appointment) => !barbers.some((barber) => barber.nome === appointment.barber))
+      .filter((appointment) => !barberNames.has(appointment.barber))
       .reduce((sum, appointment) => sum + Number(appointment.price || 0), 0)
-  const totalCommissions = compensationSummary.reduce((sum, item) => sum + item.laborCost, 0)
+  , [allActive, barberNames, compensationSummary])
+  const totalCommissions = useMemo(() => compensationSummary.reduce((sum, item) => sum + item.laborCost, 0), [compensationSummary])
   const totalProfit = totalRevenue - totalCommissions
   const avgTicket = allActive.length > 0 ? totalRevenue / allActive.length : 0
   const cancelRate = periodAppointments.length > 0 ? ((cancelled.length / periodAppointments.length) * 100).toFixed(1) : '0.0'
-  const todayCount = periodAppointments.filter(a => a.status !== 'cancelled').length
+  const todayCount = allActive.length
 
-  const filtered = periodAppointments.filter(a => {
+  const filtered = useMemo(() => periodAppointments.filter(a => {
     const matchSearch = (a.client_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (a.service ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (a.barber ?? '').toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === 'all' || a.status === statusFilter
     return matchSearch && matchStatus
-  })
+  }), [periodAppointments, search, statusFilter])
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [currentPage, filtered])
 
   function fmt(v: number) { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
   function fmtDateTime(date: string, time?: string) {
@@ -270,12 +301,6 @@ setTenantPlan(tenant.plano || null)
     const dateStr = new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const timeStr = time ? time.slice(0, 5) : ''
     return timeStr ? `${dateStr} ${timeStr}` : dateStr
-  }
-
-  const PERIOD_LABEL: Record<ChartPeriod, string> = {
-    'este-ano': 'Este ano',
-    'este-mes': 'Este mês',
-    'esta-semana': 'Esta semana',
   }
 
   const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -286,9 +311,9 @@ setTenantPlan(tenant.plano || null)
     pending:   { label: 'Pendente',   color: '#f59e0b' },
   }
 
-  const newAppointments = recentAppointments.filter(a => a.status === 'scheduled' || a.status === 'pending')
+  const newAppointments = useMemo(() => recentAppointments.filter(a => a.status === 'scheduled' || a.status === 'pending'), [recentAppointments])
   const dateLabel = dateMode === 'month' ? formatSelectedMonth(selectedMonth) : formatSelectedDate(selectedDate)
-  const chartData = dateMode === 'month'
+  const chartData = useMemo(() => dateMode === 'month'
     ? (() => {
         const [year, month] = selectedMonth.split('-').map(Number)
         const daysInMonth = new Date(year, month, 0).getDate()
@@ -304,6 +329,7 @@ setTenantPlan(tenant.plano || null)
         return Object.values(grouped)
       })()
     : [{ month: formatSelectedDate(selectedDate).split(',')[0], revenue: totalRevenue }]
+  , [allActive, dateMode, selectedDate, selectedMonth, totalRevenue])
 
   const DatePeriodControl = ({ mobile = false }: { mobile?: boolean }) => (
     <div style={{ ...S.dateControl, width: mobile ? '100%' : undefined }}>
@@ -500,26 +526,6 @@ setTenantPlan(tenant.plano || null)
               <button type="button" style={{ ...S.periodBtn, cursor: 'default' }}>
                 {dateMode === 'day' ? 'Dia selecionado' : 'Mês selecionado'}
               </button>
-              {chartDropdown && (
-                <div style={S.dropdown}>
-                  {(Object.entries(PERIOD_LABEL) as [ChartPeriod, string][]).map(([key, label]) => (
-                    <button key={key} className="dropdown-item" onClick={() => {
-                      setChartPeriod(key)
-                      generateMonthlyData(appointments, key)
-                      setChartDropdown(false)
-                    }} style={{
-                      ...S.dropdownItem,
-                      backgroundColor: chartPeriod === key ? 'rgba(59,130,246,0.15)' : 'transparent',
-                      color: chartPeriod === key ? '#60a5fa' : '#94a3b8',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {chartPeriod === key && <Check size={12} />}
-                        {label}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
           <div style={{ height: isMobile ? 200 : 260 }}>
