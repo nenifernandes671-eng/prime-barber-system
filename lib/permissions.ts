@@ -16,7 +16,7 @@ export const PLAN_FEATURES = {
   },
 
   pro: {
-    maxBarbers: 999,
+    maxBarbers: 5,
     memberships: true,
     uploads: true,
     whatsapp: true,

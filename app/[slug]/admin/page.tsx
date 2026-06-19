@@ -33,9 +33,9 @@ function timeAgo(dateStr: string) {
   const mins = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  if (mins < 60) return `${mins}min atrÃ¡s`
-  if (hours < 24) return `${hours}h atrÃ¡s`
-  return `${days}d atrÃ¡s`
+  if (mins < 60) return `${mins}min atrás`
+  if (hours < 24) return `${hours}h atrás`
+  return `${days}d atrás`
 }
 
 function localDateKey(date = new Date()) {
@@ -156,7 +156,7 @@ setTenantPlan(tenant.plano || null)
     if (period === 'este-ano') {
       months.forEach(m => { grouped[m] = { month: m, revenue: 0 } })
     } else if (period === 'esta-semana') {
-      const days = ['Dom','Seg','Ter','Qua','Qui','Sex','SÃ¡b']
+      const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
       days.forEach(d => { grouped[d] = { month: d, revenue: 0 } })
     } else if (period === 'este-mes') {
       // âœ… prÃ©-popula todos os dias do mÃªs atual
@@ -184,7 +184,7 @@ setTenantPlan(tenant.plano || null)
         ? months[d.getMonth()]
         : period === 'este-mes'
           ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
-          : ['Dom','Seg','Ter','Qua','Qui','Sex','SÃ¡b'][d.getDay()]
+          : ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()]
 
       if (!grouped[key]) grouped[key] = { month: key, revenue: 0 }
       grouped[key].revenue += item.price || 0
@@ -266,7 +266,7 @@ setTenantPlan(tenant.plano || null)
 
   function fmt(v: number) { return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
   function fmtDateTime(date: string, time?: string) {
-    if (!date) return 'â€”'
+    if (!date) return '—'
     const dateStr = new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const timeStr = time ? time.slice(0, 5) : ''
     return timeStr ? `${dateStr} ${timeStr}` : dateStr
@@ -376,7 +376,7 @@ setTenantPlan(tenant.plano || null)
       {/* â”€â”€ Header â”€â”€ */}
       <div style={{ ...S.header, ...(isMobile ? S.mobileHeader : {}) }}>
         <div>
-          <p style={S.headerSub}>Bem-vindo de volta, Administrador ðŸ‘‹</p>
+          <p style={S.headerSub}>Bem-vindo de volta, Administrador 👋</p>
           <h1 style={{ ...S.headerTitle, fontSize: isMobile ? 28 : S.headerTitle.fontSize }}>Dashboard</h1>
           <p style={{ fontSize: isMobile ? 13 : 14, color: '#3b82f6', margin: '4px 0 0', fontWeight: 500 }}>
             Acompanhe o desempenho da sua barbearia em tempo real.
@@ -397,12 +397,12 @@ setTenantPlan(tenant.plano || null)
             {notifOpen && (
               <div style={S.notifPanel}>
                 <div style={S.notifHeader}>
-                  <p style={S.notifTitle}>NotificaÃ§Ãµes</p>
+                  <p style={S.notifTitle}>Notificações</p>
                   <span style={S.notifCount}>{recentAppointments.length} recentes</span>
                 </div>
                 <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                   {recentAppointments.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: '#475569', padding: '20px', fontSize: 13 }}>Nenhuma notificaÃ§Ã£o</p>
+                    <p style={{ textAlign: 'center', color: '#475569', padding: '20px', fontSize: 13 }}>Nenhuma notificação</p>
                   ) : recentAppointments.map(a => {
                     const st = STATUS_MAP[a.status] ?? { label: a.status, color: '#64748b' }
                     const avatarColor = getAvatarColor(a.client_name ?? '')
@@ -413,7 +413,7 @@ setTenantPlan(tenant.plano || null)
                         </div>
                         <div style={{ flex: 1, overflow: 'hidden' }}>
                           <p style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.client_name}</p>
-                          <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{a.service} Â· {a.barber || 'â€”'}</p>
+                          <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{a.service} · {a.barber || '—'}</p>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, backgroundColor: st.color + '18', color: st.color }}>{st.label}</span>
@@ -425,7 +425,7 @@ setTenantPlan(tenant.plano || null)
                 </div>
                 <div style={S.notifFooter}>
                   <button onClick={() => { router.push(`/${slug}/admin/agendamentos`); setNotifOpen(false) }} style={S.notifFooterBtn}>
-                    Ver todos os agendamentos â†’
+                    Ver todos os agendamentos →
                   </button>
                 </div>
               </div>
@@ -495,10 +495,10 @@ setTenantPlan(tenant.plano || null)
       <div style={{ ...S.chartsRow, gridTemplateColumns: isMobile ? '1fr' : S.chartsRow.gridTemplateColumns }} className="charts-row">
         <div style={{ ...S.chartCard, padding: isMobile ? 16 : S.chartCard.padding, borderRadius: isMobile ? 16 : S.chartCard.borderRadius }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>ðŸ“Š</span>Receita</h2>
+            <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>📊</span>Receita</h2>
             <div style={{ position: 'relative' }}>
               <button type="button" style={{ ...S.periodBtn, cursor: 'default' }}>
-                {dateMode === 'day' ? 'Dia selecionado' : 'MÃªs selecionado'}
+                {dateMode === 'day' ? 'Dia selecionado' : 'Mês selecionado'}
               </button>
               {chartDropdown && (
                 <div style={S.dropdown}>
@@ -540,7 +540,7 @@ setTenantPlan(tenant.plano || null)
         </div>
 
         <div style={{ ...S.summaryCard, padding: isMobile ? 16 : S.summaryCard.padding, borderRadius: isMobile ? 16 : S.summaryCard.borderRadius }}>
-          <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>ðŸ“‹</span>Resumo</h2>
+          <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>📋</span>Resumo</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
             <SummaryItem label="Total de agendamentos" value={String(periodAppointments.length)} color="#60a5fa" />
             <SummaryItem label="Finalizados" value={String(finished.length)} color="#10b981" />
@@ -554,17 +554,17 @@ setTenantPlan(tenant.plano || null)
       {/* â”€â”€ Tabela â”€â”€ */}
       <div style={{ ...S.tableCard, borderRadius: isMobile ? 16 : S.tableCard.borderRadius }}>
         <div style={{ ...S.tableHeader, padding: isMobile ? '16px' : S.tableHeader.padding }} className="table-header">
-          <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>ðŸ“…</span>Agendamentos</h2>
+          <h2 style={S.cardTitle}><span style={{ marginRight: 8 }}>📅</span>Agendamentos</h2>
           <div style={S.tableFilters} className="table-filters">
             <div style={S.searchWrap}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569', fontSize: 14 }}>ðŸ”</span>
-              <input placeholder="Buscar cliente, serviÃ§o..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1) }} style={S.searchInput} />
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569', fontSize: 14 }}>🔍</span>
+              <input placeholder="Buscar cliente, serviço..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1) }} style={S.searchInput} />
             </div>
             <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1) }} style={S.select}>
               <option value="all">Todos</option>
               <option value="scheduled">Agendados</option>
               <option value="finished">Finalizados</option>
-              <option value="completed">ConcluÃ­dos</option>
+              <option value="completed">Concluídos</option>
               <option value="cancelled">Cancelados</option>
             </select>
           </div>
@@ -609,12 +609,12 @@ setTenantPlan(tenant.plano || null)
             <thead>
               <tr>
                 <th style={S.th}>Cliente</th>
-                <th style={S.th} className="col-hide">ServiÃ§o</th>
+                <th style={S.th} className="col-hide">Serviço</th>
                 <th style={S.th} className="col-hide">Barbeiro</th>
                 <th style={S.th}>Valor</th>
                 <th style={S.th} className="col-hide">Data</th>
                 <th style={S.th}>Status</th>
-                <th style={S.th}>AÃ§Ãµes</th>
+                <th style={S.th}>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -634,7 +634,7 @@ setTenantPlan(tenant.plano || null)
                       </div>
                     </td>
                     <td style={S.td} className="col-hide">{a.service}</td>
-                    <td style={S.td} className="col-hide">{a.barber || 'â€”'}</td>
+                    <td style={S.td} className="col-hide">{a.barber || '—'}</td>
                     <td style={{ ...S.td, color: '#10b981', fontWeight: 700 }}>{fmt(a.price || 0)}</td>
                     <td style={S.td} className="col-hide">{fmtDateTime(a.appointment_date, a.appointment_time)}</td>
                     <td style={S.td}>
@@ -647,7 +647,7 @@ setTenantPlan(tenant.plano || null)
                         </button>
                         {a.status !== 'finished' && a.status !== 'completed' && a.status !== 'cancelled' && (
                           <>
-                            <button title="Finalizar" className="action-btn" onClick={() => finishAppointment(a)} style={{ ...S.actionBtn, color: '#34d399', borderColor: 'rgba(16,185,129,0.2)', backgroundColor: 'rgba(16,185,129,0.08)', fontSize: 13, fontWeight: 700 }}>âœ“</button>
+                            <button title="Finalizar" className="action-btn" onClick={() => finishAppointment(a)} style={{ ...S.actionBtn, color: '#34d399', borderColor: 'rgba(16,185,129,0.2)', backgroundColor: 'rgba(16,185,129,0.08)', fontSize: 13, fontWeight: 700 }}>✓</button>
                             <button title="Cancelar" className="action-btn" onClick={() => cancelAppointment(a.id)} style={{ ...S.actionBtn, color: '#f87171', borderColor: 'rgba(239,68,68,0.2)', backgroundColor: 'rgba(239,68,68,0.08)' }}>
                               <XCircle size={15} />
                             </button>
@@ -671,7 +671,7 @@ setTenantPlan(tenant.plano || null)
                 <button key={p} onClick={() => setCurrentPage(p)} style={{ ...S.pageBtn, backgroundColor: currentPage === p ? '#3b82f6' : 'rgba(255,255,255,0.03)', color: currentPage === p ? '#fff' : '#cbd5e1', borderColor: currentPage === p ? '#3b82f6' : 'rgba(255,255,255,0.06)', minWidth: 36 }}>{p}</button>
               ))}
             </div>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} style={{ ...S.pageBtn, opacity: currentPage === totalPages ? 0.4 : 1 }}>PrÃ³xima &gt;</button>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} style={{ ...S.pageBtn, opacity: currentPage === totalPages ? 0.4 : 1 }}>Próxima &gt;</button>
           </div>
         )}
       </div>
@@ -685,7 +685,7 @@ function StatCard({ icon, label, value, color, sub, percent }: { icon: string; l
       <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at top right, ${color}22, transparent 60%)` }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 2, marginBottom: 16 }}>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</div>
-        <div style={{ padding: '4px 10px', borderRadius: 999, background: `${color}15`, color, fontSize: 12, fontWeight: 700 }}>{percent} â†—</div>
+        <div style={{ padding: '4px 10px', borderRadius: 999, background: `${color}15`, color, fontSize: 12, fontWeight: 700 }}>{percent} ↗</div>
       </div>
       <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 6px', position: 'relative', zIndex: 2 }}>{label}</p>
       <h2 style={{ fontSize: 'clamp(18px,2.5vw,28px)', fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.5px', position: 'relative', zIndex: 2 }}>{value}</h2>
