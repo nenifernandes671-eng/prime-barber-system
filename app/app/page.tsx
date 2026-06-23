@@ -33,6 +33,8 @@ type OwnerTenant = {
   id: string
   slug: string
   status?: string | null
+  subscription_status?: string | null
+  trial_end?: string | null
   trial_ends_at?: string | null
   created_at?: string | null
 }
@@ -155,7 +157,7 @@ export default function AppStartPage() {
         const tenantIds = memberships.map((item) => item.tenant_id)
         const { data: tenants } = await supabase
           .from('tenants')
-          .select('id, slug, status, trial_ends_at, created_at')
+          .select('id, slug, status, subscription_status, trial_end, trial_ends_at, created_at')
           .in('id', tenantIds)
 
         if (!active) return
@@ -189,7 +191,7 @@ export default function AppStartPage() {
 
       const { data: tenant } = await supabase
         .from('tenants')
-        .select('status, trial_ends_at')
+        .select('status, subscription_status, trial_end, trial_ends_at')
         .eq('id', barber.tenant_id)
         .maybeSingle()
 
@@ -255,7 +257,7 @@ export default function AppStartPage() {
     const tenantIds = memberships.map((item) => item.tenant_id)
     const { data: tenants } = await supabase
       .from('tenants')
-      .select('id, slug, status, trial_ends_at, created_at')
+      .select('id, slug, status, subscription_status, trial_end, trial_ends_at, created_at')
       .in('id', tenantIds)
 
     const tenant = chooseOwnerTenant(tenants || [])
@@ -344,7 +346,7 @@ export default function AppStartPage() {
 
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('status, trial_ends_at')
+      .select('status, subscription_status, trial_end, trial_ends_at')
       .eq('id', barber.tenant_id)
       .maybeSingle()
 

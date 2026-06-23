@@ -70,7 +70,7 @@ export default function BarberLoginPage() {
 
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('status, trial_ends_at')
+      .select('status, subscription_status, trial_end, trial_ends_at')
       .eq('id', barber.tenant_id)
       .maybeSingle()
 

@@ -81,7 +81,6 @@ export default function PricingPage() {
     slug: '',
     password: '',
     confirmPassword: '',
-    paymentMode: 'card',
     plano: '',
   })
   const [formError, setFormError] = useState('')
@@ -212,15 +211,23 @@ export default function PricingPage() {
       })
       const data = await res.json()
 
-      if (data.url) {
-        window.location.href = data.url
+      if (!res.ok || !data.created) {
+        throw new Error(data.error || 'Nao foi possivel criar sua conta.')
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      })
+
+      if (signInError) {
+        window.location.href = `/${data.slug || slugClean}/login`
         return
       }
 
-      setFormError(data.error || 'Erro ao iniciar pagamento.')
-      setSubmitting(false)
-    } catch {
-      setFormError('Erro de conexao. Tente novamente.')
+      window.location.href = `/${data.slug || slugClean}/admin`
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Erro de conexao. Tente novamente.')
       setSubmitting(false)
     }
   }
@@ -297,26 +304,7 @@ export default function PricingPage() {
             <button className="modal-close" onClick={() => setModal(false)}>x</button>
             <p className="modal-kicker">Comece seu teste</p>
             <h2>Criar sua barbearia</h2>
-            <p className="modal-copy">Informe os dados para abrir o checkout seguro.</p>
-
-            <div className="payment-mode">
-              <button
-                type="button"
-                className={form.paymentMode === 'card' ? 'active' : ''}
-                onClick={() => setForm({ ...form, paymentMode: 'card' })}
-              >
-                <strong>Cartao recorrente</strong>
-                <span>Cobranca automatica mensal.</span>
-              </button>
-              <button
-                type="button"
-                className={form.paymentMode === 'manual' ? 'active' : ''}
-                onClick={() => setForm({ ...form, paymentMode: 'manual' })}
-              >
-                <strong>Pix ou boleto</strong>
-                <span>Pagamento manual por 30 dias.</span>
-              </button>
-            </div>
+            <p className="modal-copy">Informe os dados para liberar seus 7 dias gratis. Nenhuma cobranca sera criada agora.</p>
 
             <label>
               Nome da barbearia
@@ -430,7 +418,7 @@ export default function PricingPage() {
             {formError && <div className="form-error">{formError}</div>}
 
             <button className="checkout-button" onClick={handleCheckout} disabled={submitting}>
-              {submitting ? 'Abrindo checkout...' : 'Ir para pagamento'}
+              {submitting ? 'Criando conta...' : 'Iniciar teste gratis'}
             </button>
           </div>
         </div>

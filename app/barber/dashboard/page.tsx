@@ -163,7 +163,7 @@ export default function BarberDashboard() {
 
       const { data: tenant } = await supabase
         .from('tenants')
-        .select('status, trial_ends_at')
+        .select('status, subscription_status, trial_end, trial_ends_at')
         .eq('id', barberData.tenant_id)
         .maybeSingle()
 

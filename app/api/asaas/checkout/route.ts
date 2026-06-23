@@ -1,32 +1,10 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-import { getSaasAsaasConfig } from '@/lib/server/saas-asaas'
-
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
-
-const DEFAULT_APP_URL = 'https://kortebarber.com.br'
-
-function planPrices() {
-  return {
-    basic: Number(process.env.ASAAS_PLAN_BASIC || 39),
-    pro: Number(process.env.ASAAS_PLAN_PRO || 69),
-    premium: Number(process.env.ASAAS_PLAN_PREMIUM || 189),
-  }
-}
-
-class AsaasApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public payload: unknown,
-  ) {
-    super(message)
-  }
-}
 
 function normalizeSlug(slug: string) {
   return slug
@@ -47,63 +25,6 @@ function addDays(date: Date, days: number) {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
-}
-
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function isPublicHttpsUrl(value?: string | null) {
-  if (!value) return false
-
-  try {
-    const url = new URL(value)
-    return (
-      url.protocol === 'https:' &&
-      !['localhost', '127.0.0.1', '0.0.0.0'].includes(url.hostname) &&
-      !url.hostname.endsWith('.local')
-    )
-  } catch {
-    return false
-  }
-}
-
-function resolveAsaasCallbackBaseUrl(req: NextRequest) {
-  const candidates = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    req.nextUrl.origin,
-    DEFAULT_APP_URL,
-  ]
-
-  const publicUrl = candidates.find(isPublicHttpsUrl) || DEFAULT_APP_URL
-  return publicUrl.replace(/\/$/, '')
-}
-
-async function asaasRequest(path: string, init: RequestInit) {
-  const config = await getSaasAsaasConfig()
-
-  const response = await fetch(`${config.baseUrl}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      access_token: config.apiKey,
-      ...(init.headers || {}),
-    },
-  })
-
-  const payload = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    const message =
-      payload?.errors?.[0]?.description ||
-      payload?.error ||
-      payload?.message ||
-      'Erro ao criar checkout Asaas.'
-
-    throw new AsaasApiError(message, response.status, payload)
-  }
-
-  return payload
 }
 
 async function findAuthUserByEmail(email: string) {
@@ -136,19 +57,7 @@ async function ensureOwnerUser(input: {
   const existingUser = await findAuthUserByEmail(input.email)
 
   if (existingUser) {
-    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-      password: input.password,
-      email_confirm: true,
-      user_metadata: {
-        ...(existingUser.user_metadata || {}),
-        nome: input.nome,
-        slug: input.slug,
-        role: 'admin',
-        password_set: true,
-      },
-    })
-
-    return existingUser.id
+    throw new Error('Ja existe uma conta com este email. Entre com sua senha atual.')
   }
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -185,19 +94,16 @@ export async function POST(req: NextRequest) {
       slug,
       password,
       confirmPassword,
-      paymentMode,
     } = await req.json()
     const normalizedSlug = normalizeSlug(String(slug ?? ''))
     const document = onlyDigits(String(cpfCnpj ?? ''))
     const phone = onlyDigits(String(telefone ?? ''))
     const postalCode = onlyDigits(String(cep ?? ''))
     const planKey = String(plano ?? '').toLowerCase()
-    const planValue = planPrices()[planKey as keyof ReturnType<typeof planPrices>]
     const emailClean = String(email ?? '').trim().toLowerCase()
     const nameClean = String(nome ?? '').trim()
     const passwordValue = String(password ?? '')
     const confirmPasswordValue = String(confirmPassword ?? '')
-    const mode = String(paymentMode ?? 'card').toLowerCase() === 'manual' ? 'manual' : 'card'
 
     if (
       !planKey ||
@@ -240,145 +146,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'As senhas nao conferem.' }, { status: 400 })
     }
 
-    if (!planValue) {
-      return NextResponse.json({ error: 'Plano invalido ou preco nao configurado.' }, { status: 400 })
+    if (!['basic', 'pro', 'premium'].includes(planKey)) {
+      return NextResponse.json({ error: 'Plano invalido.' }, { status: 400 })
     }
 
-    const asaasConfig = await getSaasAsaasConfig()
-    console.info('[ASAAS SaaS] Novo checkout solicitado', {
-      slug: normalizedSlug,
-      plan: planKey,
-      value: planValue,
-      environment: asaasConfig.environment,
-      baseUrl: asaasConfig.baseUrl,
-      paymentMode: mode,
-    })
+    if (await findAuthUserByEmail(emailClean)) {
+      return NextResponse.json(
+        { error: 'Ja existe uma conta com este email. Entre com sua senha atual.' },
+        { status: 409 },
+      )
+    }
 
     const { data: existingTenant } = await supabaseAdmin
       .from('tenants')
-      .select('id, email, asaas_customer_id, status, subscription_status, trial_start, trial_end, trial_ends_at')
+      .select('id')
       .eq('slug', normalizedSlug)
       .maybeSingle()
 
-    if (existingTenant && existingTenant.email?.toLowerCase() !== emailClean) {
+    if (existingTenant) {
       return NextResponse.json({ error: 'Este link de barbearia ja esta em uso.' }, { status: 409 })
     }
 
-    const appUrl = resolveAsaasCallbackBaseUrl(req)
     const trialStart = new Date()
     const trialEnd = addDays(trialStart, 7)
-    let asaasCustomerId = existingTenant?.asaas_customer_id || null
-
-    if (!asaasCustomerId) {
-      const customer = await asaasRequest('/customers', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: nameClean,
-          email: emailClean,
-          cpfCnpj: document,
-          mobilePhone: phone,
-          address: String(endereco).trim(),
-          addressNumber: String(numero).trim(),
-          postalCode,
-          province: String(bairro).trim(),
-        }),
-      })
-
-      asaasCustomerId = customer?.id
-
-      if (!asaasCustomerId) {
-        return NextResponse.json({ error: 'Asaas nao retornou o cliente criado.' }, { status: 502 })
-      }
-    }
-
-    const checkoutPayload: Record<string, any> = {
-      billingTypes: ['CREDIT_CARD'],
-      chargeTypes: ['RECURRENT'],
-      minutesToExpire: 60,
-      externalReference: normalizedSlug,
-      callback: {
-        cancelUrl: `${appUrl}/pricing`,
-        expiredUrl: `${appUrl}/pricing`,
-        successUrl: `${appUrl}/register/success?slug=${encodeURIComponent(normalizedSlug)}`,
-      },
-      items: [
-        {
-          name: `KorteBarber ${planKey.toUpperCase()}`,
-          description:
-            mode === 'manual'
-              ? `Mensalidade manual do plano ${planKey} por Pix ou boleto`
-              : `Assinatura mensal do plano ${planKey}`,
-          quantity: 1,
-          value: planValue,
-        },
-      ],
-      customer: asaasCustomerId,
-    }
-
-    checkoutPayload.subscription = {
-      cycle: 'MONTHLY',
-      nextDueDate: formatDate(trialEnd),
-    }
-
-    const manualPaymentPayload = {
-      customer: asaasCustomerId,
-      billingType: 'UNDEFINED',
-      value: planValue,
-      dueDate: formatDate(trialEnd),
-      description: `Mensalidade manual do plano ${planKey} - KorteBarber`,
-      externalReference: normalizedSlug,
-    }
-
-    const paymentSession =
-      mode === 'manual'
-        ? await asaasRequest('/payments', {
-            method: 'POST',
-            body: JSON.stringify(manualPaymentPayload),
-          })
-        : await asaasRequest('/checkouts', {
-            method: 'POST',
-            body: JSON.stringify(checkoutPayload),
-          })
-
-    const checkoutId = paymentSession?.id
-    const checkoutUrl =
-      paymentSession?.url ||
-      paymentSession?.link ||
-      paymentSession?.invoiceUrl ||
-      paymentSession?.bankSlipUrl ||
-      null
-    const asaasSubscriptionId =
-      typeof paymentSession?.subscription === 'string'
-        ? paymentSession.subscription
-        : paymentSession?.subscription?.id || null
-
-    if (!checkoutUrl) {
-      return NextResponse.json({ error: 'Asaas nao retornou a URL de pagamento.' }, { status: 502 })
-    }
 
     const tenantPayload: Record<string, any> = {
       nome: nameClean,
       email: emailClean,
       slug: normalizedSlug,
       plano: planKey,
-      asaas_customer_id: asaasCustomerId,
-    }
-
-    if (!existingTenant) {
-      tenantPayload.status = 'trial'
-      tenantPayload.subscription_status = 'trialing'
-      tenantPayload.trial_start = trialStart.toISOString()
-      tenantPayload.trial_end = trialEnd.toISOString()
-      tenantPayload.trial_ends_at = trialEnd.toISOString()
-    }
-
-    if (asaasSubscriptionId) {
-      tenantPayload.asaas_subscription_id = asaasSubscriptionId
+      status: 'trial',
+      subscription_status: 'trial',
+      trial_start: trialStart.toISOString(),
+      trial_end: trialEnd.toISOString(),
+      trial_ends_at: trialEnd.toISOString(),
     }
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .upsert(tenantPayload, { onConflict: 'slug' })
+      .insert(tenantPayload)
       .select('id')
       .single()
 
@@ -421,24 +227,13 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      url: checkoutUrl,
-      checkoutId,
-      paymentMode: mode,
+      created: true,
+      slug: normalizedSlug,
+      trialEndsAt: trialEnd.toISOString(),
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erro ao iniciar checkout Asaas.'
-    console.error('Asaas checkout error:', err)
-
-    if (err instanceof AsaasApiError) {
-      return NextResponse.json(
-        {
-          error: message,
-          asaasStatus: err.status,
-          asaasPayload: err.payload,
-        },
-        { status: 400 },
-      )
-    }
+    const message = err instanceof Error ? err.message : 'Erro ao criar conta.'
+    console.error('Trial registration error:', err)
 
     return NextResponse.json({ error: message }, { status: 500 })
   }

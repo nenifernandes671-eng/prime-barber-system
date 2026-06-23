@@ -57,7 +57,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   const tenantName = t?.nome ?? slug
   const initial = tenantName?.slice(0, 2).toUpperCase() || 'NB'
   const emailInitial = adminEmail?.slice(0, 1).toUpperCase() || 'A'
-  const isSubscriptionActive = t?.subscription_status === 'active'
+  const isSubscriptionActive = ['active', 'paid'].includes(String(t?.subscription_status || '').toLowerCase())
   const isTrial = hasAccess && !isSubscriptionActive
   const periodEnd = t?.trial_ends_at ?? t?.trial_end ?? null
   const periodStart = isTrial

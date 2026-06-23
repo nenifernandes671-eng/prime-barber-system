@@ -26,6 +26,8 @@ interface ReminderTenant {
   id: string
   plano: string | null
   status: string | null
+  subscription_status: string | null
+  trial_end: string | null
   trial_ends_at: string | null
 }
 
@@ -82,7 +84,7 @@ export async function GET(req: NextRequest) {
   const tenantIds = [...new Set(appointments.map((appointment) => appointment.tenant_id))]
   const { data: tenants, error: tenantsError } = await supabaseAdmin
     .from('tenants')
-    .select('id, plano, status, trial_ends_at')
+    .select('id, plano, status, subscription_status, trial_end, trial_ends_at')
     .in('id', tenantIds)
 
   if (tenantsError) {

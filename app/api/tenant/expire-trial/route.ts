@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     const trialEnd = tenant.trial_end || tenant.trial_ends_at
     const isTrial =
+      tenant.subscription_status === 'trial' ||
       tenant.subscription_status === 'trialing' ||
       (!tenant.subscription_status && tenant.status === 'trial')
     const isExpired = Boolean(trialEnd && new Date(trialEnd).getTime() <= Date.now())

@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .select('id,slug,nome,email,telefone,plano,asaas_customer_id')
+      .select('id,slug,nome,email,telefone,plano,subscription_status,asaas_customer_id,asaas_subscription_id')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -196,6 +196,24 @@ export async function POST(req: NextRequest) {
 
     const customerId = await resolveCustomer(tenant)
     const appUrl = appBaseUrl(req)
+
+    if (tenant.asaas_subscription_id) {
+      const existingPayment = await resolveFirstPayment(tenant.asaas_subscription_id)
+      const existingPaymentStatus = String(existingPayment?.status || '').toUpperCase()
+      const existingPaymentUrl =
+        existingPayment?.invoiceUrl ||
+        existingPayment?.bankSlipUrl ||
+        existingPayment?.transactionReceiptUrl ||
+        null
+
+      if (existingPaymentUrl && ['PENDING', 'OVERDUE'].includes(existingPaymentStatus)) {
+        return NextResponse.json(
+          { url: existingPaymentUrl, plan, value, reused: true },
+          { headers: noStoreHeaders },
+        )
+      }
+    }
+
     const subscription = await asaasRequest('/subscriptions', {
       method: 'POST',
       body: JSON.stringify({
