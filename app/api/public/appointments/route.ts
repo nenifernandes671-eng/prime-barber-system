@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTenantAccess } from '@/lib/subscription-access'
 
@@ -11,8 +11,98 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-function normalizeTime(time: string) {
-  return time.slice(0, 5)
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
+function normalizeTime(time?: string | null) {
+  const match = String(time || '').match(/^(\d{2}):(\d{2})/)
+  return match ? `${match[1]}:${match[2]}` : ''
+}
+
+function timeToMinutes(time?: string | null) {
+  const normalized = normalizeTime(time)
+  if (!normalized) return Number.NaN
+
+  const [hours, minutes] = normalized.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+function weekdayFromDate(date: string) {
+  const parsed = new Date(`${date}T12:00:00`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getDay()
+}
+
+function getBusinessHourRule<T extends { weekday: number; unit_id?: string | null }>(
+  hours: T[],
+  date: string,
+  unitId?: string | null
+) {
+  const weekday = weekdayFromDate(date)
+  if (weekday === null) return null
+
+  const selectedUnitId = unitId ? String(unitId) : null
+  return (
+    hours.find((item) => item.weekday === weekday && selectedUnitId && String(item.unit_id) === selectedUnitId) ||
+    hours.find((item) => item.weekday === weekday && !item.unit_id) ||
+    hours.find((item) => item.weekday === weekday) ||
+    null
+  )
+}
+
+function isInsideBusinessHours({
+  appointmentTime,
+  appointmentDate,
+  duration,
+  tenant,
+  businessHours,
+  unitId,
+}: {
+  appointmentTime: string
+  appointmentDate: string
+  duration: number
+  tenant: { opening_time?: string | null; closing_time?: string | null }
+  businessHours: Array<{
+    weekday: number
+    unit_id?: string | null
+    is_open: boolean
+    open_time?: string | null
+    close_time?: string | null
+    break_start?: string | null
+    break_end?: string | null
+  }>
+  unitId?: string | null
+}) {
+  const rule = getBusinessHourRule(businessHours, appointmentDate, unitId)
+
+  if (rule && !rule.is_open) return false
+
+  const start = timeToMinutes(rule?.open_time || tenant.opening_time || '08:00')
+  const end = timeToMinutes(rule?.close_time || tenant.closing_time || '19:00')
+  const appointmentStart = timeToMinutes(appointmentTime)
+  const serviceDuration = Number(duration || 30)
+  const appointmentEnd = appointmentStart + serviceDuration
+
+  if (
+    Number.isNaN(start) ||
+    Number.isNaN(end) ||
+    Number.isNaN(appointmentStart) ||
+    !serviceDuration ||
+    appointmentStart < start ||
+    appointmentEnd > end
+  ) {
+    return false
+  }
+
+  const breakStart = timeToMinutes(rule?.break_start)
+  const breakEnd = timeToMinutes(rule?.break_end)
+
+  return (
+    Number.isNaN(breakStart) ||
+    Number.isNaN(breakEnd) ||
+    appointmentStart >= breakEnd ||
+    appointmentEnd <= breakStart
+  )
 }
 
 async function getBarber(tenantId: string, barberId: string) {
@@ -38,7 +128,7 @@ async function getUnit(tenantId: string, unitId: string) {
 async function getTenantPlan(tenantId: string) {
   return supabaseAdmin
     .from('tenants')
-    .select('id,plano,status,subscription_status,trial_start,trial_end,trial_ends_at')
+    .select('id,plano,status,subscription_status,trial_start,trial_end,trial_ends_at,opening_time,closing_time')
     .eq('id', tenantId)
     .maybeSingle()
 }
@@ -106,8 +196,8 @@ export async function GET(req: NextRequest) {
         )
         .filter(Boolean),
     })
-  } catch (error: any) {
-    return jsonError(error.message ?? 'Erro ao carregar horarios.', 500)
+  } catch (error: unknown) {
+    return jsonError(errorMessage(error, 'Erro ao carregar horarios.'), 500)
   }
 }
 
@@ -144,13 +234,13 @@ export async function POST(req: NextRequest) {
     ] = await Promise.all([
       supabaseAdmin
         .from('tenants')
-        .select('id,plano,status,subscription_status,trial_start,trial_end,trial_ends_at')
+        .select('id,plano,status,subscription_status,trial_start,trial_end,trial_ends_at,opening_time,closing_time')
         .eq('id', tenantId)
         .maybeSingle(),
 
       supabaseAdmin
         .from('services')
-        .select('id,name,price,tenant_id,unit_id')
+        .select('id,name,price,duration,tenant_id,unit_id')
         .eq('tenant_id', tenantId)
         .eq('id', serviceId)
         .maybeSingle(),
@@ -191,6 +281,24 @@ export async function POST(req: NextRequest) {
       ? activeUnitId || barber.unit_id || service.unit_id || null
       : null
 
+    const { data: businessHours, error: businessHoursError } = await supabaseAdmin
+      .from('business_hours')
+      .select('weekday,unit_id,is_open,open_time,close_time,break_start,break_end')
+      .eq('tenant_id', tenantId)
+
+    if (businessHoursError) return jsonError(businessHoursError.message, 400)
+
+    if (!isInsideBusinessHours({
+      appointmentTime,
+      appointmentDate,
+      duration: Number(service.duration || 30),
+      tenant,
+      businessHours: businessHours ?? [],
+      unitId: finalUnitId,
+    })) {
+      return jsonError('Horario fora do funcionamento da barbearia.', 400)
+    }
+
     let existingQuery = supabaseAdmin
       .from('appointments')
       .select('id')
@@ -213,7 +321,7 @@ export async function POST(req: NextRequest) {
       return jsonError('Esse horario acabou de ser ocupado. Escolha outro horario.', 409)
     }
 
-    const { error } = await supabaseAdmin.from('appointments').insert({
+    const { data: createdAppointment, error } = await supabaseAdmin.from('appointments').insert({
       tenant_id: tenantId,
       unit_id: finalUnitId,
       client_name: clientName,
@@ -225,7 +333,7 @@ export async function POST(req: NextRequest) {
       appointment_time: appointmentTime,
       status: 'scheduled',
       payment_status: 'pending',
-    })
+    }).select('id').single()
 
     if (error) {
       const status =
@@ -241,8 +349,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    return NextResponse.json({ ok: true })
-  } catch (error: any) {
-    return jsonError(error.message ?? 'Erro ao agendar.', 500)
+    return NextResponse.json({ ok: true, appointment_id: createdAppointment?.id ?? null })
+  } catch (error: unknown) {
+    return jsonError(errorMessage(error, 'Erro ao agendar.'), 500)
   }
 }

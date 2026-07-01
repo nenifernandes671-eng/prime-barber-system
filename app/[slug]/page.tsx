@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
 
 interface Service { id: string; name: string; price: number; duration: number; description?: string; photo_url?: string; unit_id?: string | null }
 interface Barber  { id: string; nome: string; avatar_url?: string; unit_id?: string | null }
 interface Unit { id: string; tenant_id: string; name: string; address?: string | null; phone?: string | null; active: boolean }
+interface BusinessHour { id?: string; tenant_id: string; unit_id?: string | null; weekday: number; is_open: boolean; open_time: string; close_time: string; break_start?: string | null; break_end?: string | null }
 interface LandingTestimonial { name: string; text: string; rating: number }
 interface LandingDifferential { title: string; description: string; icon: string }
 interface Tenant {
@@ -41,9 +43,17 @@ interface Tenant {
 }
 interface GalleryImage { id: string; image_url: string; position: number; is_cover?: boolean; created_at?: string }
 
-function timeToMinutes(time?: string) {
-  const [hours, minutes] = String(time || '08:00').split(':').map(Number)
-  return (hours || 0) * 60 + (minutes || 0)
+function normalizeTime(time?: string | null) {
+  const match = String(time || '').match(/^(\d{2}):(\d{2})/)
+  return match ? `${match[1]}:${match[2]}` : ''
+}
+
+function timeToMinutes(time?: string | null) {
+  const normalized = normalizeTime(time)
+  if (!normalized) return Number.NaN
+
+  const [hours, minutes] = normalized.split(':').map(Number)
+  return hours * 60 + minutes
 }
 
 function minutesToTime(total: number) {
@@ -52,17 +62,42 @@ function minutesToTime(total: number) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-function generateTimes(openingTime?: string, closingTime?: string, interval?: number) {
-  const start = timeToMinutes(openingTime || '08:00')
-  const end = timeToMinutes(closingTime || '19:00')
-  const step = Number(interval || 30)
+function weekdayFromDate(date: string) {
+  const parsed = new Date(`${date}T12:00:00`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getDay()
+}
+
+function getBusinessHourRule(hours: BusinessHour[], date: string, unitId?: string | null) {
+  const weekday = weekdayFromDate(date)
+  if (weekday === null) return null
+  const selectedUnitId = unitId ? String(unitId) : null
+  return (
+    hours.find(item => item.weekday === weekday && selectedUnitId && String(item.unit_id) === selectedUnitId) ||
+    hours.find(item => item.weekday === weekday && !item.unit_id) ||
+    hours.find(item => item.weekday === weekday) ||
+    null
+  )
+}
+
+function generateTimes(tenant: Tenant | null, hours: BusinessHour[], date: string, duration?: number, unitId?: string | null) {
+  const rule = date ? getBusinessHourRule(hours, date, unitId) : null
+  if (rule && !rule.is_open) return []
+
+  const start = timeToMinutes(normalizeTime(rule?.open_time) || tenant?.opening_time || '08:00')
+  const end = timeToMinutes(normalizeTime(rule?.close_time) || tenant?.closing_time || '19:00')
+  const breakStart = timeToMinutes(normalizeTime(rule?.break_start))
+  const breakEnd = timeToMinutes(normalizeTime(rule?.break_end))
+  const step = Number(tenant?.slot_interval || 30)
+  const serviceDuration = Number(duration || step)
 
   if (!step || step < 5 || start >= end) return []
 
   const times: string[] = []
 
-  for (let current = start; current < end; current += step) {
-    times.push(minutesToTime(current))
+  for (let current = start; current + serviceDuration <= end; current += step) {
+    const finishesAt = current + serviceDuration
+    const overlapsBreak = !Number.isNaN(breakStart) && !Number.isNaN(breakEnd) && current < breakEnd && finishesAt > breakStart
+    if (!overlapsBreak) times.push(minutesToTime(current))
   }
 
   return times
@@ -97,9 +132,15 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const [barbers, setBarbers]   = useState<Barber[]>([])
   const [tenantGallery, setTenantGallery] = useState<GalleryImage[]>([])
   const [units, setUnits]       = useState<Unit[]>([])
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([])
   const [bookedTimes, setBookedTimes] = useState<string[]>([])
   const [mobileNav, setMobileNav] = useState(false)
-  const [showAppReturn, setShowAppReturn] = useState(false)
+  const [showAppReturn] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    const fromApp = new URLSearchParams(window.location.search).get('from') === 'app'
+    return Boolean(standalone || fromApp)
+  })
   const [tenantChecked, setTenantChecked] = useState(false)
 
   const [selectedUnit, setSelectedUnit]       = useState<Unit | null>(null)
@@ -117,7 +158,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const normalizedPlan = tenant?.plano?.toLowerCase()
   const isPro = normalizedPlan === 'pro' || normalizedPlan === 'premium'
   const isPremium = normalizedPlan === 'premium'
-  const allTimes = generateTimes(tenant?.opening_time, tenant?.closing_time, tenant?.slot_interval)
+  const allTimes = generateTimes(tenant, businessHours, selectedDate, selectedService?.duration, selectedUnit?.id ?? null)
   const availableTimes = allTimes.filter(t => !bookedTimes.includes(t))
   const hasMultipleUnits = isPremium && units.length > 1
   const filteredBarbers = isPremium && selectedUnit
@@ -138,12 +179,6 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
   const landingLogoUrl = (isPro && tenant?.landing_logo_url) || ''
 
   useEffect(() => {
-    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-    const fromApp = new URLSearchParams(window.location.search).get('from') === 'app'
-    setShowAppReturn(Boolean(standalone || fromApp))
-  }, [])
-
-  useEffect(() => {
     async function load() {
       setTenantChecked(false)
       const { data: t } = await supabase.from('tenants').select('*').eq('slug', slug).maybeSingle()
@@ -153,6 +188,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
         setBarbers([])
         setTenantGallery([])
         setUnits([])
+        setBusinessHours([])
         setTenantChecked(true)
         return
       }
@@ -169,6 +205,19 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
       const activeUnits = (unitRows ?? []) as Unit[]
       setUnits(activeUnits)
       setSelectedUnit(t.plano === 'premium' && activeUnits.length === 1 ? activeUnits[0] : null)
+
+      const { data: hoursRows } = await supabase
+        .from('business_hours')
+        .select('*')
+        .eq('tenant_id', t.id)
+        .order('weekday', { ascending: true })
+      setBusinessHours(((hoursRows ?? []) as BusinessHour[]).map((row) => ({
+        ...row,
+        open_time: normalizeTime(row.open_time) || '08:00',
+        close_time: normalizeTime(row.close_time) || '19:00',
+        break_start: normalizeTime(row.break_start) || null,
+        break_end: normalizeTime(row.break_end) || null,
+      })))
 
       const response = await fetch(`/api/public/tenant-assets?tenant_id=${encodeURIComponent(t.id)}`)
       const assets = await response.json().catch(() => ({}))
@@ -281,9 +330,9 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
           <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6, margin: '0 0 22px' }}>
             O link acessado nao existe ou ainda nao foi configurado.
           </p>
-          <a href="/app" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, textDecoration: 'none', fontWeight: 800, fontSize: 13 }}>
+          <Link href="/app" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD2})`, color: DARK, textDecoration: 'none', fontWeight: 800, fontSize: 13 }}>
             Voltar para KorteBarber
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -488,7 +537,7 @@ export default function BookingPage({ params }: { params: Promise<{ slug: string
             </div>
           </div>
 
-          {showAppReturn && <a href="/app" className="app-return">← Voltar</a>}
+          {showAppReturn && <Link href="/app" className="app-return">← Voltar</Link>}
 
           {/* Links */}
           <div className="nav-links" style={{ display:'flex', gap:32, alignItems:'center' }}>
