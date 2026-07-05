@@ -162,10 +162,31 @@ async function listSubscriptionPayments(subscriptionId?: string | null) {
   return Array.isArray(response?.data) ? response.data : []
 }
 
+function normalizeCpfCnpj(tenant: { cpf_cnpj?: string | null }) {
+  const cpfCnpj = onlyDigits(tenant.cpf_cnpj)
+  if (cpfCnpj.length !== 11 && cpfCnpj.length !== 14) {
+    throw new Error('CPF ou CNPJ invalido. Verifique o cadastro em "Minha barbearia".')
+  }
+  return cpfCnpj
+}
+
+async function syncAsaasCustomerCpf(customerId: string, cpfCnpj: string) {
+  await asaasRequest(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ cpfCnpj }),
+  })
+}
+
 async function ensureAsaasCustomer(tenant: any) {
-  if (tenant.asaas_customer_id) return tenant.asaas_customer_id
   if (!tenant.email) throw new Error('E-mail do tenant obrigatorio para criar cliente no Asaas.')
   if (!tenant.cpf_cnpj) throw new Error('Cadastre o CPF ou CNPJ da barbearia em "Minha barbearia" antes de gerar cobranças.')
+
+  const cpfCnpj = normalizeCpfCnpj(tenant)
+
+  if (tenant.asaas_customer_id) {
+    await syncAsaasCustomerCpf(tenant.asaas_customer_id, cpfCnpj)
+    return tenant.asaas_customer_id
+  }
 
   const search = await asaasRequest(`/customers?email=${encodeURIComponent(tenant.email)}&limit=1`)
   const existingCustomer = Array.isArray(search?.data) ? search.data[0] : null
@@ -175,12 +196,16 @@ async function ensureAsaasCustomer(tenant: any) {
       name: tenant.nome || tenant.name || tenant.slug,
       email: tenant.email,
       mobilePhone: onlyDigits(tenant.telefone || tenant.phone) || undefined,
-      cpfCnpj: tenant.cpf_cnpj,
+      cpfCnpj,
       externalReference: tenant.slug,
     }),
   }))?.id
 
   if (!customerId) throw new Error('Asaas nao retornou o cliente da cobranca.')
+
+  if (existingCustomer?.id) {
+    await syncAsaasCustomerCpf(customerId, cpfCnpj)
+  }
 
   await supabaseAdmin
     .from('tenants')
