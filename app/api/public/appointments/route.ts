@@ -329,6 +329,7 @@ export async function POST(req: NextRequest) {
       service: service.name,
       price: service.price,
       barber: barber.nome,
+      barber_id: barber.id,
       appointment_date: appointmentDate,
       appointment_time: appointmentTime,
       status: 'scheduled',
