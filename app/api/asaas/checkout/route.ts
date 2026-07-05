@@ -171,16 +171,17 @@ export async function POST(req: NextRequest) {
     const trialEnd = addDays(trialStart, 7)
 
     const tenantPayload: Record<string, any> = {
-      nome: nameClean,
-      email: emailClean,
-      slug: normalizedSlug,
-      plano: planKey,
-      status: 'trial',
-      subscription_status: 'trial',
-      trial_start: trialStart.toISOString(),
-      trial_end: trialEnd.toISOString(),
-      trial_ends_at: trialEnd.toISOString(),
-    }
+  nome: nameClean,
+  email: emailClean,
+  slug: normalizedSlug,
+  plano: planKey,
+  status: 'trial',
+  subscription_status: 'trial',
+  trial_start: trialStart.toISOString(),
+  trial_end: trialEnd.toISOString(),
+  trial_ends_at: trialEnd.toISOString(),
+  cpf_cnpj: document,
+}
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')

@@ -69,6 +69,10 @@ async function asaasRequest(path: string, init: RequestInit = {}) {
 }
 
 async function resolveCustomer(tenant: any) {
+  if (!tenant.cpf_cnpj) {
+    throw new Error('Cadastre o CPF ou CNPJ da barbearia em "Minha barbearia" antes de alterar o plano.')
+  }
+
   if (tenant.asaas_customer_id) {
     return tenant.asaas_customer_id
   }
@@ -88,6 +92,7 @@ async function resolveCustomer(tenant: any) {
       name: tenant.nome,
       email: tenant.email,
       mobilePhone: tenant.telefone || undefined,
+      cpfCnpj: tenant.cpf_cnpj,
       externalReference: tenant.slug,
     }),
   })
@@ -149,7 +154,7 @@ export async function POST(req: NextRequest) {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .select('id,slug,nome,email,telefone,plano,subscription_status,asaas_customer_id,asaas_subscription_id')
+      .select('id,slug,nome,email,telefone,cpf_cnpj,plano,subscription_status,asaas_customer_id,asaas_subscription_id')
       .eq('slug', slug)
       .maybeSingle()
 
