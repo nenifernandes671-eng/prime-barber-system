@@ -134,15 +134,26 @@ async function sendFcm(token: string, title: string, body: string, data: PushDat
 }
 
 export async function validateTenantUser(tenantId: string, userId: string) {
-  const { data, error } = await supabaseAdmin
+  const { data: tenantUser, error: tenantUserError } = await supabaseAdmin
     .from('tenant_users')
     .select('user_id')
     .eq('tenant_id', tenantId)
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (error) throw error
-  return Boolean(data)
+  if (tenantUserError) throw tenantUserError
+  if (tenantUser) return true
+
+  const { data: barber, error: barberError } = await supabaseAdmin
+    .from('barbeiros')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId)
+    .eq('ativo', true)
+    .maybeSingle()
+
+  if (barberError) throw barberError
+  return Boolean(barber)
 }
 
 
