@@ -16,6 +16,7 @@ import {
   HandCoins, Wrench, Menu, X, Crown, LogOut, ChevronRight,
   ShieldCheck, Copy, CheckCircle2,ReceiptText,MessageCircle,
 } from 'lucide-react' 
+import { monthsToYears } from 'date-fns'
 
 function fmtDate(value?: string | null) {
   if (!value) return 'Vencimento não informado'
@@ -85,6 +86,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
     { name: 'Barbeiros', path: `/${slug}/admin/barbeiros`, icon: Scissors },
     { name: 'Clientes', path: `/${slug}/admin/clientes`, icon: Users },
     { name: 'Servicos', path: `/${slug}/admin/servicos`, icon: Wrench },
+    
 
     ...(isPremium
       ? [
@@ -98,6 +100,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           { name: 'Despesas', path: `/${slug}/admin/despesas`, icon: ReceiptText },
           { name: 'Assinaturas', path: `/${slug}/admin/memberships`, icon: Crown },
           { name: 'Comissoes', path: `/${slug}/admin/comissoes`, icon: HandCoins },
+          { name: 'Frequencia', path: `/${slug}/admin/frequencia`, icon: CalendarDays },
           { name: 'WhatsApp', path: `/${slug}/admin/whatsapp`, icon: MessageCircle },
           { name: 'Relatorios', path: `/${slug}/admin/relatorios`, icon: BarChart3 },
         ]

@@ -61,6 +61,7 @@ export const PRO_ADMIN_PATHS = [
   '/admin/comissoes',
   '/admin/whatsapp',
   '/admin/memberships',
+  '/admin/frequencia',
 ]
 
 export const PREMIUM_ADMIN_PATHS = [
