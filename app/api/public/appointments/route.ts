@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTenantAccess } from '@/lib/subscription-access'
+import { enqueuePush } from '@/lib/server/push'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -108,7 +109,7 @@ function isInsideBusinessHours({
 async function getBarber(tenantId: string, barberId: string) {
   return supabaseAdmin
     .from('barbeiros')
-    .select('id,nome,ativo,tenant_id,unit_id')
+    .select('id,nome,ativo,tenant_id,unit_id,user_id')
     .eq('tenant_id', tenantId)
     .eq('id', barberId)
     .maybeSingle()
@@ -350,8 +351,23 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    if (barber.user_id && createdAppointment?.id) {
+      enqueuePush({
+        tenant_id: tenantId,
+        user_ids: [barber.user_id],
+        title: 'Novo agendamento',
+        body: `${clientName} agendou ${service.name} para ${appointmentDate} as ${appointmentTime}.`,
+        type: 'appointment_created',
+        data: {
+          entity_id: createdAppointment.id,
+          route: `/agendamento/${createdAppointment.id}`,
+        },
+      }).catch((pushError) => console.error('Falha ao enfileirar push de novo agendamento:', pushError))
+    }
+
     return NextResponse.json({ ok: true, appointment_id: createdAppointment?.id ?? null })
   } catch (error: unknown) {
     return jsonError(errorMessage(error, 'Erro ao agendar.'), 500)
   }
 }
+
