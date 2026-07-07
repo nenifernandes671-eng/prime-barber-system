@@ -115,6 +115,16 @@ async function getBarber(tenantId: string, barberId: string) {
     .maybeSingle()
 }
 
+async function getOwnerNotificationUserIds(tenantId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('tenant_users')
+    .select('user_id,role')
+    .eq('tenant_id', tenantId)
+    .in('role', ['owner', 'admin'])
+
+  if (error) throw error
+  return (data ?? []).map((item) => String(item.user_id)).filter(Boolean)
+}
 async function getUnit(tenantId: string, unitId: string) {
   if (!unitId) return { data: null, error: null }
 
@@ -351,18 +361,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (barber.user_id && createdAppointment?.id) {
-      enqueuePush({
-        tenant_id: tenantId,
-        user_ids: [barber.user_id],
-        title: 'Novo agendamento',
-        body: `${clientName} agendou ${service.name} para ${appointmentDate} as ${appointmentTime}.`,
-        type: 'appointment_created',
-        data: {
-          entity_id: createdAppointment.id,
-          route: `/agendamento/${createdAppointment.id}`,
-        },
-      }).catch((pushError) => console.error('Falha ao enfileirar push de novo agendamento:', pushError))
+    if (createdAppointment?.id) {
+      try {
+        const ownerUserIds = await getOwnerNotificationUserIds(tenantId)
+        const userIds = [...new Set([barber.user_id, ...ownerUserIds].filter(Boolean).map(String))]
+
+        await enqueuePush({
+          tenant_id: tenantId,
+          user_ids: userIds,
+          title: 'Novo agendamento',
+          body: `${clientName} agendou ${service.name} com ${barber.nome} para ${appointmentDate} as ${appointmentTime}.`,
+          type: 'appointment_created',
+          data: {
+            entity_id: createdAppointment.id,
+            route: `/agendamento/${createdAppointment.id}`,
+          },
+        })
+      } catch (pushError) {
+        console.error('Falha ao enfileirar push de novo agendamento:', pushError)
+      }
     }
 
     return NextResponse.json({ ok: true, appointment_id: createdAppointment?.id ?? null })
