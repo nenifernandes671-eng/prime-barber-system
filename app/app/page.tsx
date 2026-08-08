@@ -8,7 +8,6 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
-  Crown,
   DollarSign,
   Eye,
   EyeOff,
@@ -17,7 +16,6 @@ import {
   Lock,
   Mail,
   Menu,
-  Scissors,
   Share2,
   ShieldCheck,
   UserRound,
@@ -27,7 +25,6 @@ import { supabase } from '@/lib/supabase'
 import { getTenantAccess } from '@/lib/subscription-access'
 
 const LAST_ACCESS_KEY = 'kortebarber:last-access'
-const LAST_CLIENT_SLUG_KEY = 'kortebarber:last-client-slug'
 
 type OwnerTenant = {
   id: string
@@ -69,39 +66,6 @@ const CHECK_ITEMS = [
   'Atualizações constantes',
 ]
 
-function cleanSlug(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-
-  const sanitize = (input: string) =>
-    input
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9-]/g, '')
-
-  if (!trimmed.includes('.') && !trimmed.includes('/')) {
-    return sanitize(trimmed)
-  }
-
-  try {
-    const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
-    const firstPath = url.pathname.split('/').filter(Boolean)[0]
-    if (firstPath) return sanitize(firstPath)
-
-    const host = url.hostname.replace(/^www\./, '')
-    if (host === 'kortebarber.com.br') return ''
-    return sanitize(host.split('.')[0] || '')
-  } catch {
-    const fallback = trimmed
-      .replace(/^https?:\/\//, '')
-      .replace(/^www\./, '')
-      .split('/')[0]
-      .split('.')[0]
-    return fallback ? sanitize(fallback) : ''
-  }
-}
-
 function chooseOwnerTenant(tenants: OwnerTenant[]) {
   if (!tenants.length) return null
 
@@ -120,26 +84,16 @@ function chooseOwnerTenant(tenants: OwnerTenant[]) {
 
 export default function AppStartPage() {
   const router = useRouter()
-  const [barbershop, setBarbershop] = useState('')
-  const [ownerEmail, setOwnerEmail] = useState('')
-  const [ownerPassword, setOwnerPassword] = useState('')
-  const [barberEmail, setBarberEmail] = useState('')
-  const [barberPassword, setBarberPassword] = useState('')
-  const [ownerLoading, setOwnerLoading] = useState(false)
-  const [barberLoading, setBarberLoading] = useState(false)
-  const [ownerError, setOwnerError] = useState('')
-  const [barberError, setBarberError] = useState('')
-  const [showOwnerPassword, setShowOwnerPassword] = useState(false)
-  const [showBarberPassword, setShowBarberPassword] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
 
   useEffect(() => {
     let active = true
 
     async function restoreAccess() {
-      const lastClientSlug = localStorage.getItem(LAST_CLIENT_SLUG_KEY) || ''
-
-      if (lastClientSlug) setBarbershop(lastClientSlug)
-
       const { data: { user } } = await supabase.auth.getUser()
       if (!active || !user) return
 
@@ -210,34 +164,24 @@ export default function AppStartPage() {
     }
   }, [router])
 
-  function goToShop() {
-    const slug = cleanSlug(barbershop)
-    if (!slug) return
-    localStorage.setItem(LAST_ACCESS_KEY, 'client')
-    localStorage.setItem(LAST_CLIENT_SLUG_KEY, slug)
-    setBarbershop(slug)
-    router.push(`/${slug}?from=app`)
-  }
-
-  async function signInOwner(event: React.FormEvent<HTMLFormElement>) {
+  async function signInInternal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!ownerEmail || !ownerPassword) {
-      setOwnerError('Preencha e-mail e senha.')
+    if (!loginEmail || !loginPassword) {
+      setLoginError('Preencha e-mail e senha.')
       return
     }
 
-    setOwnerLoading(true)
-    setOwnerError('')
-    setBarberError('')
+    setLoginLoading(true)
+    setLoginError('')
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: ownerEmail.trim().toLowerCase(),
-      password: ownerPassword,
+      email: loginEmail.trim().toLowerCase(),
+      password: loginPassword,
     })
 
     if (error || !data.user) {
-      setOwnerError('E-mail ou senha incorretos.')
-      setOwnerLoading(false)
+      setLoginError('E-mail ou senha incorretos.')
+      setLoginLoading(false)
       return
     }
 
@@ -248,9 +192,41 @@ export default function AppStartPage() {
       .in('role', ['admin', 'owner'])
 
     if (membershipError || !memberships?.length) {
-      await supabase.auth.signOut()
-      setOwnerError('Esta conta nao possui acesso de dono.')
-      setOwnerLoading(false)
+      const { data: barber, error: barberLookupError } = await supabase
+        .from('barbeiros')
+        .select('id, ativo, tenant_id')
+        .eq('user_id', data.user.id)
+        .maybeSingle()
+
+      if (barberLookupError || !barber) {
+        await supabase.auth.signOut()
+        setLoginError('Esta conta nao possui acesso interno ao sistema.')
+        setLoginLoading(false)
+        return
+      }
+
+      if (!barber.ativo) {
+        await supabase.auth.signOut()
+        setLoginError('Seu acesso de barbeiro esta desativado.')
+        setLoginLoading(false)
+        return
+      }
+
+      const { data: barberTenant } = await supabase
+        .from('tenants')
+        .select('status, subscription_status, trial_end, trial_ends_at')
+        .eq('id', barber.tenant_id)
+        .maybeSingle()
+
+      if (!getTenantAccess(barberTenant).allowed) {
+        await supabase.auth.signOut()
+        setLoginError('A assinatura desta barbearia esta bloqueada ou vencida.')
+        setLoginLoading(false)
+        return
+      }
+
+      localStorage.setItem(LAST_ACCESS_KEY, 'barber')
+      router.push('/barber/dashboard')
       return
     }
 
@@ -264,8 +240,8 @@ export default function AppStartPage() {
 
     if (!tenant?.slug) {
       await supabase.auth.signOut()
-      setOwnerError('Nao encontrei a barbearia desta conta.')
-      setOwnerLoading(false)
+      setLoginError('Nao encontrei a barbearia desta conta.')
+      setLoginLoading(false)
       return
     }
 
@@ -281,84 +257,6 @@ export default function AppStartPage() {
 
     localStorage.setItem(LAST_ACCESS_KEY, 'owner')
     router.push(`/${tenant.slug}/admin`)
-  }
-
-  async function signInBarber(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!barberEmail || !barberPassword) {
-      setBarberError('Preencha e-mail e senha.')
-      return
-    }
-
-    setBarberLoading(true)
-    setBarberError('')
-    setOwnerError('')
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: barberEmail.trim().toLowerCase(),
-      password: barberPassword,
-    })
-
-    if (error || !data.user) {
-      setBarberError('E-mail ou senha incorretos.')
-      setBarberLoading(false)
-      return
-    }
-
-    let { data: barber, error: barberLookupError } = await supabase
-      .from('barbeiros')
-      .select('id, ativo, tenant_id')
-      .eq('user_id', data.user.id)
-      .maybeSingle()
-
-    if (!barber && data.user.email) {
-      const fallback = await supabase
-        .from('barbeiros')
-        .select('id, ativo, tenant_id')
-        .eq('email', data.user.email)
-        .maybeSingle()
-
-      barber = fallback.data
-      barberLookupError = fallback.error
-
-      if (barber) {
-        await supabase
-          .from('barbeiros')
-          .update({ user_id: data.user.id })
-          .eq('id', barber.id)
-          .eq('tenant_id', barber.tenant_id)
-      }
-    }
-
-    if (barberLookupError || !barber) {
-      await supabase.auth.signOut()
-      setBarberError('Esta conta nao possui acesso de barbeiro.')
-      setBarberLoading(false)
-      return
-    }
-
-    if (!barber.ativo) {
-      await supabase.auth.signOut()
-      setBarberError('Seu acesso de barbeiro esta desativado.')
-      setBarberLoading(false)
-      return
-    }
-
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('status, subscription_status, trial_end, trial_ends_at')
-      .eq('id', barber.tenant_id)
-      .maybeSingle()
-
-    if (!getTenantAccess(tenant).allowed) {
-      await supabase.auth.signOut()
-      setBarberError('A assinatura desta barbearia esta bloqueada ou vencida.')
-      setBarberLoading(false)
-      return
-    }
-
-    localStorage.setItem(LAST_ACCESS_KEY, 'barber')
-    router.push('/barber/dashboard')
   }
 
   return (
@@ -429,55 +327,17 @@ export default function AppStartPage() {
         <div className="access-stack">
           <article className="access-card">
             <div className="access-head">
-              <div className="access-icon"><UserRound size={30} /></div>
+              <div className="access-icon"><Lock size={30} /></div>
               <div>
-                <h2>Sou cliente</h2>
-                <p>Acesse a pagina publica da barbearia</p>
+                <h2>Entrar no sistema</h2>
+                <p>Acesso unico para dono, administrador ou barbeiro.</p>
               </div>
             </div>
-            <div className="client-row">
-              <input
-                value={barbershop}
-                onChange={(event) => setBarbershop(event.target.value)}
-                onBlur={() => setBarbershop((value) => cleanSlug(value))}
-                onKeyDown={(event) => { if (event.key === 'Enter') goToShop() }}
-                placeholder="Link da barbearia"
-                autoCapitalize="none"
-                autoCorrect="off"
-              />
-              <button onClick={goToShop}>Abrir agenda</button>
-            </div>
-          </article>
-
-          <article className="access-card">
-            <div className="access-head">
-              <div className="access-icon"><Scissors size={30} /></div>
-              <div>
-                <h2>Sou barbeiro</h2>
-                <p>Entre no painel para ver seus horarios, clientes e comissoes.</p>
-              </div>
-            </div>
-            <form className="login-form" onSubmit={signInBarber}>
-              <Field icon={<Mail size={16} />} placeholder="E-mail ou telefone" type="email" value={barberEmail} onChange={setBarberEmail} />
-              <PasswordField value={barberPassword} onChange={setBarberPassword} show={showBarberPassword} onToggle={() => setShowBarberPassword((value) => !value)} />
-              {barberError && <div className="error-box">{barberError}</div>}
-              <button type="submit" disabled={barberLoading}>{barberLoading ? 'Entrando...' : 'Entrar como barbeiro'}</button>
-            </form>
-          </article>
-
-          <article className="access-card">
-            <div className="access-head">
-              <div className="access-icon"><Crown size={30} /></div>
-              <div>
-                <h2>Sou dono</h2>
-                <p>Acesse o painel administrativo e gerencie sua barbearia.</p>
-              </div>
-            </div>
-            <form className="login-form" onSubmit={signInOwner}>
-              <Field icon={<Mail size={16} />} placeholder="E-mail ou telefone" type="email" value={ownerEmail} onChange={setOwnerEmail} />
-              <PasswordField value={ownerPassword} onChange={setOwnerPassword} show={showOwnerPassword} onToggle={() => setShowOwnerPassword((value) => !value)} />
-              {ownerError && <div className="error-box">{ownerError}</div>}
-              <button type="submit" disabled={ownerLoading}>{ownerLoading ? 'Entrando...' : 'Entrar como dono'}</button>
+            <form className="login-form" onSubmit={signInInternal}>
+              <Field icon={<Mail size={16} />} placeholder="E-mail" type="email" value={loginEmail} onChange={setLoginEmail} />
+              <PasswordField value={loginPassword} onChange={setLoginPassword} show={showLoginPassword} onToggle={() => setShowLoginPassword((value) => !value)} />
+              {loginError && <div className="error-box">{loginError}</div>}
+              <button type="submit" disabled={loginLoading}>{loginLoading ? 'Entrando...' : 'Entrar'}</button>
             </form>
           </article>
         </div>
@@ -504,8 +364,7 @@ export default function AppStartPage() {
       <footer className="app-footer">
         <span>© 2026 KorteBarber. Todos os direitos reservados.</span>
         <nav>
-          <a href="/termos">Termos de uso</a>
-          <a href="/privacidade">Politica de privacidade</a>
+          <a href="/contratos">Contratos</a>
         </nav>
       </footer>
 

@@ -2769,8 +2769,7 @@ export default function Home() {
         <div className="footer-logo">Korte<span>Barber</span></div>
         <p>© 2026 KorteBarber. Todos os direitos reservados.</p>
         <div className="footer-links">
-          <Link href="/termos">Termos</Link>
-          <Link href="/privacidade">Privacidade</Link>
+          <Link href="/contratos">Contratos</Link>
           <Link href="/suporte">Suporte</Link>
         </div>
       </footer>
