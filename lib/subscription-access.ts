@@ -4,6 +4,7 @@ export interface TenantAccessInput {
   trial_start?: string | null
   trial_end?: string | null
   paid_until?: string | null
+  billing_cycle?: string | null
   subscription_status?: string | null
 }
 

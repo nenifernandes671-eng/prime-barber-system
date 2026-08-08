@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { normalizeBillingCycle } from '@/lib/saas-billing'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,6 +54,7 @@ async function ensureOwnerUser(input: {
   password: string
   nome: string
   slug: string
+  marketingOptIn?: boolean
 }) {
   const existingUser = await findAuthUserByEmail(input.email)
 
@@ -69,6 +71,7 @@ async function ensureOwnerUser(input: {
       slug: input.slug,
       role: 'admin',
       password_set: true,
+      marketing_opt_in: Boolean(input.marketingOptIn),
     },
   })
 
@@ -83,6 +86,7 @@ export async function POST(req: NextRequest) {
   try {
     const {
       plano,
+      billingCycle,
       nome,
       email,
       cpfCnpj,
@@ -94,27 +98,34 @@ export async function POST(req: NextRequest) {
       slug,
       password,
       confirmPassword,
+      nomeBarbearia,
+      acceptedTerms,
+      marketingOptIn,
     } = await req.json()
-    const normalizedSlug = normalizeSlug(String(slug ?? ''))
+    const barbershopNameClean = String(nomeBarbearia ?? '').trim()
+    const isQuickRegistration = Boolean(barbershopNameClean)
+    const baseSlug = normalizeSlug(String(slug ?? barbershopNameClean))
+    let normalizedSlug = baseSlug
     const document = onlyDigits(String(cpfCnpj ?? ''))
     const phone = onlyDigits(String(telefone ?? ''))
     const postalCode = onlyDigits(String(cep ?? ''))
     const planKey = String(plano ?? '').toLowerCase()
+    const cycle = normalizeBillingCycle(billingCycle)
     const emailClean = String(email ?? '').trim().toLowerCase()
     const nameClean = String(nome ?? '').trim()
     const passwordValue = String(password ?? '')
     const confirmPasswordValue = String(confirmPassword ?? '')
 
+    if (isQuickRegistration && !acceptedTerms) {
+      return NextResponse.json({ error: 'Aceite os Termos de Uso e a Politica de Privacidade.' }, { status: 400 })
+    }
+
     if (
       !planKey ||
       !nameClean ||
       !emailClean ||
-      !document ||
       !phone ||
-      !postalCode ||
-      !endereco ||
-      !numero ||
-      !bairro ||
+      (isQuickRegistration && !barbershopNameClean) ||
       !normalizedSlug ||
       !passwordValue ||
       !confirmPasswordValue
@@ -130,7 +141,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Informe um telefone valido com DDD.' }, { status: 400 })
     }
 
-    if (postalCode.length !== 8) {
+    if (!isQuickRegistration && postalCode.length !== 8) {
       return NextResponse.json({ error: 'Informe um CEP valido.' }, { status: 400 })
     }
 
@@ -163,26 +174,31 @@ export async function POST(req: NextRequest) {
       .eq('slug', normalizedSlug)
       .maybeSingle()
 
-    if (existingTenant) {
+    if (existingTenant && !isQuickRegistration) {
       return NextResponse.json({ error: 'Este link de barbearia ja esta em uso.' }, { status: 409 })
     }
 
+    if (existingTenant) {
+      normalizedSlug = `${baseSlug}-${Date.now().toString().slice(-6)}`
+    }
+
     const trialStart = new Date()
-    const trialEnd = addDays(trialStart, 7)
+    const trialEnd = addDays(trialStart, 30)
 
     const tenantPayload: Record<string, any> = {
-  nome: nameClean,
+  nome: barbershopNameClean || nameClean,
   email: emailClean,
   slug: normalizedSlug,
-  plano: planKey,
+      plano: planKey,
+      billing_cycle: cycle,
   status: 'trial',
   subscription_status: 'trial',
   trial_start: trialStart.toISOString(),
   trial_end: trialEnd.toISOString(),
   trial_ends_at: trialEnd.toISOString(),
-  cpf_cnpj: document,
 }
 
+    if (document) tenantPayload.cpf_cnpj = document
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .insert(tenantPayload)
@@ -201,6 +217,7 @@ export async function POST(req: NextRequest) {
       password: passwordValue,
       nome: nameClean,
       slug: normalizedSlug,
+      marketingOptIn: Boolean(marketingOptIn),
     })
 
     const { data: existingMembership } = await supabaseAdmin

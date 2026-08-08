@@ -1,6 +1,7 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const PLANS = [
@@ -15,12 +16,12 @@ const PLANS = [
       { text: 'Agendamentos online', active: true },
       { text: '1 barbeiro', active: true },
       { text: 'Controle financeiro', active: true },
-      { text: 'Dashboard basico', active: true },
+      { text: 'Dashboard básico', active: true },
       { text: 'Suporte por email', active: true },
       { text: 'Lembrete via WhatsApp', active: false },
-      { text: 'Comissoes automaticas', active: false },
+      { text: 'Comissões automáticas', active: false },
       { text: 'Assinaturas de clientes', active: false },
-      { text: 'Relatorios avancados', active: false },
+      { text: 'Relatórios avançados', active: false },
     ],
   },
   {
@@ -35,17 +36,17 @@ const PLANS = [
       { text: 'Barbeiros ilimitados', active: true },
       { text: 'Controle financeiro', active: true },
       { text: 'Dashboard completo', active: true },
-      { text: 'Comissoes automaticas', active: true },
+      { text: 'Comissões automáticas', active: true },
       { text: 'Lembrete via WhatsApp', active: true },
       { text: 'Assinaturas de clientes', active: true },
-      { text: 'Relatorios avancados', active: true },
-      { text: 'Suporte prioritario', active: true },
+      { text: 'Relatórios avançados', active: true },
+      { text: 'Suporte prioritário', active: true },
     ],
   },
   {
     key: 'premium',
     name: 'Premium',
-    price: 189,
+    price: 99,
     featured: false,
     badge: '',
     description: 'Para redes e barbearias multiunidade',
@@ -54,10 +55,10 @@ const PLANS = [
       { text: 'Barbeiros ilimitados', active: true },
       { text: 'Controle financeiro', active: true },
       { text: 'Dashboard completo', active: true },
-      { text: 'Comissoes automaticas', active: true },
+      { text: 'Comissões automáticas', active: true },
       { text: 'Lembrete via WhatsApp', active: true },
       { text: 'Assinaturas de clientes', active: true },
-      { text: 'Relatorios avancados', active: true },
+      { text: 'Relatórios avançados', active: true },
       { text: 'Dashboard executivo', active: true },
       { text: 'Multiunidade', active: true },
       { text: 'Clientes inativos', active: true },
@@ -66,7 +67,16 @@ const PLANS = [
   },
 ]
 
+type BillingPeriod = 'monthly' | 'quarterly' | 'yearly'
+
+const BILLING_OPTIONS = [
+  { key: 'monthly' as const, label: 'Mensal', multiplier: 1, periodLabel: 'por mês' },
+  { key: 'quarterly' as const, label: 'Trimestral', multiplier: 3, periodLabel: 'a cada 3 meses' },
+  { key: 'yearly' as const, label: 'Anual', multiplier: 12, periodLabel: 'por ano' },
+]
+
 export default function PricingPage() {
+  const router = useRouter()
   const [modal, setModal] = useState(false)
   const [existingTenantSlug, setExistingTenantSlug] = useState('')
   const [form, setForm] = useState({
@@ -85,6 +95,8 @@ export default function PricingPage() {
   })
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
+  const selectedBilling = BILLING_OPTIONS.find((option) => option.key === billingPeriod)!
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -102,9 +114,7 @@ export default function PricingPage() {
       return
     }
 
-    setForm((current) => ({ ...current, plano: planKey }))
-    setModal(true)
-    setFormError('')
+    router.push(`/cadastro?plano=${planKey}&ciclo=${billingPeriod}`)
   }
 
   async function handleExistingTenantCheckout(planKey: string) {
@@ -127,17 +137,17 @@ export default function PricingPage() {
           Authorization: `Bearer ${token}`,
         },
         cache: 'no-store',
-        body: JSON.stringify({ slug: existingTenantSlug, plan: planKey }),
+          body: JSON.stringify({ slug: existingTenantSlug, plan: planKey, billingPeriod }),
       })
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok || !data.url) {
-        throw new Error(data.error || 'Nao foi possivel iniciar o pagamento.')
+        throw new Error(data.error || 'Não foi possível iniciar o pagamento.')
       }
 
       window.location.href = data.url
     } catch (error: any) {
-      setFormError(error?.message || 'Erro de conexao. Tente novamente.')
+      setFormError(error?.message || 'Erro de conexão. Tente novamente.')
       setSubmitting(false)
     }
   }
@@ -165,17 +175,17 @@ export default function PricingPage() {
     const cepDigits = form.cep.replace(/\D/g, '')
 
     if (![11, 14].includes(documentDigits.length)) {
-      setFormError('Informe um CPF ou CNPJ valido.')
+      setFormError('Informe um CPF ou CNPJ válido.')
       return
     }
 
     if (![10, 11].includes(telefoneDigits.length)) {
-      setFormError('Informe um telefone valido com DDD.')
+      setFormError('Informe um telefone válido com DDD.')
       return
     }
 
     if (cepDigits.length !== 8) {
-      setFormError('Informe um CEP valido.')
+      setFormError('Informe um CEP válido.')
       return
     }
 
@@ -185,7 +195,7 @@ export default function PricingPage() {
     }
 
     if (form.password !== form.confirmPassword) {
-      setFormError('As senhas nao conferem.')
+      setFormError('As senhas não conferem.')
       return
     }
 
@@ -196,7 +206,7 @@ export default function PricingPage() {
       .replace(/^-|-$/g, '')
 
     if (!slugClean) {
-      setFormError('Digite um link valido para sua barbearia.')
+      setFormError('Digite um link válido para sua barbearia.')
       return
     }
 
@@ -207,12 +217,12 @@ export default function PricingPage() {
       const res = await fetch('/api/asaas/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, slug: slugClean }),
+        body: JSON.stringify({ ...form, slug: slugClean, billingPeriod }),
       })
       const data = await res.json()
 
       if (!res.ok || !data.created) {
-        throw new Error(data.error || 'Nao foi possivel criar sua conta.')
+        throw new Error(data.error || 'Não foi possível criar sua conta.')
       }
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -227,7 +237,7 @@ export default function PricingPage() {
 
       window.location.href = `/${data.slug || slugClean}/admin`
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Erro de conexao. Tente novamente.')
+      setFormError(error instanceof Error ? error.message : 'Erro de conexão. Tente novamente.')
       setSubmitting(false)
     }
   }
@@ -245,7 +255,7 @@ export default function PricingPage() {
           <a href="/#depoimentos">Depoimentos</a>
         </div>
         <button className="nav-cta" onClick={() => openModal('pro')} disabled={submitting}>
-          {existingTenantSlug ? 'Assinar Pro' : 'Comecar gratis'}
+          {existingTenantSlug ? 'Assinar Pro' : 'Começar grátis'}
         </button>
       </nav>
 
@@ -254,13 +264,25 @@ export default function PricingPage() {
         <h1>Escolha o seu plano</h1>
         <p>
           {existingTenantSlug
-            ? 'Escolha o plano da sua barbearia. Sua conta e seus dados serao mantidos.'
-            : '7 dias de teste gratis em qualquer plano. Cancele quando quiser.'}
+            ? 'Escolha o plano da sua barbearia. Sua conta e seus dados serão mantidos.'
+            : '30 dias de teste grátis em qualquer plano. Cancele quando quiser.'}
         </p>
         {formError && existingTenantSlug && <div className="existing-checkout-error">{formError}</div>}
       </section>
 
       <section className="plans-wrap">
+        <div className="billing-switch" role="group" aria-label="Período de cobrança">
+          {BILLING_OPTIONS.map((option) => (
+            <button
+              type="button"
+              key={option.key}
+              className={billingPeriod === option.key ? 'active' : ''}
+              onClick={() => setBillingPeriod(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <div className="plans-grid">
           {PLANS.map((plan) => (
             <article key={plan.key} className={`plan-card ${plan.featured ? 'featured' : ''}`}>
@@ -269,9 +291,12 @@ export default function PricingPage() {
               <p className="plan-desc">{plan.description}</p>
               <div className="plan-price">
                 <span>R$</span>
-                {plan.price}
+                {(plan.price * selectedBilling.multiplier).toLocaleString('pt-BR')}
               </div>
-              <p className="plan-period">por mes</p>
+              <p className="plan-period">{selectedBilling.periodLabel}</p>
+              <p className={`plan-equivalent ${billingPeriod === 'monthly' ? 'hidden' : ''}`}>
+                equivale a R$ {plan.price}/mês
+              </p>
 
               <ul className="plan-features">
                 {plan.features.map((feature) => (
@@ -282,7 +307,7 @@ export default function PricingPage() {
               </ul>
 
               <button className="plan-button" onClick={() => openModal(plan.key)} disabled={submitting}>
-                {submitting && existingTenantSlug ? 'Abrindo checkout...' : existingTenantSlug ? 'Escolher plano' : 'Comecar gratis'}
+                {submitting && existingTenantSlug ? 'Abrindo checkout...' : existingTenantSlug ? 'Escolher plano' : 'Começar grátis'}
               </button>
             </article>
           ))}
@@ -304,7 +329,7 @@ export default function PricingPage() {
             <button className="modal-close" onClick={() => setModal(false)}>x</button>
             <p className="modal-kicker">Comece seu teste</p>
             <h2>Criar sua barbearia</h2>
-            <p className="modal-copy">Informe os dados para liberar seus 7 dias gratis. Nenhuma cobranca sera criada agora.</p>
+            <p className="modal-copy">Informe os dados para liberar seus 30 dias grátis. Nenhuma cobrança será criada agora.</p>
 
             <label>
               Nome da barbearia
@@ -341,7 +366,7 @@ export default function PricingPage() {
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="Minimo 8 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                 />
               </label>
 
@@ -375,7 +400,7 @@ export default function PricingPage() {
             </label>
 
             <label>
-              Endereco
+              Endereço
               <input
                 value={form.endereco}
                 onChange={(e) => setForm({ ...form, endereco: e.target.value })}
@@ -385,7 +410,7 @@ export default function PricingPage() {
 
             <div className="address-grid">
               <label>
-                Numero
+                Número
                 <input
                   value={form.numero}
                   onChange={(e) => setForm({ ...form, numero: e.target.value })}
@@ -404,7 +429,7 @@ export default function PricingPage() {
             </div>
 
             <label>
-              Link publico
+              Link público
               <div className="slug-row">
                 <span>kortebarber.com.br/</span>
                 <input
@@ -418,7 +443,7 @@ export default function PricingPage() {
             {formError && <div className="form-error">{formError}</div>}
 
             <button className="checkout-button" onClick={handleCheckout} disabled={submitting}>
-              {submitting ? 'Criando conta...' : 'Iniciar teste gratis'}
+              {submitting ? 'Criando conta...' : 'Iniciar teste grátis'}
             </button>
           </div>
         </div>
@@ -428,8 +453,9 @@ export default function PricingPage() {
         .pricing-page {
           min-height: 100vh;
           background:
-            radial-gradient(ellipse 60% 45% at 50% 18%, rgba(201,168,76,0.1), transparent 70%),
-            linear-gradient(180deg, #0a0a0a 0%, #111 48%, #070707 100%);
+            radial-gradient(ellipse 60% 45% at 50% 18%, rgba(18,104,255,0.22), transparent 70%),
+            radial-gradient(ellipse 42% 34% at 12% 72%, rgba(88,166,255,0.08), transparent 62%),
+            linear-gradient(180deg, #060914 0%, #0b0f19 48%, #05070d 100%);
           color: #f5f0e8;
           font-family: 'DM Sans', 'Segoe UI', sans-serif;
           overflow-x: hidden;
@@ -441,8 +467,8 @@ export default function PricingPage() {
           inset: 0;
           pointer-events: none;
           background-image:
-            linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+            linear-gradient(to right, rgba(88,166,255,0.035) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(88,166,255,0.03) 1px, transparent 1px);
           background-size: 80px 80px;
           mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.25));
         }
@@ -457,7 +483,7 @@ export default function PricingPage() {
           justify-content: space-between;
           padding: 0 60px;
           border-bottom: 1px solid rgba(255,255,255,0.08);
-          background: rgba(10,10,10,0.88);
+          background: rgba(5,7,13,0.88);
           backdrop-filter: blur(18px);
         }
 
@@ -471,7 +497,7 @@ export default function PricingPage() {
         }
 
         .brand span {
-          color: #c9a84c;
+          color: #1268ff;
         }
 
         .brand.small {
@@ -500,8 +526,8 @@ export default function PricingPage() {
         .plan-button,
         .checkout-button {
           border: 0;
-          background: #c9a84c;
-          color: #0a0a0a;
+          background: #1268ff;
+          color: #fff;
           cursor: pointer;
           font-weight: 900;
           text-transform: uppercase;
@@ -509,6 +535,10 @@ export default function PricingPage() {
         }
 
         .nav-cta {
+          border: 1px solid rgba(88,166,255,0.45);
+          border-radius: 999px;
+          background: linear-gradient(135deg, #1268ff, #0047d6);
+          box-shadow: 0 12px 34px rgba(18,104,255,0.28);
           padding: 15px 28px;
           font-size: 12px;
         }
@@ -521,7 +551,7 @@ export default function PricingPage() {
         }
 
         .section-label {
-          color: #c9a84c;
+          color: #1268ff;
           text-transform: uppercase;
           letter-spacing: 5px;
           font-size: 12px;
@@ -571,21 +601,55 @@ export default function PricingPage() {
           gap: 0;
         }
 
+        .billing-switch {
+          display: flex;
+          width: max-content;
+          max-width: 100%;
+          margin: 0 auto 28px;
+          padding: 4px;
+          border: 1px solid rgba(55, 148, 255, 0.32);
+          border-radius: 8px;
+          background: rgba(8, 17, 32, 0.88);
+        }
+
+        .billing-switch button {
+          min-width: 112px;
+          padding: 11px 18px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: #8b96a8;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .billing-switch button.active {
+          background: #1677ff;
+          color: #fff;
+          box-shadow: 0 6px 22px rgba(22, 119, 255, 0.28);
+        }
+
         .plan-card {
           position: relative;
           min-height: 568px;
           padding: 52px 36px 46px;
-          border: 1px solid rgba(255,255,255,0.09);
-          background: linear-gradient(145deg, rgba(24,24,24,0.92), rgba(10,10,10,0.88));
+          border: 1px solid rgba(88,166,255,0.12);
+          border-radius: 24px;
+          background: linear-gradient(180deg, rgba(18,24,38,0.92), rgba(9,13,22,0.94));
           display: flex;
           flex-direction: column;
+          box-shadow: 0 22px 70px rgba(0,0,0,0.22);
         }
 
         .plan-card.featured {
-          border-color: #c9a84c;
+          border-color: rgba(88,166,255,0.72);
           background:
-            radial-gradient(circle at 50% 15%, rgba(201,168,76,0.14), transparent 48%),
-            linear-gradient(145deg, rgba(24,21,9,0.96), rgba(10,10,10,0.92));
+            radial-gradient(circle at 50% 8%, rgba(18,104,255,0.32), transparent 48%),
+            linear-gradient(180deg, rgba(18,32,58,0.98), rgba(9,13,22,0.98));
+          box-shadow: 0 32px 100px rgba(18,104,255,0.16);
           transform: translateY(-12px);
           z-index: 2;
         }
@@ -595,8 +659,9 @@ export default function PricingPage() {
           top: -1px;
           left: 50%;
           transform: translateX(-50%);
-          background: #c9a84c;
-          color: #0a0a0a;
+          border-radius: 0 0 12px 12px;
+          background: linear-gradient(135deg, #1268ff, #58a6ff);
+          color: #fff;
           padding: 7px 28px;
           font-size: 10px;
           font-weight: 900;
@@ -605,7 +670,7 @@ export default function PricingPage() {
 
         .plan-name {
           margin: 0 0 10px;
-          color: #c9a84c;
+          color: #1268ff;
           font-size: 14px;
           letter-spacing: 6px;
           text-transform: uppercase;
@@ -634,9 +699,20 @@ export default function PricingPage() {
         }
 
         .plan-period {
-          margin: 4px 0 34px;
+          margin: 4px 0;
           color: #888;
           font-size: 13px;
+        }
+
+        .plan-equivalent {
+          min-height: 18px;
+          margin: 0 0 24px;
+          color: #62738a;
+          font-size: 12px;
+        }
+
+        .plan-equivalent.hidden {
+          visibility: hidden;
         }
 
         .plan-features {
@@ -675,30 +751,32 @@ export default function PricingPage() {
         }
 
         .plan-features li.active::before {
-          color: #c9a84c;
-          border-color: #c9a84c;
-          background: rgba(201,168,76,0.12);
+          color: #1268ff;
+          border-color: #1268ff;
+          background: rgba(18,104,255,0.16);
         }
 
         .plan-button {
           width: 100%;
           padding: 17px;
           background: transparent;
-          border: 1px solid rgba(201,168,76,0.28);
-          color: #c9a84c;
+          border: 1px solid rgba(88,166,255,0.30);
+          border-radius: 14px;
+          color: #1268ff;
         }
 
         .featured .plan-button {
-          background: #c9a84c;
-          color: #0a0a0a;
-          border-color: #c9a84c;
+          background: linear-gradient(135deg, #1268ff, #0047d6);
+          color: #fff;
+          border-color: #1268ff;
+          box-shadow: 0 16px 44px rgba(18,104,255,0.28);
         }
 
         .plan-button:hover,
         .nav-cta:hover,
         .checkout-button:hover {
-          background: #e8c96b;
-          color: #0a0a0a;
+          background: #58a6ff;
+          color: #fff;
         }
 
         .pricing-footer {
@@ -729,7 +807,7 @@ export default function PricingPage() {
         }
 
         .legal-links a:hover {
-          color: #c9a84c;
+          color: #1268ff;
         }
 
         .modal-overlay {
@@ -748,8 +826,9 @@ export default function PricingPage() {
           width: min(460px, 100%);
           max-height: calc(100vh - 32px);
           overflow-y: auto;
-          background: #151515;
-          border: 1px solid rgba(201,168,76,0.22);
+          background: #0f1724;
+          border: 1px solid rgba(88,166,255,0.22);
+          border-radius: 24px;
           padding: 34px;
           box-shadow: 0 40px 100px rgba(0,0,0,0.55);
         }
@@ -768,7 +847,7 @@ export default function PricingPage() {
 
         .modal-kicker {
           margin: 0 0 8px;
-          color: #c9a84c;
+          color: #1268ff;
           text-transform: uppercase;
           letter-spacing: 4px;
           font-size: 11px;
@@ -804,8 +883,8 @@ export default function PricingPage() {
         }
 
         .payment-mode button.active {
-          border-color: #c9a84c;
-          background: rgba(201,168,76,0.12);
+          border-color: #1268ff;
+          background: rgba(18,104,255,0.16);
           color: #f5f0e8;
         }
 
@@ -883,6 +962,9 @@ export default function PricingPage() {
         .checkout-button {
           width: 100%;
           padding: 16px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, #1268ff, #0047d6);
+          box-shadow: 0 16px 44px rgba(18,104,255,0.22);
         }
 
         .checkout-button:disabled {

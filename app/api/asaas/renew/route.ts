@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaasAsaasConfig } from '@/lib/server/saas-asaas'
+import { BILLING_CYCLES, normalizeBillingCycle, planPrices, type BillingCycle } from '@/lib/saas-billing'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,14 +16,6 @@ const noStoreHeaders = {
 }
 
 export const dynamic = 'force-dynamic'
-
-function planPrices() {
-  return {
-    basic: Number(process.env.ASAAS_PLAN_BASIC || 39),
-    pro: Number(process.env.ASAAS_PLAN_PRO || 69),
-    premium: Number(process.env.ASAAS_PLAN_PREMIUM || 189),
-  }
-}
 
 function appBaseUrl(req: NextRequest) {
   const configured = process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL
@@ -167,6 +160,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const slug = String(body.slug || '').trim().toLowerCase()
     const requestedPlan = String(body.plan || '').trim().toLowerCase()
+    const requestedBillingPeriod = normalizeBillingCycle(body.billingPeriod)
 
     if (!slug) {
       return NextResponse.json(
@@ -177,7 +171,7 @@ export async function POST(req: NextRequest) {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .select('id,slug,nome,email,telefone,cpf_cnpj,plano,subscription_status,asaas_customer_id,asaas_subscription_id')
+      .select('id,slug,nome,email,telefone,cpf_cnpj,plano,billing_cycle,subscription_status,asaas_customer_id,asaas_subscription_id')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -203,7 +197,9 @@ export async function POST(req: NextRequest) {
     }
 
     const plan = (requestedPlan || String(tenant.plano || '').toLowerCase()) as keyof ReturnType<typeof planPrices>
-    const value = planPrices()[plan]
+    const billingPeriod: BillingCycle = requestedBillingPeriod
+    const billing = BILLING_CYCLES[billingPeriod]
+    const value = Number((planPrices()[plan] * billing.multiplier).toFixed(2))
 
     if (!value || !['basic', 'pro', 'premium'].includes(plan)) {
       return NextResponse.json(
@@ -248,10 +244,10 @@ export async function POST(req: NextRequest) {
         customer: customerId,
         billingType: 'UNDEFINED',
         value,
-        cycle: 'MONTHLY',
+        cycle: billing.asaasCycle,
         nextDueDate: new Date().toISOString().slice(0, 10),
-        description: `Renovacao mensal do plano KorteBarber ${plan.toUpperCase()}`,
-        externalReference: `saas-plan:${tenant.slug}:${plan}`,
+        description: `Renovacao ${billingPeriod} do plano KorteBarber ${plan.toUpperCase()}`,
+        externalReference: `saas-plan:${tenant.slug}:${plan}:${billingPeriod}`,
         callback: {
           successUrl: `${appUrl}/register/success?slug=${encodeURIComponent(tenant.slug)}`,
           autoRedirect: true,
@@ -273,6 +269,8 @@ export async function POST(req: NextRequest) {
       .update({
         asaas_customer_id: customerId,
         asaas_subscription_id: subscriptionId,
+        billing_cycle: billingPeriod,
+        plano: plan,
       })
       .eq('id', tenant.id)
 

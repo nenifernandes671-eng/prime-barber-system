@@ -1,5 +1,8 @@
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { enqueueTenantPush } from '@/lib/server/push'
+import { normalizeBillingCycle, subscriptionEndDate } from '@/lib/saas-billing'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,7 +14,7 @@ function unauthorized() {
 }
 
 function saasSubscriptionStatusFromEvent(event: string) {
-  if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event)) {
+  if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RESTORED'].includes(event)) {
     return 'active'
   }
 
@@ -19,7 +22,7 @@ function saasSubscriptionStatusFromEvent(event: string) {
     return 'overdue'
   }
 
-  if (event === 'PAYMENT_CREATED') {
+  if (['PAYMENT_CREATED', 'SUBSCRIPTION_CREATED', 'SUBSCRIPTION_UPDATED'].includes(event)) {
     return 'pending'
   }
 
@@ -40,7 +43,7 @@ function saasSubscriptionStatusFromEvent(event: string) {
   return null
 }
 
-function nextAccessDate(payment: any) {
+function nextAccessDate(payment: any, billingCycle: unknown) {
   const baseDate =
     payment?.paymentDate ||
     payment?.clientPaymentDate ||
@@ -48,8 +51,7 @@ function nextAccessDate(payment: any) {
     payment?.dueDate
 
   const date = baseDate ? new Date(`${baseDate}T00:00:00`) : new Date()
-  date.setMonth(date.getMonth() + 1)
-  return date.toISOString()
+  return subscriptionEndDate(date, normalizeBillingCycle(billingCycle)).toISOString()
 }
 
 function dateOnly(value?: string | null) {
@@ -74,11 +76,15 @@ function isMembershipReference(reference?: string | null) {
 
 function parseSaasPlanReference(reference?: string | null) {
   const match = String(reference ?? '').match(
-    /^saas-plan:([a-z0-9-]+):(basic|pro|premium)$/i,
+    /^saas-plan:([a-z0-9-]+):(basic|pro|premium)(?::(monthly|quarterly|yearly))?$/i,
   )
 
   return match
-    ? { slug: match[1].toLowerCase(), plan: match[2].toLowerCase() }
+    ? {
+        slug: match[1].toLowerCase(),
+        plan: match[2].toLowerCase(),
+        billingCycle: normalizeBillingCycle(match[3]),
+      }
     : null
 }
 
@@ -138,7 +144,7 @@ async function findSaasTenant(
   if (tenantSlug) {
     const { data, error } = await supabaseAdmin
       .from('tenants')
-      .select('id, asaas_customer_id, asaas_subscription_id')
+      .select('id, asaas_customer_id, asaas_subscription_id, billing_cycle, plano')
       .eq('slug', tenantSlug)
       .maybeSingle()
 
@@ -149,7 +155,7 @@ async function findSaasTenant(
   if (subscriptionId) {
     const { data, error } = await supabaseAdmin
       .from('tenants')
-      .select('id, asaas_customer_id, asaas_subscription_id')
+      .select('id, asaas_customer_id, asaas_subscription_id, billing_cycle, plano')
       .eq('asaas_subscription_id', subscriptionId)
       .maybeSingle()
 
@@ -160,6 +166,99 @@ async function findSaasTenant(
   return null
 }
 
+
+function clientPaymentIdFromReference(reference?: string | null) {
+  const match = String(reference ?? '').match(/^client-payment:([0-9a-f-]{36})$/i)
+  return match?.[1] ?? null
+}
+
+function clientPaymentStatusFromEvent(event: string) {
+  if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RESTORED'].includes(event)) {
+    return 'paid'
+  }
+  if (event === 'PAYMENT_OVERDUE') return 'overdue'
+  if (['PAYMENT_DELETED', 'PAYMENT_REFUNDED'].includes(event)) return 'cancelled'
+  if (event === 'PAYMENT_CREATED') return 'waiting_payment'
+  return event.replace(/^PAYMENT_/, '').toLowerCase()
+}
+
+async function processClientPaymentEvent({
+  event,
+  payment,
+  externalReference,
+}: {
+  event: string
+  payment: any
+  externalReference?: string | null
+}) {
+  const clientPaymentId = clientPaymentIdFromReference(externalReference)
+  if (!clientPaymentId) return false
+
+  const { data: clientPayment, error } = await supabaseAdmin
+    .from('client_payments')
+    .select('*')
+    .eq('id', clientPaymentId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!clientPayment) return false
+
+  const paid = ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RESTORED'].includes(event)
+  const status = clientPaymentStatusFromEvent(event)
+  const paidAt = paid ? new Date().toISOString() : null
+
+  await supabaseAdmin
+    .from('client_payments')
+    .update({
+      status,
+      provider: 'asaas',
+      provider_payment_id: payment?.id ? String(payment.id) : clientPayment.provider_payment_id,
+      paid_at: paidAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', clientPayment.id)
+
+  if (clientPayment.appointment_id) {
+    await supabaseAdmin
+      .from('appointments')
+      .update({
+        payment_status: paid ? 'paid' : status,
+        paid,
+        asaas_payment_id: payment?.id ? String(payment.id) : clientPayment.provider_payment_id,
+      })
+      .eq('id', clientPayment.appointment_id)
+      .eq('tenant_id', clientPayment.tenant_id)
+  }
+
+  if (clientPayment.membership_subscription_id) {
+    await supabaseAdmin
+      .from('membership_subscriptions')
+      .update({
+        status: paid ? 'active' : status,
+        ...(paid ? { paid_until: addDaysYmd(dateOnly(payment?.paymentDate) || new Date().toISOString().slice(0, 10), 30) } : {}),
+      })
+      .eq('id', clientPayment.membership_subscription_id)
+      .eq('tenant_id', clientPayment.tenant_id)
+  }
+
+  if (paid) {
+    enqueueTenantPush({
+      tenant_id: clientPayment.tenant_id,
+      roles: ['owner', 'admin'],
+      title: 'Pagamento recebido',
+      body: clientPayment.appointment_id
+        ? 'Um agendamento foi pago pelo app cliente.'
+        : 'Uma assinatura foi paga pelo app cliente.',
+      type: 'client_payment_approved',
+      data: {
+        entity_id: clientPayment.appointment_id || clientPayment.membership_subscription_id,
+        route: clientPayment.appointment_id ? '/agendamentos' : '/assinaturas',
+      },
+    }).catch((pushError) => console.error('Falha ao enfileirar push de pagamento do cliente:', pushError))
+  }
+
+  return true
+}
 async function processMembershipEvent({
   event,
   payment,
@@ -203,7 +302,7 @@ async function processMembershipEvent({
     paymentAlreadyPaid = existingPayment?.status === 'paid'
 
     const paymentStatus =
-      ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event)
+      ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RESTORED'].includes(event)
         ? 'paid'
         : event === 'PAYMENT_OVERDUE'
           ? 'overdue'
@@ -219,7 +318,7 @@ async function processMembershipEvent({
           amount,
           status: paymentStatus,
           due_date: dueDate,
-          paid_at: ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event)
+          paid_at: ['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RESTORED'].includes(event)
             ? new Date().toISOString()
             : null,
         },
@@ -229,7 +328,7 @@ async function processMembershipEvent({
     if (paymentError) throw paymentError
   }
 
-  if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'].includes(event)) {
+  if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RESTORED'].includes(event)) {
     if (paymentAlreadyPaid) {
       return true
     }
@@ -263,6 +362,15 @@ async function processMembershipEvent({
       .update({ status: 'ativo', vencimento: paidUntil, valor_pago: amount })
       .eq('id', membershipSubscription.customer_id)
       .eq('tenant_id', membershipSubscription.tenant_id)
+
+    enqueueTenantPush({
+      tenant_id: membershipSubscription.tenant_id,
+      roles: ['owner', 'admin'],
+      title: 'Pagamento aprovado',
+      body: 'Uma assinatura de cliente teve pagamento aprovado.',
+      type: 'membership_payment_approved',
+      data: { entity_id: membershipSubscription.id, route: '/assinatura/' + membershipSubscription.id },
+    }).catch((pushError) => console.error('Falha ao enfileirar push de pagamento aprovado:', pushError))
   } else if (event === 'PAYMENT_OVERDUE') {
     await supabaseAdmin
       .from('membership_subscriptions')
@@ -274,6 +382,15 @@ async function processMembershipEvent({
       .update({ status: 'vencido' })
       .eq('id', membershipSubscription.customer_id)
       .eq('tenant_id', membershipSubscription.tenant_id)
+
+    enqueueTenantPush({
+      tenant_id: membershipSubscription.tenant_id,
+      roles: ['owner', 'admin'],
+      title: 'Cobranca vencida',
+      body: 'Uma cobranca de assinatura venceu.',
+      type: 'membership_payment_overdue',
+      data: { entity_id: membershipSubscription.id, route: '/assinatura/' + membershipSubscription.id },
+    }).catch((pushError) => console.error('Falha ao enfileirar push de cobranca vencida:', pushError))
   } else if (['SUBSCRIPTION_DELETED', 'SUBSCRIPTION_INACTIVATED'].includes(event)) {
     await supabaseAdmin
       .from('membership_subscriptions')
@@ -285,6 +402,14 @@ async function processMembershipEvent({
       .update({ status: 'cancelado' })
       .eq('id', membershipSubscription.customer_id)
       .eq('tenant_id', membershipSubscription.tenant_id)
+  } else if (['SUBSCRIPTION_CREATED', 'SUBSCRIPTION_UPDATED'].includes(event)) {
+    await supabaseAdmin
+      .from('membership_subscriptions')
+      .update({
+        asaas_subscription_id: subscriptionId || membershipSubscription.asaas_subscription_id,
+        asaas_customer_id: customerId || membershipSubscription.asaas_customer_id,
+      })
+      .eq('id', membershipSubscription.id)
   }
 
   return true
@@ -306,6 +431,7 @@ async function processSaasBillingEvent({
   const subscriptionStatus = saasSubscriptionStatusFromEvent(event)
   if (!subscriptionStatus) return false
 
+  const planReference = parseSaasPlanReference(externalReference)
   const tenant = await findSaasTenant(subscriptionId, externalReference)
   if (!tenant) return false
 
@@ -321,9 +447,12 @@ async function processSaasBillingEvent({
 
   if (subscriptionStatus === 'active') {
     updatePayload.status = 'active'
-    updatePayload.trial_ends_at = nextAccessDate(payment)
+    updatePayload.paid_until = nextAccessDate(payment, tenant.billing_cycle)
     if (tenant.pendingPlan) {
       updatePayload.plano = tenant.pendingPlan
+    }
+    if (planReference?.billingCycle) {
+      updatePayload.billing_cycle = planReference.billingCycle
     }
   } else if (subscriptionStatus === 'overdue') {
     updatePayload.status = 'suspended'
@@ -373,6 +502,16 @@ export async function POST(req: NextRequest) {
       externalReference,
     })
 
+
+    const clientPaymentHandled = await processClientPaymentEvent({
+      event,
+      payment,
+      externalReference,
+    })
+
+    if (clientPaymentHandled) {
+      return NextResponse.json({ received: true, clientPayment: true })
+    }
     const membershipHandled = await processMembershipEvent({
       event,
       payment,
@@ -406,3 +545,4 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
