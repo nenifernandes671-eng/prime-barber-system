@@ -1,16 +1,19 @@
-'use client'
+﻿'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   CalendarDays,
   ChartColumn,
   Crown,
   DollarSign,
+  ShieldCheck,
+  Menu,
   Scissors,
   Trophy,
   TrendingUp,
   Users,
+  X,
 } from 'lucide-react'
 
 const features = [
@@ -139,6 +142,8 @@ const testimonials = [
 ]
 
 export default function Home() {
+  const [navOpen, setNavOpen] = useState(false)
+
   useEffect(() => {
     const reveals = document.querySelectorAll('.reveal')
     const observer = new IntersectionObserver(
@@ -165,9 +170,9 @@ export default function Home() {
           --dark: #111111;
           --card: #161616;
           --border: #222222;
-          --gold: #c9a84c;
-          --gold-light: #e8c96b;
-          --gold-dim: rgba(201, 168, 76, 0.15);
+          --gold: #1268ff;
+          --gold-light: #58a6ff;
+          --gold-dim: rgba(18, 104, 255, 0.16);
           --white: #f5f0e8;
           --muted: #888;
           min-height: 100vh;
@@ -210,14 +215,14 @@ export default function Home() {
 
         [data-theme='light'] .korte-page .hero-bg {
           background:
-            radial-gradient(ellipse 60% 60% at 70% 50%, rgba(201, 168, 76, 0.08) 0%, transparent 70%),
-            radial-gradient(ellipse 40% 40% at 10% 80%, rgba(192, 57, 43, 0.06) 0%, transparent 60%) !important;
+            radial-gradient(ellipse 60% 60% at 70% 50%, rgba(18, 104, 255, 0.08) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 40% at 10% 80%, rgba(14, 165, 233, 0.08) 0%, transparent 60%) !important;
         }
 
         [data-theme='light'] .korte-page .hero-lines {
           background-image:
-            linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px) !important;
+            linear-gradient(to right, rgba(88, 166, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(88, 166, 255, 0.035) 1px, transparent 1px) !important;
         }
 
         [data-theme='light'] .korte-page .feature-card,
@@ -371,9 +376,12 @@ export default function Home() {
         }
 
         .nav-cta {
-          background: var(--gold);
-          color: var(--black);
-          padding: 10px 24px;
+          border: 1px solid rgba(88, 166, 255, 0.45);
+          border-radius: 999px;
+          background: linear-gradient(135deg, var(--gold), #0047d6);
+          box-shadow: 0 12px 34px rgba(18, 104, 255, 0.28);
+          color: #fff;
+          padding: 11px 24px;
           font-size: 13px;
           font-weight: 700;
           letter-spacing: 1px;
@@ -383,7 +391,7 @@ export default function Home() {
         }
 
         .nav-cta:hover {
-          background: var(--gold-light);
+          background: linear-gradient(135deg, var(--gold-light), var(--gold));
           transform: translateY(-1px);
         }
 
@@ -395,9 +403,10 @@ export default function Home() {
 
         .nav-login {
           min-width: 142px;
-          border: 1px solid #d4af37;
+          border: 1px solid rgba(88, 166, 255, 0.55);
+          border-radius: 999px;
           background: transparent;
-          color: #d4af37;
+          color: var(--gold-light);
           padding: 9px 24px;
           font-size: 13px;
           font-weight: 800;
@@ -409,9 +418,25 @@ export default function Home() {
         }
 
         .nav-login:hover {
-          background: #d4af37;
-          color: var(--black);
+          background: rgba(18, 104, 255, 0.14);
+          color: #fff;
           transform: translateY(-1px);
+        }
+
+        .nav-toggle {
+          display: none;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid rgba(88, 166, 255, 0.42);
+          background: rgba(18, 104, 255, 0.08);
+          color: var(--gold-light);
+          min-height: 42px;
+          border-radius: 999px;
+          padding: 0 14px;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          text-transform: uppercase;
         }
 
         .hero {
@@ -431,14 +456,15 @@ export default function Home() {
 
         .hero-bg {
           background:
-            radial-gradient(ellipse 60% 60% at 70% 50%, rgba(201, 168, 76, 0.08) 0%, transparent 70%),
-            radial-gradient(ellipse 40% 40% at 10% 80%, rgba(192, 57, 43, 0.06) 0%, transparent 60%);
+            radial-gradient(ellipse 60% 60% at 72% 50%, rgba(18, 104, 255, 0.20) 0%, transparent 70%),
+            radial-gradient(ellipse 44% 44% at 20% 18%, rgba(88, 166, 255, 0.12) 0%, transparent 64%),
+            radial-gradient(ellipse 40% 40% at 10% 80%, rgba(14, 165, 233, 0.08) 0%, transparent 60%);
         }
 
         .hero-lines {
           background-image:
-            linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            linear-gradient(to right, rgba(88, 166, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(88, 166, 255, 0.035) 1px, transparent 1px);
           background-size: 80px 80px;
         }
 
@@ -469,8 +495,8 @@ export default function Home() {
           border-radius: 48px;
           background:
             radial-gradient(circle at 32% 30%, rgba(245, 240, 232, 0.20), transparent 12%),
-            radial-gradient(circle at 54% 33%, rgba(201, 168, 76, 0.14), transparent 13%),
-            linear-gradient(130deg, rgba(201, 168, 76, 0.08), rgba(255, 255, 255, 0.04));
+            radial-gradient(circle at 54% 33%, rgba(18, 104, 255, 0.14), transparent 13%),
+            linear-gradient(130deg, rgba(18, 104, 255, 0.08), rgba(255, 255, 255, 0.04));
           filter: blur(3px);
           opacity: 0.78;
         }
@@ -483,7 +509,7 @@ export default function Home() {
           bottom: -18px;
           height: 82px;
           border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(245, 240, 232, 0.16) 0%, rgba(201, 168, 76, 0.10) 32%, transparent 72%);
+          background: radial-gradient(ellipse, rgba(245, 240, 232, 0.16) 0%, rgba(18, 104, 255, 0.10) 32%, transparent 72%);
           filter: blur(10px);
           opacity: 0.72;
         }
@@ -498,7 +524,7 @@ export default function Home() {
           opacity: 0.99;
           filter:
             drop-shadow(0 42px 60px rgba(0, 0, 0, 0.56))
-            drop-shadow(0 0 34px rgba(201, 168, 76, 0.12));
+            drop-shadow(0 0 34px rgba(18, 104, 255, 0.12));
         }
 
         .hero-showcase .showcase-glow,
@@ -515,7 +541,7 @@ export default function Home() {
           position: absolute;
           inset: 8% -8% -4% 0;
           background:
-            radial-gradient(circle at 45% 44%, rgba(201, 168, 76, 0.20), transparent 34%),
+            radial-gradient(circle at 45% 44%, rgba(18, 104, 255, 0.20), transparent 34%),
             radial-gradient(circle at 84% 36%, rgba(255, 255, 255, 0.10), transparent 28%);
           filter: blur(24px);
           opacity: 0.78;
@@ -532,8 +558,8 @@ export default function Home() {
           background:
             radial-gradient(circle at 38% 18%, rgba(245,240,232,0.42), transparent 11%),
             radial-gradient(circle at 62% 18%, rgba(245,240,232,0.36), transparent 10%),
-            linear-gradient(90deg, transparent 0 34%, rgba(201,168,76,.18) 35% 39%, transparent 40% 58%, rgba(245,240,232,.2) 59% 64%, transparent 65%),
-            linear-gradient(135deg, rgba(201,168,76,.16), rgba(0,0,0,.15));
+            linear-gradient(90deg, transparent 0 34%, rgba(88,166,255,.2) 35% 39%, transparent 40% 58%, rgba(245,240,232,.2) 59% 64%, transparent 65%),
+            linear-gradient(135deg, rgba(18,104,255,.18), rgba(0,0,0,.15));
           border: 1px solid rgba(255,255,255,.08);
           box-shadow: inset 0 0 80px rgba(0,0,0,.55);
         }
@@ -545,7 +571,7 @@ export default function Home() {
           bottom: -22px;
           height: 74px;
           border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,255,255,.16) 0%, rgba(201,168,76,.08) 34%, transparent 72%);
+          background: radial-gradient(ellipse, rgba(255,255,255,.16) 0%, rgba(88,166,255,.12) 34%, transparent 72%);
           filter: blur(9px);
         }
 
@@ -1014,7 +1040,7 @@ export default function Home() {
           height: 34px;
           place-items: center;
           border-radius: 8px;
-          background: rgba(201,168,76,.16);
+          background: rgba(18,104,255,.16);
           color: var(--gold);
         }
 
@@ -1095,7 +1121,9 @@ export default function Home() {
           gap: 8px;
           margin-bottom: 32px;
           padding: 6px 14px;
-          border: 1px solid var(--gold);
+          border: 1px solid rgba(88, 166, 255, 0.48);
+          border-radius: 999px;
+          background: rgba(18, 104, 255, 0.09);
           color: var(--gold);
           font-size: 11px;
           font-weight: 500;
@@ -1153,9 +1181,11 @@ export default function Home() {
         .btn-primary {
           display: inline-block;
           padding: 16px 36px;
-          clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-          background: var(--gold);
-          color: var(--black);
+          border: 1px solid rgba(88, 166, 255, 0.45);
+          border-radius: 16px;
+          background: linear-gradient(135deg, var(--gold), #0047d6);
+          box-shadow: 0 18px 48px rgba(18, 104, 255, 0.28);
+          color: #fff;
           font-size: 13px;
           font-weight: 800;
           letter-spacing: 2px;
@@ -1165,8 +1195,8 @@ export default function Home() {
         }
 
         .btn-primary:hover {
-          background: var(--gold-light);
-          box-shadow: 0 12px 40px rgba(201, 168, 76, 0.3);
+          background: linear-gradient(135deg, var(--gold-light), var(--gold));
+          box-shadow: 0 20px 54px rgba(18, 104, 255, 0.38);
           transform: translateY(-2px);
         }
 
@@ -1174,6 +1204,11 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 8px;
+          min-height: 52px;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          border-radius: 16px;
+          padding: 0 22px;
+          background: rgba(255, 255, 255, 0.035);
           color: var(--white);
           font-size: 13px;
           letter-spacing: 1px;
@@ -1301,8 +1336,8 @@ export default function Home() {
         .plan,
         .testimonial,
         .mockup-window {
-          border: 1px solid var(--border);
-          background: var(--card);
+          border: 1px solid rgba(88,166,255,0.10);
+          background: linear-gradient(180deg, rgba(18,24,38,0.92), rgba(14,14,16,0.96));
         }
 
         .feature-card {
@@ -1322,7 +1357,8 @@ export default function Home() {
         }
 
         .feature-card:hover {
-          border-color: var(--gold);
+          border-color: rgba(88,166,255,0.55);
+          box-shadow: 0 18px 60px rgba(18,104,255,0.12);
           transform: translateY(-4px);
         }
 
@@ -1341,8 +1377,8 @@ export default function Home() {
           color: var(--gold-light);
           background:
             radial-gradient(circle at 30% 20%, rgba(255,255,255,0.16), transparent 32%),
-            linear-gradient(145deg, rgba(201,168,76,0.18), rgba(37,99,235,0.08));
-          border: 1px solid rgba(201,168,76,0.26);
+            linear-gradient(145deg, rgba(18,104,255,0.26), rgba(37,99,235,0.08));
+          border: 1px solid rgba(88,166,255,0.34);
           box-shadow: 0 18px 38px rgba(0,0,0,0.32);
         }
 
@@ -1388,7 +1424,9 @@ export default function Home() {
           display: inline-block;
           margin-top: 20px;
           padding: 3px 10px;
-          border: 1px solid var(--gold);
+          border: 1px solid rgba(88,166,255,0.42);
+          border-radius: 999px;
+          background: rgba(18,104,255,0.10);
           color: var(--gold);
           font-size: 10px;
           letter-spacing: 2px;
@@ -1409,7 +1447,7 @@ export default function Home() {
           width: 600px;
           height: 600px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.05) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(18, 104, 255, 0.05) 0%, transparent 70%);
         }
 
         .how-inner {
@@ -1544,7 +1582,7 @@ export default function Home() {
           align-items: center;
           justify-content: center;
           border-radius: 11px;
-          background: rgba(201,168,76,0.14);
+          background: rgba(18,104,255,0.16);
           color: var(--gold);
           font-size: 13px;
           font-weight: 900;
@@ -1676,11 +1714,15 @@ export default function Home() {
         .plan {
           position: relative;
           padding: 48px 36px;
+          border-radius: 24px;
         }
 
         .plan.featured {
-          border-color: var(--gold);
-          background: #141209;
+          border-color: rgba(88,166,255,0.62);
+          background:
+            radial-gradient(circle at 50% -20%, rgba(18,104,255,0.26), transparent 55%),
+            linear-gradient(180deg, rgba(18,32,58,0.98), rgba(9,13,22,0.98));
+          box-shadow: 0 28px 90px rgba(18,104,255,0.14);
         }
 
         .plan.featured::before {
@@ -1688,9 +1730,10 @@ export default function Home() {
           position: absolute;
           top: -1px;
           left: 50%;
-          padding: 4px 16px;
-          background: var(--gold);
-          color: var(--black);
+          padding: 5px 16px;
+          border-radius: 0 0 12px 12px;
+          background: linear-gradient(135deg, var(--gold), var(--gold-light));
+          color: #fff;
           font-size: 10px;
           font-weight: 800;
           letter-spacing: 2px;
@@ -1773,7 +1816,9 @@ export default function Home() {
         .plan-btn {
           display: block;
           padding: 14px;
-          border: 1px solid var(--border);
+          border: 1px solid rgba(88,166,255,0.22);
+          border-radius: 14px;
+          background: rgba(18,104,255,0.04);
           color: var(--muted);
           font-size: 12px;
           font-weight: 700;
@@ -1786,13 +1831,15 @@ export default function Home() {
 
         .plan-btn:hover {
           border-color: var(--gold);
+          background: rgba(18,104,255,0.12);
           color: var(--gold);
         }
 
         .plan.featured .plan-btn {
           border-color: var(--gold);
-          background: var(--gold);
-          color: var(--black);
+          background: linear-gradient(135deg, var(--gold), var(--gold-light));
+          box-shadow: 0 16px 44px rgba(18,104,255,0.28);
+          color: #fff;
         }
 
         .testimonials {
@@ -1814,7 +1861,7 @@ export default function Home() {
           position: absolute;
           top: 10px;
           right: 20px;
-          color: rgba(201, 168, 76, 0.2);
+          color: rgba(18, 104, 255, 0.2);
           font-family: Impact, "Arial Narrow", sans-serif;
           font-size: 80px;
           line-height: 1;
@@ -1875,7 +1922,7 @@ export default function Home() {
           width: 800px;
           height: 400px;
           pointer-events: none;
-          background: radial-gradient(ellipse, rgba(201, 168, 76, 0.1) 0%, transparent 70%);
+          background: radial-gradient(ellipse, rgba(18, 104, 255, 0.1) 0%, transparent 70%);
           transform: translate(-50%, -50%);
         }
 
@@ -2034,22 +2081,70 @@ export default function Home() {
 
         @media (max-width: 900px) {
           .korte-nav {
-            padding: 16px 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 14px 18px;
           }
 
-          .nav-links {
+          .nav-logo {
+            font-size: 23px;
+            gap: 8px;
+            letter-spacing: 3px;
+          }
+
+          .nav-toggle {
+            display: inline-flex;
+          }
+
+          .nav-links,
+          .nav-actions {
             display: none;
           }
 
-          .nav-actions {
-            gap: 10px;
+          .nav-open .nav-links,
+          .nav-open .nav-actions {
+            display: flex;
+            width: 100%;
+          }
+
+          .nav-open .nav-links {
+            flex-direction: column;
+            gap: 0;
+            border: 1px solid rgba(88, 166, 255, 0.16);
+            background: rgba(17, 17, 17, 0.96);
+            border-radius: 18px;
+            padding: 8px;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
+          }
+
+          .nav-open .nav-links li {
+            width: 100%;
+          }
+
+          .nav-open .nav-links a {
+            display: flex;
+            width: 100%;
+            min-height: 44px;
+            align-items: center;
+            border-radius: 12px;
+            padding: 0 12px;
+          }
+
+          .nav-open .nav-actions {
+            gap: 8px;
           }
 
           .nav-login,
           .nav-cta {
-            min-width: auto;
-            padding: 10px 14px;
+            flex: 1;
+            min-width: 0;
+            min-height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 12px;
             font-size: 11px;
+            border-radius: 12px;
           }
 
           .korte-section {
@@ -2129,17 +2224,209 @@ export default function Home() {
             display: none;
           }
         }
+
+        /* Hero refresh: full-bleed promotional artwork */
+        .korte-nav {
+          background: linear-gradient(180deg, rgba(2, 7, 18, 0.9), rgba(2, 7, 18, 0.38));
+          border-bottom: 1px solid rgba(18, 104, 255, 0.16);
+          backdrop-filter: blur(18px);
+        }
+
+        .hero {
+          position: relative;
+          display: flex;
+          align-items: center;
+          min-height: 100svh;
+          padding: 112px 64px 156px;
+          background: #020814;
+          isolation: isolate;
+          overflow: hidden;
+        }
+
+        .hero-bg {
+          z-index: 0;
+          background:
+            linear-gradient(90deg, rgba(2, 8, 20, 0.99) 0%, rgba(2, 8, 20, 0.97) 30%, rgba(2, 8, 20, 0.82) 43%, rgba(2, 8, 20, 0.34) 57%, rgba(2, 8, 20, 0.12) 70%, rgba(2, 8, 20, 0.48) 84%, rgba(2, 8, 20, 0.94) 100%),
+            linear-gradient(180deg, rgba(2, 8, 20, 0.08) 0%, rgba(2, 8, 20, 0.04) 43%, rgba(2, 8, 20, 0.52) 68%, rgba(2, 8, 20, 0.96) 100%),
+            url('/kortebarber-hero-pro.png') center center / cover no-repeat;
+        }
+
+        .hero-lines {
+          z-index: 1;
+          opacity: 0.34;
+          mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.72) 42%, transparent 78%);
+        }
+
+        .hero::after {
+          content: '';
+          position: absolute;
+          inset: auto 0 0;
+          height: 34%;
+          z-index: 1;
+          pointer-events: none;
+          background: linear-gradient(180deg, rgba(2, 8, 20, 0), rgba(2, 8, 20, 0.86) 62%, #020814 100%);
+        }
+
+        .hero-content {
+          position: relative;
+          z-index: 3;
+          width: min(560px, 44vw);
+          max-width: 560px;
+          padding: 0;
+        }
+
+        .hero h1 {
+          max-width: 570px;
+          font-size: clamp(64px, 6vw, 112px);
+          line-height: 0.88;
+          font-weight: 900;
+          letter-spacing: 0;
+          text-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .hero h1 .accent { color: #1672ff; }
+        .hero h1 .line2 { color: rgba(245, 240, 232, 0.74); }
+
+        .hero-sub {
+          max-width: 480px;
+          color: rgba(245, 240, 232, 0.76);
+        }
+
+        .hero-showcase { display: contents !important; }
+        .hero-showcase > :not(.hero-pills) { display: none !important; }
+
+        .hero-showcase .hero-pills,
+        .hero-pills {
+          position: absolute;
+          z-index: 4;
+          left: 54px;
+          right: 54px;
+          bottom: 24px;
+          width: auto !important;
+          display: flex !important;
+          align-items: center;
+          justify-content: space-between;
+          padding: 18px 0 0;
+          margin: 0;
+          border-top: 1px solid rgba(70, 139, 255, 0.24);
+          background: transparent;
+          box-shadow: none;
+        }
+
+        .hero-pill {
+          flex: 1 1 0;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 0 28px;
+          background: transparent !important;
+          border: 0 !important;
+          border-right: 1px solid rgba(70, 139, 255, 0.18) !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          color: rgba(255, 255, 255, 0.92);
+        }
+
+        .hero-pill:first-child { padding-left: 0; }
+        .hero-pill:last-child { padding-right: 0; border-right: 0 !important; }
+
+        .hero-pill-icon {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
+          display: grid;
+          place-items: center;
+          color: #1672ff;
+          background: transparent;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .hero-pill-icon svg { width: 32px; height: 32px; stroke-width: 1.65; }
+        .hero-pill strong { display: block; color: #fff; font-size: 16px; line-height: 1.35; font-weight: 600; }
+        .hero-pill span:not(.hero-pill-icon) { display: none; }
+
+        .hero-stats {
+          position: absolute;
+          z-index: 4;
+          right: 64px;
+          top: 50%;
+          transform: translateY(-39%);
+          display: grid;
+          gap: 32px;
+          padding-left: 28px;
+          border-left: 1px solid rgba(22, 114, 255, 0.86);
+        }
+
+        .stat-item {
+          padding: 0;
+          text-align: left;
+          background: transparent !important;
+          border: 0 !important;
+          box-shadow: none !important;
+        }
+
+        .stat-number {
+          color: #1672ff;
+          font-size: clamp(36px, 3.2vw, 58px);
+          line-height: 1;
+          text-shadow: 0 0 32px rgba(22, 114, 255, 0.42);
+        }
+
+        .stat-label {
+          margin-top: 8px;
+          color: rgba(255, 255, 255, 0.72);
+          font-size: 13px;
+          letter-spacing: 0.16em;
+        }
+
+        .scroll-line { display: none; }
+
+        @media (max-width: 1100px) {
+          .hero { min-height: 860px; padding: 112px 28px 190px; align-items: flex-start; }
+          .hero-bg { background-position: 60% center; }
+          .hero-content { width: min(590px, 68vw); padding-top: 40px; }
+          .hero h1 { font-size: clamp(56px, 11vw, 88px); }
+          .hero-stats { right: 28px; top: auto; bottom: 128px; transform: none; grid-template-columns: repeat(3, auto); gap: 22px; padding: 16px 0 0; border-left: 0; border-top: 1px solid rgba(22, 114, 255, 0.5); }
+          .stat-number { font-size: 30px; }
+          .hero-showcase .hero-pills, .hero-pills { left: 28px; right: 28px; overflow-x: auto; justify-content: flex-start; padding-bottom: 8px; }
+          .hero-pill { min-width: 220px; flex: 0 0 220px; }
+        }
+
+        @media (max-width: 620px) {
+          .hero { min-height: 780px; padding: 108px 20px 215px; }
+          .hero-bg { background-position: 67% center; }
+          .hero-content { width: min(100%, 390px); padding-top: 0; }
+          .hero h1 { font-size: clamp(48px, 16vw, 68px); }
+          .hero-sub { font-size: 15px; }
+          .hero-actions { align-items: stretch; flex-direction: column; max-width: 360px; }
+          .hero-stats { display: none; }
+          .hero-showcase .hero-pills, .hero-pills { left: 20px; right: 20px; bottom: 18px; }
+          .hero-pill { min-width: 210px; flex-basis: 210px; padding: 0 20px; }
+        }
       `}</style>
 
-      <nav className="korte-nav" aria-label="Navegação principal">
+      <nav className={`korte-nav ${navOpen ? 'nav-open' : ''}`} aria-label="Navegação principal">
         <a className="nav-logo" href="#inicio">
           Korte<span>Barber</span>
         </a>
+        <button
+          className="nav-toggle"
+          type="button"
+          aria-label={navOpen ? 'Fechar menu' : 'Abrir menu'}
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((current) => !current)}
+        >
+          {navOpen ? <X size={20} /> : <Menu size={20} />}
+          <span>Menu</span>
+        </button>
         <ul className="nav-links">
-          <li><a href="#funcionalidades">Funcionalidades</a></li>
-          <li><a href="#como-funciona">Como funciona</a></li>
-          <li><a href="#planos">Planos</a></li>
-          <li><a href="#depoimentos">Depoimentos</a></li>
+          <li><a href="#funcionalidades" onClick={() => setNavOpen(false)}>Funcionalidades</a></li>
+          <li><a href="#como-funciona" onClick={() => setNavOpen(false)}>Como funciona</a></li>
+          <li><a href="#planos" onClick={() => setNavOpen(false)}>Planos</a></li>
+          <li><a href="#depoimentos" onClick={() => setNavOpen(false)}>Depoimentos</a></li>
         </ul>
         <div className="nav-actions">
           <Link href="/app" className="nav-login">Entrar</Link>
@@ -2161,7 +2448,7 @@ export default function Home() {
             Do agendamento à comissão, do financeiro ao dashboard — tudo em um único sistema pensado para quem vive de navalha e tesoura.
           </p>
           <div className="hero-actions">
-            <Link href="/pricing" className="btn-primary">Testar 7 dias grátis</Link>
+            <Link href="/pricing" className="btn-primary">Testar 30 dias grátis</Link>
             <a href="#como-funciona" className="btn-ghost">Ver como funciona</a>
           </div>
         </div>
@@ -2265,20 +2552,26 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          <div className="showcase-caption">Conheça o Sistema completo</div>
           <div className="hero-pills">
             <div className="hero-pill">
-              <span className="hero-pill-icon"><ChartColumn aria-hidden="true" /></span>
-              <div><strong>Dashboard Financeiro</strong><span>Indicadores e agendamentos.</span></div>
-            </div>
-            <div className="hero-pill">
               <span className="hero-pill-icon"><CalendarDays aria-hidden="true" /></span>
-              <div><strong>Agendamentos Rápidos</strong><span>Acompanhe tudo em tempo real.</span></div>
+              <div><strong>Agendamento online 24h</strong></div>
             </div>
             <div className="hero-pill">
               <span className="hero-pill-icon"><Users aria-hidden="true" /></span>
-              <div><strong>Controle de Equipe</strong><span>Gerencie barbeiros e comissões.</span></div>
+              <div><strong>Mais clientes e menos faltas</strong></div>
+            </div>
+            <div className="hero-pill">
+              <span className="hero-pill-icon"><ChartColumn aria-hidden="true" /></span>
+              <div><strong>Relatórios e indicadores</strong></div>
+            </div>
+            <div className="hero-pill">
+              <span className="hero-pill-icon"><DollarSign aria-hidden="true" /></span>
+              <div><strong>Controle financeiro completo</strong></div>
+            </div>
+            <div className="hero-pill">
+              <span className="hero-pill-icon"><ShieldCheck aria-hidden="true" /></span>
+              <div><strong>Segurança e dados protegidos</strong></div>
             </div>
           </div>
         </div>
@@ -2355,7 +2648,7 @@ export default function Home() {
             <div className="mockup-body">
               <div className="mock-header">
                 Visão Geral
-                <div className="mock-badge">● Ao Vivo</div>
+                <div className="mock-badge">● Ao vivo</div>
               </div>
               <div className="mock-dashboard-grid">
                 <div className="mock-dashboard-card">
@@ -2392,7 +2685,7 @@ export default function Home() {
                   <div style={{ color: '#f8fafc', fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Resumo</div>
                   <div className="mock-summary-row"><span>Agendamentos</span><strong style={{ color: '#60a5fa' }}>18</strong></div>
                   <div className="mock-summary-row"><span>Finalizados</span><strong style={{ color: '#10b981' }}>14</strong></div>
-                  <div className="mock-summary-row"><span>Comissões</span><strong style={{ color: '#c9a84c' }}>R$ 560</strong></div>
+                  <div className="mock-summary-row"><span>Comissões</span><strong style={{ color: '#3b82f6' }}>R$ 560</strong></div>
                 </div>
               </div>
             </div>
@@ -2404,7 +2697,7 @@ export default function Home() {
         <div className="pricing-header reveal">
           <div className="section-label">Planos</div>
           <h2 className="section-title">ESCOLHA O SEU PLANO</h2>
-          <p style={{ color: 'var(--muted)', fontSize: 15 }}>7 dias de teste grátis em qualquer plano. Cancele quando quiser.</p>
+          <p style={{ color: 'var(--muted)', fontSize: 15 }}>30 dias de teste grátis em qualquer plano. Cancele quando quiser.</p>
         </div>
         <div className="pricing-grid">
           {plans.map((plan) => (
@@ -2455,7 +2748,7 @@ export default function Home() {
           <span className="gold">NO PRÓXIMO NÍVEL</span>
         </h2>
         <p className="cta-sub reveal">
-          Junte-se a mais de 3.000 barbearias que já profissionalizaram sua gestão. 7 dias grátis, sem compromisso.
+          Junte-se a mais de 3.000 barbearias que já profissionalizaram sua gestão. 30 dias grátis, sem compromisso.
         </p>
         <div className="cta-actions reveal">
           <Link href="/pricing" className="btn-primary">Criar minha conta grátis</Link>
@@ -2484,3 +2777,13 @@ export default function Home() {
     </main>
   )
 }
+
+
+
+
+
+
+
+
+
+
