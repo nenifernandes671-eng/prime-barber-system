@@ -1,7 +1,8 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTenantAccess } from '@/lib/subscription-access'
-import { enqueuePush } from '@/lib/server/push'
+import { notifyAppointmentCreated } from '@/lib/server/appointment-notification'
+import { validateTenantUser } from '@/lib/server/push'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -216,6 +217,33 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
+    if (body.action === 'notify_created') {
+      const accessToken = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+      if (!accessToken) return jsonError('Login obrigatorio.', 401)
+
+      const { data: session, error: sessionError } = await supabaseAdmin.auth.getUser(accessToken)
+      if (sessionError || !session.user) return jsonError('Sessao invalida.', 401)
+
+      const notifyTenantId = String(body.tenant_id || '')
+      const appointmentId = String(body.appointment_id || '')
+      if (!notifyTenantId || !appointmentId) return jsonError('tenant_id e appointment_id sao obrigatorios.', 400)
+      if (!(await validateTenantUser(notifyTenantId, session.user.id))) return jsonError('Sem acesso a esta barbearia.', 403)
+
+      const { data: appointment, error: appointmentError } = await supabaseAdmin
+        .from('appointments')
+        .select('id,tenant_id,client_name,service,barber,barber_id,appointment_date,appointment_time,barbeiros(user_id)')
+        .eq('id', appointmentId)
+        .eq('tenant_id', notifyTenantId)
+        .maybeSingle()
+
+      if (appointmentError) return jsonError(appointmentError.message, 400)
+      if (!appointment) return jsonError('Agendamento nao encontrado.', 404)
+
+      const barberUserId = (appointment.barbeiros as { user_id?: string | null } | null)?.user_id ?? null
+      const result = await notifyAppointmentCreated({ ...appointment, barber_user_id: barberUserId })
+      return NextResponse.json({ ok: true, ...result })
+    }
+
     const tenantId = String(body.tenant_id ?? '')
     const unitId = String(body.unit_id ?? '')
     const serviceId = String(body.service_id ?? '')
@@ -363,22 +391,18 @@ export async function POST(req: NextRequest) {
 
     if (createdAppointment?.id) {
       try {
-        const ownerUserIds = await getOwnerNotificationUserIds(tenantId)
-        const userIds = [...new Set([barber.user_id, ...ownerUserIds].filter(Boolean).map(String))]
-
-        await enqueuePush({
+        await notifyAppointmentCreated({
+          id: createdAppointment.id,
           tenant_id: tenantId,
-          user_ids: userIds,
-          title: 'Novo agendamento',
-          body: `${clientName} agendou ${service.name} com ${barber.nome} para ${appointmentDate} as ${appointmentTime}.`,
-          type: 'appointment_created',
-          data: {
-            entity_id: createdAppointment.id,
-            route: `/agendamento/${createdAppointment.id}`,
-          },
+          client_name: clientName,
+          service: service.name,
+          barber: barber.nome,
+          barber_user_id: barber.user_id,
+          appointment_date: appointmentDate,
+          appointment_time: appointmentTime,
         })
-      } catch (pushError) {
-        console.error('Falha ao enfileirar push de novo agendamento:', pushError)
+      } catch (notificationError) {
+        console.error('Falha ao enviar notificacao de novo agendamento:', notificationError)
       }
     }
 
