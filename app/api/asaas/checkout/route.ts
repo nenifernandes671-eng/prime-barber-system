@@ -163,7 +163,11 @@ export async function POST(req: NextRequest) {
 
     if (await findAuthUserByEmail(emailClean)) {
       return NextResponse.json(
-        { error: 'Ja existe uma conta com este email. Entre com sua senha atual.' },
+        {
+          code: 'EMAIL_ALREADY_EXISTS',
+          message: 'Ja existe uma conta com este email. Entre com sua senha atual.',
+          error: 'Ja existe uma conta com este email. Entre com sua senha atual.',
+        },
         { status: 409 },
       )
     }
@@ -175,7 +179,14 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (existingTenant && !isQuickRegistration) {
-      return NextResponse.json({ error: 'Este link de barbearia ja esta em uso.' }, { status: 409 })
+      return NextResponse.json(
+        {
+          code: 'SLUG_ALREADY_EXISTS',
+          message: 'Este link de barbearia ja esta em uso.',
+          error: 'Este link de barbearia ja esta em uso.',
+        },
+        { status: 409 },
+      )
     }
 
     if (existingTenant) {

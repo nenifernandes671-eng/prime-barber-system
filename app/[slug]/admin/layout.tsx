@@ -155,6 +155,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
   }
 
   const handleRenewSubscription = async () => {
+    if (renewing) return
     setRenewing(true)
     setRenewError('')
 
@@ -185,6 +186,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
       window.location.assign(result.url)
     } catch (error: any) {
       setRenewError(error?.message || 'Nao foi possivel iniciar a renovacao.')
+    } finally {
       setRenewing(false)
     }
   }
@@ -229,7 +231,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
             disabled={renewing}
             style={{ display: 'inline-flex', justifyContent: 'center', width: '100%', padding: '14px 18px', borderRadius: 14, border: 0, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', fontWeight: 900, cursor: renewing ? 'wait' : 'pointer', opacity: renewing ? .7 : 1 }}
           >
-            {renewing ? 'Abrindo renovacao...' : `Renovar assinatura ${planName}`}
+            {renewing ? 'Processando...' : `Renovar assinatura ${planName}`}
           </button>
           <button onClick={handleLogout} style={{ marginTop: 12, width: '100%', padding: '12px 18px', borderRadius: 14, border: '1px solid rgba(239,68,68,.28)', background: 'transparent', color: '#f87171', fontWeight: 800, cursor: 'pointer' }}>
             Sair
@@ -317,7 +319,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
               onClick={handleRenewSubscription}
               disabled={renewing}
             >
-              {renewing ? 'Abrindo...' : 'Pagar agora'}
+              {renewing ? 'Processando...' : 'Pagar agora'}
             </button>
           </div>
         </div>
@@ -465,7 +467,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
                   onClick={handleRenewSubscription}
                   disabled={renewing}
                 >
-                  {renewing ? 'Abrindo...' : 'Pagar agora'}
+                  {renewing ? 'Processando...' : 'Pagar agora'}
                 </button>
               </div>
             </div>

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { enqueueTenantPush } from '@/lib/server/push'
-import { normalizeBillingCycle, subscriptionEndDate } from '@/lib/saas-billing'
+import { getBillingExpirationDate, normalizeBillingCycle, type BillingCycle } from '@/lib/saas-billing'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,20 +43,39 @@ function saasSubscriptionStatusFromEvent(event: string) {
   return null
 }
 
-function nextAccessDate(payment: any, billingCycle: unknown) {
-  const baseDate =
-    payment?.paymentDate ||
-    payment?.clientPaymentDate ||
-    payment?.confirmedDate ||
-    payment?.dueDate
-
-  const date = baseDate ? new Date(`${baseDate}T00:00:00`) : new Date()
-  return subscriptionEndDate(date, normalizeBillingCycle(billingCycle)).toISOString()
-}
-
 function dateOnly(value?: string | null) {
   if (!value) return null
   return String(value).slice(0, 10)
+}
+
+function dateFromYmd(value?: string | null) {
+  const ymd = dateOnly(value)
+  return ymd ? new Date(`${ymd}T12:00:00-03:00`) : null
+}
+
+function nextAccessDate(
+  payment: any,
+  billingCycle: BillingCycle,
+  tenant: { paid_until?: string | null; trial_end?: string | null; trial_ends_at?: string | null },
+) {
+  const now = new Date()
+  const paidUntil = dateFromYmd(tenant.paid_until)
+  const trialEnd = dateFromYmd(tenant.trial_ends_at || tenant.trial_end)
+  const paymentBase = dateFromYmd(
+    payment?.paymentDate ||
+      payment?.clientPaymentDate ||
+      payment?.confirmedDate ||
+      payment?.dueDate,
+  )
+
+  const baseDate =
+    paidUntil && paidUntil > now
+      ? paidUntil
+      : trialEnd && trialEnd > now
+        ? trialEnd
+        : paymentBase || now
+
+  return getBillingExpirationDate(baseDate, billingCycle).toISOString()
 }
 
 function addDaysYmd(value: string, days: number) {
@@ -83,7 +102,7 @@ function parseSaasPlanReference(reference?: string | null) {
     ? {
         slug: match[1].toLowerCase(),
         plan: match[2].toLowerCase(),
-        billingCycle: normalizeBillingCycle(match[3]),
+        billingCycle: match[3] ? normalizeBillingCycle(match[3]) : null,
       }
     : null
 }
@@ -144,7 +163,7 @@ async function findSaasTenant(
   if (tenantSlug) {
     const { data, error } = await supabaseAdmin
       .from('tenants')
-      .select('id, asaas_customer_id, asaas_subscription_id, billing_cycle, plano')
+      .select('id, asaas_customer_id, asaas_subscription_id, billing_cycle, plano, paid_until, trial_end, trial_ends_at')
       .eq('slug', tenantSlug)
       .maybeSingle()
 
@@ -155,7 +174,7 @@ async function findSaasTenant(
   if (subscriptionId) {
     const { data, error } = await supabaseAdmin
       .from('tenants')
-      .select('id, asaas_customer_id, asaas_subscription_id, billing_cycle, plano')
+      .select('id, asaas_customer_id, asaas_subscription_id, billing_cycle, plano, paid_until, trial_end, trial_ends_at')
       .eq('asaas_subscription_id', subscriptionId)
       .maybeSingle()
 
@@ -446,13 +465,13 @@ async function processSaasBillingEvent({
   }
 
   if (subscriptionStatus === 'active') {
+    const billingCycle = planReference?.billingCycle ?? normalizeBillingCycle(tenant.billing_cycle)
+
     updatePayload.status = 'active'
-    updatePayload.paid_until = nextAccessDate(payment, tenant.billing_cycle)
+    updatePayload.billing_cycle = billingCycle
+    updatePayload.paid_until = nextAccessDate(payment, billingCycle, tenant)
     if (tenant.pendingPlan) {
       updatePayload.plano = tenant.pendingPlan
-    }
-    if (planReference?.billingCycle) {
-      updatePayload.billing_cycle = planReference.billingCycle
     }
   } else if (subscriptionStatus === 'overdue') {
     updatePayload.status = 'suspended'
@@ -474,6 +493,8 @@ async function processSaasBillingEvent({
 }
 
 export async function POST(req: NextRequest) {
+  let logContext: Record<string, unknown> = {}
+
   try {
     const webhookToken = process.env.ASAAS_WEBHOOK_TOKEN
     const receivedToken =
@@ -493,6 +514,13 @@ export async function POST(req: NextRequest) {
     const customerId = payment.customer || subscription.customer || payload.customer?.id || null
     const externalReference =
       payment.externalReference || subscription.externalReference || payload.externalReference || null
+    logContext = {
+      event,
+      paymentId: payment.id,
+      subscriptionId,
+      customerId,
+      externalReference,
+    }
 
     console.log('Asaas webhook recebido:', {
       event,
@@ -538,7 +566,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true, ignored: true })
   } catch (err: any) {
-    console.error('Asaas webhook error:', err)
+    console.error('[ASAAS_WEBHOOK_ERROR]', {
+      ...logContext,
+      error: err?.message || err,
+    })
     return NextResponse.json(
       { error: err.message || 'Erro no webhook Asaas.' },
       { status: 500 },

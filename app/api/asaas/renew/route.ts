@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaasAsaasConfig } from '@/lib/server/saas-asaas'
-import { BILLING_CYCLES, normalizeBillingCycle, planPrices, type BillingCycle } from '@/lib/saas-billing'
+import { BILLING_CYCLES, getPlanPrice, normalizeBillingCycle, type BillingCycle, type PlanKey } from '@/lib/saas-billing'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -138,6 +138,8 @@ async function resolveFirstPayment(subscriptionId: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let logContext: Record<string, unknown> = {}
+
   try {
     const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
 
@@ -159,8 +161,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}))
     const slug = String(body.slug || '').trim().toLowerCase()
-    const requestedPlan = String(body.plan || '').trim().toLowerCase()
-    const requestedBillingPeriod = normalizeBillingCycle(body.billingPeriod)
+    logContext = { slug }
 
     if (!slug) {
       return NextResponse.json(
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .select('id,slug,nome,email,telefone,cpf_cnpj,plano,billing_cycle,subscription_status,asaas_customer_id,asaas_subscription_id')
+      .select('id,slug,nome,email,telefone,cpf_cnpj,plano,billing_cycle,paid_until,trial_end,trial_ends_at,subscription_status,asaas_customer_id,asaas_subscription_id')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -196,10 +197,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const plan = (requestedPlan || String(tenant.plano || '').toLowerCase()) as keyof ReturnType<typeof planPrices>
-    const billingPeriod: BillingCycle = requestedBillingPeriod
+    const plan = String(tenant.plano || '').trim().toLowerCase() as PlanKey
+    const billingPeriod: BillingCycle = normalizeBillingCycle(tenant.billing_cycle)
     const billing = BILLING_CYCLES[billingPeriod]
-    const value = Number((planPrices()[plan] * billing.multiplier).toFixed(2))
+    const value = getPlanPrice(plan, billingPeriod)
+    logContext = {
+      slug: tenant.slug,
+      tenantId: tenant.id,
+      plan,
+      billingCycle: billingPeriod,
+    }
 
     if (!value || !['basic', 'pro', 'premium'].includes(plan)) {
       return NextResponse.json(
@@ -209,7 +216,7 @@ export async function POST(req: NextRequest) {
     }
 
     const asaasConfig = await getSaasAsaasConfig()
-    console.info('[ASAAS SaaS] Upgrade solicitado', {
+    console.info('[ASAAS SaaS] Renovacao solicitada', {
       slug: tenant.slug,
       plan,
       value,
@@ -300,7 +307,10 @@ export async function POST(req: NextRequest) {
       { headers: noStoreHeaders },
     )
   } catch (error: any) {
-    console.error('Asaas renewal error:', error)
+    console.error('[ASAAS_RENEW_ERROR]', {
+      ...logContext,
+      error: error instanceof Error ? error.message : error,
+    })
     return NextResponse.json(
       { error: error?.message || 'Erro ao iniciar renovacao.' },
       { status: 500, headers: noStoreHeaders },

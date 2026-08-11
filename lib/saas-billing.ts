@@ -20,8 +20,28 @@ export function planPrices() {
   }
 }
 
+export function getPlanPrice(plan: PlanKey, cycle: BillingCycle = 'monthly') {
+  const monthlyPrice = planPrices()[plan]
+  return Number((monthlyPrice * BILLING_CYCLES[cycle].multiplier).toFixed(2))
+}
+
+export function getBillingExpirationDate(baseDate: Date | string, cycle: BillingCycle) {
+  const source = new Date(baseDate)
+  const date = new Date(source)
+  const originalDay = date.getDate()
+
+  date.setDate(1)
+  if (cycle === 'yearly') {
+    date.setFullYear(date.getFullYear() + 1)
+  } else {
+    date.setMonth(date.getMonth() + BILLING_CYCLES[cycle].months)
+  }
+
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  date.setDate(Math.min(originalDay, lastDay))
+  return date
+}
+
 export function subscriptionEndDate(start: Date, cycle: BillingCycle) {
-  const end = new Date(start)
-  end.setMonth(end.getMonth() + BILLING_CYCLES[cycle].months)
-  return end
+  return getBillingExpirationDate(start, cycle)
 }
