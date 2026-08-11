@@ -123,9 +123,18 @@ async function resolveCustomer(tenant: any) {
 async function resolveFirstPayment(subscriptionId: string) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const payments = await asaasRequest(
-      `/subscriptions/${encodeURIComponent(subscriptionId)}/payments?limit=1`,
+      `/subscriptions/${encodeURIComponent(subscriptionId)}/payments?limit=20`,
     )
-    const payment = Array.isArray(payments?.data) ? payments.data[0] : null
+    const paymentList = Array.isArray(payments?.data) ? payments.data : []
+    const payment =
+      paymentList.find((item: any) =>
+        ['PENDING', 'OVERDUE'].includes(String(item?.status || '').toUpperCase()) &&
+        Boolean(item?.invoiceUrl || item?.bankSlipUrl || item?.transactionReceiptUrl),
+      ) ||
+      paymentList.find((item: any) =>
+        Boolean(item?.invoiceUrl || item?.bankSlipUrl || item?.transactionReceiptUrl),
+      ) ||
+      null
 
     if (payment) {
       return payment

@@ -185,7 +185,9 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
 
       window.location.assign(result.url)
     } catch (error: any) {
-      setRenewError(error?.message || 'Nao foi possivel iniciar a renovacao.')
+      const message = error?.message || 'Nao foi possivel iniciar a renovacao.'
+      setRenewError(message)
+      window.alert(message)
     } finally {
       setRenewing(false)
     }
@@ -310,6 +312,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
                 ? 'Escolha um plano para continuar usando.'
                 : `Você está no teste gratuito. Restam ${trialDaysLeft} dias.`}
             </span>
+            {renewError && <p className="trial-error">{renewError}</p>}
           </div>
           <div className="trial-actions">
             <Link href={existingTenantPricingUrl}>Escolher plano</Link>
@@ -458,6 +461,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
                     : `Você está no teste gratuito. Restam ${trialDaysLeft} dias.`}
                 </strong>
                 <span>Todos os recursos do seu plano continuam disponíveis durante o período de teste.</span>
+                {renewError && <p className="trial-error">{renewError}</p>}
               </div>
               <div>
                 <Link href={existingTenantPricingUrl}>Escolher plano</Link>
@@ -501,6 +505,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
         .trial-card{padding:14px;border-radius:16px;display:grid;gap:10px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.22)}
         .trial-card strong{display:block;color:#fbbf24;font-size:13px;font-weight:950}
         .trial-card span{display:block;margin-top:2px;color:#fcd34d;font-size:11px}
+        .trial-error{margin:8px 0 0;color:#fca5a5!important;font-size:11px!important;line-height:1.4}
         .trial-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
         .trial-card a,.trial-card button{min-width:0;color:#fbbf24;border:1px solid rgba(245,158,11,.30);border-radius:10px;padding:8px 9px;font-size:10px;font-weight:950;text-align:center;text-decoration:none;background:transparent;cursor:pointer}
         .trial-card .trial-pay-now{color:#111827;background:#f59e0b;border-color:#f59e0b}
