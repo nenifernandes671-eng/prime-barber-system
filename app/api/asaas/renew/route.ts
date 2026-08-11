@@ -170,20 +170,32 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}))
     const slug = String(body.slug || '').trim().toLowerCase()
-    logContext = { slug }
+    const tenantId = String(body.tenantId || '').trim()
+    logContext = { slug, tenantId }
 
-    if (!slug) {
+    if (!slug && !tenantId) {
       return NextResponse.json(
-        { error: 'Slug obrigatorio.' },
+        { error: 'Slug ou tenantId obrigatorio.' },
         { status: 400, headers: noStoreHeaders },
       )
     }
 
-    const { data: tenant, error: tenantError } = await supabaseAdmin
+    let { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .select('id,slug,nome,email,telefone,cpf_cnpj,plano,billing_cycle,paid_until,trial_end,trial_ends_at,subscription_status,asaas_customer_id,asaas_subscription_id')
       .eq('slug', slug)
       .maybeSingle()
+
+    if (!tenant && !tenantError && tenantId) {
+      const fallback = await supabaseAdmin
+        .from('tenants')
+        .select('id,slug,nome,email,telefone,cpf_cnpj,plano,billing_cycle,paid_until,trial_end,trial_ends_at,subscription_status,asaas_customer_id,asaas_subscription_id')
+        .eq('id', tenantId)
+        .maybeSingle()
+
+      tenant = fallback.data
+      tenantError = fallback.error
+    }
 
     if (tenantError || !tenant) {
       return NextResponse.json(

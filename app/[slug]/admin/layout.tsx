@@ -175,7 +175,7 @@ function AdminLayoutInner({ slug, children }: { slug: string; children: React.Re
           Authorization: `Bearer ${token}`,
         },
         cache: 'no-store',
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, tenantId: t?.id }),
       })
       const result = await response.json().catch(() => ({}))
 
