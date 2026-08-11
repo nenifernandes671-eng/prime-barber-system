@@ -113,7 +113,7 @@ async function sendFcm(token: string, title: string, body: string, data: PushDat
       message: {
         token,
         notification: { title, body },
-        data: { ...normalizeData(data), type },
+        data: { ...normalizeData(data), type, notification_title: title, notification_body: body },
         android: {
           priority: 'HIGH',
           notification: { channel_id: 'default', sound: 'default' },
@@ -261,9 +261,40 @@ export async function processPushQueue(limit = 25) {
       let sent = 0
       let failed = 0
 
+      if (tokens.length === 0) {
+        const shouldRetry = row.attempts + 1 < row.max_attempts
+        const message = 'Nenhum device token ativo para os destinatarios.'
+        await supabaseAdmin
+          .from('push_queue')
+          .update({
+            status: shouldRetry ? 'pending' : 'failed',
+            next_attempt_at: shouldRetry
+              ? new Date(Date.now() + 60_000 * (row.attempts + 1)).toISOString()
+              : new Date().toISOString(),
+            error_message: message,
+            processed_at: shouldRetry ? null : new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', row.id)
+
+        results.push({ id: row.id, status: shouldRetry ? 'retry_no_token' : 'failed_no_token', error: message })
+        continue
+      }
+
       for (const token of tokens) {
         try {
-          await sendFcm(token.token, row.title, row.body, row.data ?? {}, row.type)
+          await sendFcm(
+            token.token,
+            row.title,
+            row.body,
+            {
+              ...(row.data ?? {}),
+              tenant_id: row.tenant_id,
+              user_id: token.user_id,
+              recipient_user_id: token.user_id,
+            },
+            row.type
+          )
           sent += 1
           await supabaseAdmin.from('device_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', token.id)
           await logPush(row, token, 'sent')
@@ -309,3 +340,4 @@ export async function processPushQueue(limit = 25) {
 
   return { checked: rows?.length ?? 0, results }
 }
+
